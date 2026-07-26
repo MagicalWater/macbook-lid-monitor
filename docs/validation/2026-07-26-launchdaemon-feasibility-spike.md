@@ -305,15 +305,17 @@ console login history 顯示 `water console Mon Jul 27 00:34`，因此上述 run
 
 ## Cleanup
 
-Task 7 前景程序停止後，下列路徑均不存在。Task 8 經批准後已安裝暫時 artifact，且目前為了後續 Task 9 驗收保留：
+Task 13 經批准後執行安全 uninstall。管理腳本先 bootout system job、確認 daemon process 已退出，再刪除固定 binary、plist 與 active logs。Task 12 前保存的兩份 bounded log backup 隨後明確刪除，空 log directory 也已移除。
 
 ```text
-/Library/PrivilegedHelperTools/macbook-lid-monitor-daemon-spike: present
-/Library/LaunchDaemons/com.crazydennies.macbook-lid-monitor.feasibility.plist: present
-/Library/Logs/MacBookLidMonitor/Feasibility: present
+system/com.crazydennies.macbook-lid-monitor.feasibility: absent
+macbook-lid-monitor-daemon-spike process: absent
+/Library/PrivilegedHelperTools/macbook-lid-monitor-daemon-spike: absent
+/Library/LaunchDaemons/com.crazydennies.macbook-lid-monitor.feasibility.plist: absent
+/Library/Logs/MacBookLidMonitor/Feasibility: absent
 ```
 
-Task 12 重開機前已重新 bootstrap dry-run system job。重開機後 job 自動載入，單一 root PID 為 `271`；暫時 binary／plist／log 仍保留，供 Task 13 uninstall acceptance 使用。
+解除安裝後重新執行 clean build/test 不會重新建立任何 `/Library` artifact，也沒有 user LaunchAgent 或其他 duplicate authority。
 
 ## Findings
 
@@ -343,9 +345,17 @@ Task 9 執行前的口頭操作說明曾錯誤套用 `0° = 闔上、90° = 垂�
 
 **Resolution：** 中止登出步驟、重新審查 decoder／policy／歷史校準 evidence，作廢錯誤說明，並改以「正常打開／接近闔上」描述人工作業；驗收與文件均以實際 sensor value 判定。
 
+### P1 — README 在 phase 結束後仍描述 feasibility 尚未執行
+
+Task 13 whole-phase review 發現 README 仍寫著 daemon 尚未寫入 `/Library`、尚未 bootstrap、驗證仍在進行，且把所有專案路徑概括為不需要管理員權限。
+
+**Impact：** 不影響 runtime，但會讓後續維護者誤判已完成的 acceptance、目前 system state 與管理腳本的權限邊界。
+
+**Resolution：** README 已更新為「feasibility phase 已完成且所有暫時 artifact 已卸載」，並區分一般前景 CLI 與明確執行 feasibility management tooling 的權限模型。
+
 ## 目前結論
 
-Task 7 至 Task 12 驗證均通過：
+Task 7 至 Task 13 驗證均通過：
 
 - IOKit power observer 可在一般前景 process 註冊；
 - M1 Pro lid HID 可被辨識、開啟並收到有效 report；
@@ -368,10 +378,8 @@ Task 7 至 Task 12 驗證均通過：
 - 重新開機後 LaunchDaemon 於 boot 約 14 秒自動啟動，早於 console login；
 - pre-login 階段已完成 candidate selection、power observer registration、HID open、first valid report 與兩次完整 dry-run close/rearm cycle；
 - 登入後仍是同一 PID `271`、`runs=1`、單一 root process，沒有 duplicate authority、stderr 或真實睡眠。
+- safe uninstall 已移除 system label、daemon process、installed binary、plist 與 feasibility log directory；
+- uninstall 後 clean validation 再次通過 111 tests、release build、plist lint、shell syntax 與 diff check；
+- README、validation 與 review 文件已同步 phase 最終狀態。
 
-這代表 **Task 12 通過**。LaunchDaemon 在重新開機後可於使用者登入前自動啟動、開啟 M1 Pro lid HID 並持續執行 mechanically enforced dry-run policy。下一步 Task 13 是 uninstall acceptance 與 whole-phase final review。
-- root one-shot sleep probe 以 exit code `0` 回傳 `sleep-requested`；
-- macOS 獨立記錄 `Software Sleep pid=75771` 與 HID Activity wake；
-- probe 執行後沒有第二次 probe、自動 retry、殘留 daemon 或 probe process。
-
-這代表 **Task 11 通過**。下一步 Task 12 是 reboot auto-start dry-run acceptance，仍需另外明確批准重新開機。
+最終結論：**LaunchDaemon feasibility phase 通過**。production daemon architecture 已解除可行性阻塞；目前系統保持完全卸載狀態。正式 production daemon 仍需另立階段處理 packaging、持久 logging、升級／回滾、production enablement 與更廣泛硬體相容性。

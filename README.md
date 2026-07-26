@@ -1,8 +1,8 @@
 # macbook-lid-monitor
 
-`macbook-lid-monitor` 是一個 macOS 上蓋角度感測器診斷工具，也提供一個需要明確啟用的前景自動睡眠原型，用於處理原生闔蓋睡眠偵測不可靠的情況。
+`macbook-lid-monitor` 是一個 macOS 上蓋感測器診斷工具，也提供一個需要明確啟用的前景自動睡眠原型，用於處理原生闔蓋睡眠偵測不可靠的情況。
 
-診斷模式只會讀取資料。自動睡眠必須明確選擇，且預設為只輸出 `would-sleep` 的 dry-run 模式；真正要求 macOS 睡眠時，還必須額外傳入 `--execute-sleep`。本專案不會修改持久電源設定、不會修改 NVRAM、不會安裝 LaunchAgent、不會要求系統管理員權限，也不會寫入 HID report。
+診斷模式只會讀取資料。自動睡眠必須明確選擇，且預設為只輸出 `would-sleep` 的 dry-run 模式；真正要求 macOS 睡眠時，還必須額外傳入 `--execute-sleep`。一般前景 CLI 不會修改持久電源設定、不會修改 NVRAM、不會安裝 LaunchAgent、不會要求系統管理員權限，也不會寫入 HID report。倉庫另保留一組已完成驗證、但不屬於正式部署的 LaunchDaemon feasibility tooling；只有明確執行管理腳本時才會使用管理員權限與 `/Library` 暫時路徑。
 
 ## 系統需求
 
@@ -177,7 +177,7 @@ Transport:  SPU
 01 AC 00
 ```
 
-會解碼為 `172°`。
+會解碼為感測器值 `172`。此值在已驗證機型上可單調反映上蓋位置，但不應直接解讀為一般幾何鉸鏈角度。
 
 這個解碼器目前只以已擷取的 M1 Pro 證據為權威。舊的 2-byte、十分之一度解碼器仍屬探索用途；在其他硬體上沒有取得相符證據前，不應視為可靠來源。
 
@@ -194,7 +194,7 @@ Transport:  SPU
 - 不寫入 HID，也不發送 feature report request
 - 診斷模式與 dry-run 模式永遠不要求系統睡眠
 - 真實睡眠必須明確傳入 `--auto-sleep --execute-sleep`
-- 不安裝常駐服務
+- 一般前景流程不安裝常駐服務；feasibility tooling 只有經明確批准才會暫時安裝，且已完成 uninstall acceptance
 - 不修改持久電源設定
 - 不擷取無關的鍵盤或觸控板資料
 - HID callback 收到的 bytes 會先複製，再交由解碼器處理
@@ -230,18 +230,20 @@ macOS 將第二次低功耗轉換記錄為 DarkWake，而不是與第一次完�
 
 診斷與前景自動睡眠流程不會安裝系統服務，也不會修改任何持久系統設定，因此不需要額外解除安裝步驟。
 
-## LaunchDaemon 可行性驗證（實驗階段）
+## LaunchDaemon 可行性驗證
 
-目前正式可用的功能仍是前景 CLI。專案正在進行系統層 `LaunchDaemon` 的可行性驗證，但尚未安裝任何常駐服務，也尚未批准正式 daemon。
+正式可用的功能目前仍是前景 CLI。系統層 `LaunchDaemon` feasibility phase 已完成，證明 M1 Pro 上的 system-domain daemon 可於登入前啟動、讀取 lid HID、接收 IOKit power notification，且 root/system context 可透過獨立 one-shot probe 成功呼叫 `IOPMSleepSystem`。
 
-目前新增的 `macbook-lid-monitor-daemon-spike` 具有以下限制：
+這不等於正式 production daemon 已完成或已安裝。Task 13 已移除所有暫時 system artifacts，目前沒有載入的 job、daemon process、installed binary、plist 或 feasibility log directory。
+
+`macbook-lid-monitor-daemon-spike` 仍具有以下實驗限制：
 
 - 永遠使用 dry-run，不包含切換為真實睡眠的參數。
 - 只用於驗證系統層 HID、IOKit power notification、程序生命週期與登入前執行環境。
-- 暫時 plist 不含 `KeepAlive`，停止後不應自動重啟。
-- 尚未寫入 `/Library`，也尚未執行 `launchctl bootstrap system`。
+- 暫時 plist 不含 `KeepAlive`，停止後不會自動重啟。
+- binary 與 plist 只用於受控 feasibility acceptance；最終已安全解除安裝。
 
-下列操作必須分別取得明確批准，不能由一次批准概括授權：
+feasibility phase 執行時，下列操作均分別取得明確批准，沒有由一次批准概括授權：
 
 - 安裝暫時 LaunchDaemon
 - 登出並停留在 loginwindow
@@ -249,4 +251,13 @@ macOS 將第二次低功耗轉換記錄為 DarkWake，而不是與第一次完�
 - 執行一次性真實睡眠 probe
 - 重新開機驗收
 
-`macbook-lid-monitor-sleep-probe` 與 daemon spike 是分離的 executable。probe 預設也不執行睡眠；只有在另外取得批准後，才允許使用具有固定 approval token 的一次性命令。它不會被 LaunchDaemon plist 啟動。
+`macbook-lid-monitor-sleep-probe` 與 daemon spike 是分離的 executable。probe 預設不執行睡眠；真實 probe 需要固定 approval token，且不會被 LaunchDaemon plist 啟動。
+
+完整 feasibility 結論與逐 Task 證據位於：
+
+```text
+docs/validation/2026-07-26-launchdaemon-feasibility-spike.md
+docs/superpowers/reviews/2026-07-26-launchdaemon-feasibility-spike-final-review.md
+```
+
+最終 disposition：production daemon architecture 已解除可行性阻塞，可以進入正式設計；但 production packaging、持久 logging、升級／回滾與真實 sensor-driven sleep enablement 仍必須另立正式階段實作與驗收。

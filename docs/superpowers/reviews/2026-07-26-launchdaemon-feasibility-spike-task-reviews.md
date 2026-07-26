@@ -653,3 +653,58 @@ user LaunchAgent: absent
 - Open P2: 0
 - Task 12: Pass
 - Task 13: ready for uninstall acceptance and whole-phase final review
+
+## Task 13 — Uninstall Acceptance and Whole-Phase Final Review
+
+### Implementation review
+
+Reviewed uninstall path safety, fixed-path ownership, symlink refusal, process shutdown ordering, residual system state, shared-core integrity, daemon dry-run enforcement, IOKit callback lifecycle, acknowledgement ordering, signal shutdown, bounded evidence, duplicate authority, restart policy, one-shot sleep isolation, reboot ordering, documentation accuracy, and final architecture disposition.
+
+### Findings
+
+#### P1-1 — README retained pre-acceptance feasibility status
+
+README still stated that the spike had never been installed or bootstrapped and broadly implied that no repository workflow required administrator access.
+
+**Impact:** Runtime and uninstall safety were unaffected, but the public project status and privilege boundary were stale after Tasks 8–12.
+
+**Resolution:** README now distinguishes the normal foreground CLI from explicitly invoked feasibility tooling, records that the phase passed, confirms all temporary artifacts were removed, and states that production deployment remains a separate phase.
+
+### Re-review
+
+- `sudo ./scripts/manage-feasibility-daemon.sh uninstall` completed successfully.
+- `launchctl print system/com.crazydennies.macbook-lid-monitor.feasibility` fails as not found.
+- No `macbook-lid-monitor-daemon-spike` process remains.
+- Installed binary, plist, active logs, bounded backup logs, and feasibility log directory are absent.
+- No user LaunchAgent or duplicate authority exists.
+- `swift package clean` followed by `swift test` executed 111 tests with zero failures.
+- Fresh release build produced both daemon-spike and sleep-probe artifacts in the worktree only.
+- Plist lint, shell syntax validation, and `git diff --check` passed.
+- Clean validation did not recreate any system artifact.
+- All prior P1 findings are resolved; no open P0/P1 remains.
+- The feasibility results separately prove logged-in HID, loginwindow HID, power callbacks, root one-shot sleep, reboot pre-login auto-start, and uninstall safety.
+
+### Validation
+
+```text
+system launchd label: absent
+daemon process: absent
+installed binary: absent
+installed plist: absent
+feasibility log directory: absent
+tests: 111 passed, 0 failed
+release daemon-spike: built
+release sleep-probe: built
+plist lint: passed
+script syntax: passed
+git diff check: passed
+```
+
+### Disposition
+
+- Open P0: 0
+- Open P1: 0
+- Open P2: 0
+- Task 13: Pass
+- LaunchDaemon feasibility phase: Pass
+- Production daemon architecture: Unlocked for a separate formal implementation phase
