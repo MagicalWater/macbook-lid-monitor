@@ -22,7 +22,8 @@ enum AutoSleepComposition {
         policy: LidSleepPolicy,
         now: @escaping @Sendable () -> Date = Date.init,
         systemSleepOperation: (any SystemSleepOperating)? = nil,
-        onOperationalEvent: @escaping @Sendable (AutoSleepOperationalEvent) -> Void
+        onOperationalEvent: @escaping @Sendable (AutoSleepOperationalEvent) -> Void,
+        onTransitionEvent: @escaping @Sendable (AutoSleepTransitionEvent) -> Void = { _ in }
     ) -> LidSleepCoordinator {
         let requester: any SleepRequesting
 
@@ -45,7 +46,8 @@ enum AutoSleepComposition {
             wakeObserver: wakeObserver,
             sleepRequester: requester,
             policy: policy,
-            now: now
+            now: now,
+            onTransitionEvent: onTransitionEvent
         )
     }
 }
@@ -277,6 +279,9 @@ private struct DiagnosticApplication {
             policy: policy,
             onOperationalEvent: { event in
                 print(activeFormatter.autoSleepLine(event))
+            },
+            onTransitionEvent: { event in
+                print(activeFormatter.autoSleepTransitionLine(event))
             }
         )
         let controller = AutoSleepRunController(coordinator: coordinator)

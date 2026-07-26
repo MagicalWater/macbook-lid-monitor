@@ -16,6 +16,18 @@ final class OutputFormatterTests: XCTestCase {
         )
     }
 
+    func testAutoSleepStateTransitionsUseCompactMessages() {
+        let formatter = OutputFormatter(timeZone: TimeZone(secondsFromGMT: 0)!)
+
+        XCTAssertEqual(formatter.autoSleepTransitionLine(.disarmed), "auto-sleep: disarmed")
+        XCTAssertEqual(formatter.autoSleepTransitionLine(.rearmed), "auto-sleep: rearmed")
+        XCTAssertEqual(
+            formatter.autoSleepTransitionLine(.candidateStarted),
+            "auto-sleep: candidate-started"
+        )
+        XCTAssertEqual(formatter.autoSleepTransitionLine(.triggered), "auto-sleep: triggered")
+    }
+
     func testDecodedWatchLine() {
         let formatter = OutputFormatter(
             timeZone: TimeZone(secondsFromGMT: 8 * 3600)!

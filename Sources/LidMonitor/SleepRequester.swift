@@ -15,6 +15,15 @@ enum AutoSleepOperationalEvent: Equatable, Sendable {
     case sleepRequested
 }
 
+enum AutoSleepTransitionEvent: Equatable, Sendable {
+    case rearmed
+    case candidateStarted
+    case candidateCancelled
+    case triggered
+    case disarmed
+    case cooldown
+}
+
 final class DryRunSleepRequester: SleepRequesting, @unchecked Sendable {
     private let onEvent: @Sendable (AutoSleepOperationalEvent) -> Void
 

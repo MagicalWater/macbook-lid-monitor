@@ -9,6 +9,7 @@ final class LidSleepCoordinator: @unchecked Sendable {
     private let sleepRequester: SleepRequesting
     private let policy: LidSleepPolicy
     private let now: @Sendable () -> Date
+    private let onTransitionEvent: @Sendable (AutoSleepTransitionEvent) -> Void
     private let queue = DispatchQueue(label: "macbook-lid-monitor.coordinator")
 
     private var machine: LidSleepStateMachine
@@ -23,7 +24,8 @@ final class LidSleepCoordinator: @unchecked Sendable {
         wakeObserver: SystemWakeObserving,
         sleepRequester: SleepRequesting,
         policy: LidSleepPolicy,
-        now: @escaping @Sendable () -> Date = Date.init
+        now: @escaping @Sendable () -> Date = Date.init,
+        onTransitionEvent: @escaping @Sendable (AutoSleepTransitionEvent) -> Void = { _ in }
     ) {
         self.stream = stream
         self.decoder = decoder
@@ -32,6 +34,7 @@ final class LidSleepCoordinator: @unchecked Sendable {
         self.sleepRequester = sleepRequester
         self.policy = policy
         self.now = now
+        self.onTransitionEvent = onTransitionEvent
         machine = LidSleepStateMachine(policy: policy)
     }
 
@@ -131,8 +134,14 @@ final class LidSleepCoordinator: @unchecked Sendable {
             case .requestSleep:
                 try? sleepRequester.requestSleep()
 
-            case .stateChanged:
-                break
+            case let .stateChanged(state):
+                switch state {
+                case .open: onTransitionEvent(.rearmed)
+                case .closingCandidate: onTransitionEvent(.candidateStarted)
+                case .triggered: onTransitionEvent(.triggered)
+                case .disarmed: onTransitionEvent(.disarmed)
+                case .cooldown: onTransitionEvent(.cooldown)
+                }
             }
         }
     }

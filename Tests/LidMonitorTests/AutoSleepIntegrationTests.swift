@@ -18,7 +18,8 @@ final class AutoSleepIntegrationTests: XCTestCase {
             executionMode: .dryRun,
             policy: .calibratedDefault,
             now: { base },
-            onOperationalEvent: recorder.record
+            onOperationalEvent: recorder.record,
+            onTransitionEvent: recorder.recordTransition
         )
 
         try coordinator.start()
@@ -33,6 +34,10 @@ final class AutoSleepIntegrationTests: XCTestCase {
         XCTAssertEqual(recorder.events, [.wouldSleep])
 
         stream.emit(angle: 70, at: base.addingTimeInterval(11))
+        XCTAssertEqual(
+            recorder.transitions,
+            [.disarmed, .rearmed, .candidateStarted, .triggered, .rearmed]
+        )
         stream.emit(angle: 60, at: base.addingTimeInterval(12))
         scheduler.fire(at: base.addingTimeInterval(14))
         XCTAssertEqual(recorder.events, [.wouldSleep, .wouldSleep])
@@ -141,8 +146,13 @@ private final class IntegrationSystemSleepOperation: SystemSleepOperating, @unch
 
 private final class IntegrationEventRecorder: @unchecked Sendable {
     private(set) var events: [AutoSleepOperationalEvent] = []
+    private(set) var transitions: [AutoSleepTransitionEvent] = []
 
     func record(_ event: AutoSleepOperationalEvent) {
         events.append(event)
+    }
+
+    func recordTransition(_ event: AutoSleepTransitionEvent) {
+        transitions.append(event)
     }
 }

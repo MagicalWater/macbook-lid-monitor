@@ -40,6 +40,19 @@ struct OutputFormatter: Sendable {
         }
     }
 
+    func autoSleepTransitionLine(_ event: AutoSleepTransitionEvent) -> String {
+        let value: String
+        switch event {
+        case .rearmed: value = "rearmed"
+        case .candidateStarted: value = "candidate-started"
+        case .candidateCancelled: value = "candidate-cancelled"
+        case .triggered: value = "triggered"
+        case .disarmed: value = "disarmed"
+        case .cooldown: value = "cooldown"
+        }
+        return "auto-sleep: \(value)"
+    }
+
     func watchLine(
         timestamp: Date,
         result: AngleDecodeResult,
