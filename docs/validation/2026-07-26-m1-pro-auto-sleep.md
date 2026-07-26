@@ -155,3 +155,81 @@ Task 6 dry-run hardware acceptance decision: **Pass**.
 Real-sleep acceptance remains blocked until Task 7 completes the idle-energy and
 whole-phase operational safety review and the user gives separate explicit
 approval for one bounded foreground real-sleep test.
+
+## Task 7 idle-energy observation
+
+The release dry-run was observed with the lid stationary above the reopen
+threshold for 901 seconds from 2026-07-26 16:03:24 +0800 through
+2026-07-26 16:18:25 +0800.
+
+Environmental controls:
+
+- AC power remained connected.
+- No third-party `caffeinate`, Amphetamine, or equivalent inhibitor was active.
+- No other `macbook-lid-monitor` process remained after cleanup.
+- The normal macOS `powerd` assertion named `Powerd - Prevent sleep while
+  display is on` was retained as part of the intended supported environment.
+- `PreventSystemSleep` remained `0`; the application created no power
+  assertion.
+- The lid remained stationary above `75` and no build/test activity occurred
+  during the measured interval.
+
+One earlier, invalid measurement attempt exposed a stale foreground dry-run
+process that had been running with obsolete explicit `60 / 70` arguments. That
+process and the incompatible measurement script were stopped, residual process
+count was confirmed as zero, and the formal 901-second observation was restarted
+from a clean state. The invalid attempt is not included in the metrics below.
+
+Observed process metrics:
+
+| Metric | Result |
+| --- | ---: |
+| Samples | 31 |
+| Duration | 901 seconds |
+| Average sampled CPU | 0.0000% |
+| Maximum sampled CPU | 0.0000% |
+| Process CPU time | 0.01 s → 0.07 s |
+| RSS range | 11,136–11,936 KiB |
+| Thread range | 3–4 |
+| Total application log lines | 15 |
+| Auto-sleep transition lines | 1 |
+
+The only transition line was the expected startup state:
+
+```text
+auto-sleep: rearmed
+```
+
+There was no periodic logging, candidate churn, trigger, or `would-sleep`
+decision while stationary. RSS rose during startup and then remained within a
+narrow stable range; thread count alternated between three and four without an
+upward trend. Accumulated CPU time increased by only 0.06 seconds over the full
+interval.
+
+The system assertion snapshot naturally changed as user-activity and the
+display-on idle assertion timed out during the observation. No application-owned
+assertion appeared, and `PreventSystemSleep` was `0` both before and after.
+
+Task 7 idle-energy decision: **Pass**. The measured implementation behaves as an
+event-driven HID listener with one-shot timers rather than a polling loop.
+
+## Task 7 whole-phase safety decision
+
+The full implementation review covered fail-open decoding, explicit real-sleep
+opt-in, one-shot triggering and hysteresis, startup/wake cooldown, process
+lifecycle, diagnostic-mode separation, persistence boundaries, power settings,
+and documentation accuracy.
+
+- Open P0 findings: 0
+- Open P1 findings: 0
+- Open P2 findings: 1
+- Real sleep invoked: No
+
+The P2 limitation is operational visibility: if a future explicit
+`IOPMSleepSystem` request fails, the requester itself returns an error and never
+retries, but the coordinator currently suppresses that error. This cannot create
+a sleep loop and therefore does not invalidate the safety decision; Task 8 must
+still observe whether the bounded real-sleep request actually succeeds.
+
+Task 7 decision: **Pass**. Task 8 remains blocked until the user gives separate,
+explicit approval for one foreground real-sleep acceptance cycle.

@@ -500,15 +500,15 @@ Real-sleep acceptance is blocked unless all five cycles and cancellation/cooldow
 - Consumes: dry-run production process.
 - Produces: evidence that the implementation is event-driven and ready or not ready for real sleep.
 
-- [ ] **Step 1: Inspect timers and logging statically**
+- [x] **Step 1: Inspect timers and logging statically**
 
 Verify source contains no repeating timer for angle monitoring and no per-report production logging in auto-sleep mode.
 
-- [ ] **Step 2: Run an idle observation**
+- [x] **Step 2: Run an idle observation**
 
 Run release dry-run with the lid stationary for at least 15 minutes. Record process CPU time/percentage samples, wakeup observations available from standard macOS tools, log line count, and HID transition count. The acceptance decision is qualitative and evidence-based: no sustained CPU activity, no log churn, and no application-created periodic wakeup loop.
 
-- [ ] **Step 3: Perform whole-phase review**
+- [x] **Step 3: Perform whole-phase review**
 
 Review:
 
@@ -521,7 +521,7 @@ Review:
 - No persistent power mutation.
 - Documentation accuracy.
 
-- [ ] **Step 4: Fix all findings and rerun full validation**
+- [x] **Step 4: Fix all findings and rerun full validation**
 
 ```bash
 swift package clean
@@ -530,7 +530,7 @@ swift build -c release
 git diff --check
 ```
 
-- [ ] **Step 5: Commit the final review**
+- [x] **Step 5: Commit the final review**
 
 Require Open P0 = 0 and Open P1 = 0, then commit:
 
