@@ -124,8 +124,15 @@ When no candidate reaches the threshold, use `--list` output as evidence. Do not
 - Input callback bytes are copied before decoding
 
 The tool cannot repair a broken clamshell sensor. The auto-sleep workaround is
-event-driven, foreground-only, and must remain in dry-run until the recorded
-hardware and operational safety gates pass.
+event-driven and foreground-only. On the validated M1 Pro, the recorded dry-run,
+idle-energy, operational-safety, and one-cycle real-sleep acceptance gates have
+passed. Real sleep remains an explicit operator action through
+`--auto-sleep --execute-sleep`; no background or persistent deployment is
+created by this project.
+
+The acceptance evidence is hardware-specific. Other MacBook models or sensor
+report formats must repeat calibration and dry-run validation before using real
+sleep mode.
 
 ## Removal
 

@@ -91,7 +91,7 @@ full test + release build + diff check
 - Produces: `DiagnosticMode.autoSleep(AutoSleepExecutionMode, LidSleepPolicy)`
 - Consumes: existing `CLIParser.parse(_:)`, `CLIOptions`, and diagnostic modes.
 
-- [ ] **Step 1: Write failing parser tests**
+- [x] **Step 1: Write failing parser tests**
 
 Add tests proving:
 
@@ -112,7 +112,7 @@ XCTAssertThrowsError(try CLIParser.parse([
 
 Also cover nonfinite/negative timing values, values outside `0...360`, conflicting `--dry-run` and `--execute-sleep`, and incompatible diagnostic flags.
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 Run:
 
@@ -122,7 +122,7 @@ swift test --filter AutoSleepCLIParserTests
 
 Expected: compilation or assertions fail because auto-sleep options do not exist.
 
-- [ ] **Step 3: Implement exact configuration types**
+- [x] **Step 3: Implement exact configuration types**
 
 Add:
 
@@ -151,14 +151,14 @@ struct LidSleepPolicy: Equatable, Sendable {
 
 Validation must require `0...360`, `reopenThreshold > sleepThreshold`, positive finite debounce, and nonnegative finite cooldown.
 
-- [ ] **Step 4: Run GREEN and regression tests**
+- [x] **Step 4: Run GREEN and regression tests**
 
 ```bash
 swift test --filter AutoSleepCLIParserTests
 swift test --filter CLIParserTests
 ```
 
-- [ ] **Step 5: Review and commit**
+- [x] **Step 5: Review and commit**
 
 Confirm that no argument path implicitly enables real sleep, then commit:
 
@@ -181,7 +181,7 @@ git commit -m "feat: define safe auto-sleep CLI contract"
 - Produces: `enum LidSleepEffect: Equatable, Sendable`
 - Produces: `mutating func handle(_ event: LidSleepEvent) -> [LidSleepEffect]`
 
-- [ ] **Step 1: Write state transition tests**
+- [x] **Step 1: Write state transition tests**
 
 Use deterministic timestamps and cover:
 
@@ -198,13 +198,13 @@ Use deterministic timestamps and cover:
 // Invalid angle fails open and cancels any candidate.
 ```
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 ```bash
 swift test --filter LidSleepStateMachineTests
 ```
 
-- [ ] **Step 3: Implement the state machine without timers or I/O**
+- [x] **Step 3: Implement the state machine without timers or I/O**
 
 Use these public shapes:
 
@@ -227,13 +227,13 @@ enum LidSleepEffect: Equatable, Sendable {
 
 The state machine must never call Foundation timers, IOKit, shell commands, or sleep APIs.
 
-- [ ] **Step 4: Run GREEN**
+- [x] **Step 4: Run GREEN**
 
 ```bash
 swift test --filter LidSleepStateMachineTests
 ```
 
-- [ ] **Step 5: Review and commit**
+- [x] **Step 5: Review and commit**
 
 Review boundary values `59`, `60`, `61`, `69`, and `70`, duplicate deadlines, and one-shot behavior. Commit:
 
@@ -261,7 +261,7 @@ git commit -m "feat: add calibrated lid sleep state machine"
 - Produces: `protocol SystemWakeObserving`
 - Produces: `final class LidSleepCoordinator`
 
-- [ ] **Step 1: Write coordinator tests with fakes**
+- [x] **Step 1: Write coordinator tests with fakes**
 
 Create a fake angle source, manual scheduler, fake wake observer, and spy requester. Prove that:
 
@@ -276,13 +276,13 @@ Create a fake angle source, manual scheduler, fake wake observer, and spy reques
 // Decode failure dispatches dataInvalid and never sleeps.
 ```
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 ```bash
 swift test --filter LidSleepCoordinatorTests
 ```
 
-- [ ] **Step 3: Implement injectable one-shot scheduling**
+- [x] **Step 3: Implement injectable one-shot scheduling**
 
 Define:
 
@@ -309,11 +309,11 @@ The production adapter registers only with `NSWorkspace.shared.notificationCente
 
 Update `Package.swift` to link `AppKit` in addition to the existing `IOKit` framework so the wake adapter has an explicit build dependency.
 
-- [ ] **Step 4: Implement the coordinator**
+- [x] **Step 4: Implement the coordinator**
 
 The coordinator serializes state-machine events on one queue, owns at most one pending debounce task and one cooldown task, routes wake notifications into `.systemDidWake`, routes `requestSleep` effects to `SleepRequesting`, and exposes idempotent `start()`/`stop()`.
 
-- [ ] **Step 5: Run GREEN and concurrency review**
+- [x] **Step 5: Run GREEN and concurrency review**
 
 ```bash
 swift test --filter LidSleepCoordinatorTests
@@ -322,7 +322,7 @@ swift test
 
 Review for callback-after-stop, duplicate timer, retain cycle, and data race risks.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add Package.swift Sources/LidMonitor/Scheduler.swift Sources/LidMonitor/LidSleepCoordinator.swift Sources/LidMonitor/SleepRequester.swift Sources/LidMonitor/SystemWakeObserver.swift Tests/LidMonitorTests/LidSleepCoordinatorTests.swift
@@ -342,17 +342,17 @@ git commit -m "feat: coordinate event-driven lid sleep decisions"
 - Consumes: `SleepRequesting` from Task 3.
 - Produces: `DryRunSleepRequester`, `MacOSSleepRequester`, and transition events.
 
-- [ ] **Step 1: Write failing adapter tests**
+- [x] **Step 1: Write failing adapter tests**
 
 Prove dry-run records exactly one `would-sleep` event and does not invoke the injected system operation. Prove the real adapter maps success and nonzero/error outcomes without retry loops.
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 ```bash
 swift test --filter SleepRequesterTests
 ```
 
-- [ ] **Step 3: Implement adapters with an injectable system operation**
+- [x] **Step 3: Implement adapters with an injectable system operation**
 
 Use:
 
@@ -364,11 +364,11 @@ protocol SystemSleepOperating: Sendable {
 
 `MacOSSleepRequester` delegates once to this port. The concrete implementation obtains the root power-domain connection with `IOPMCopySystemPowerConnection()`, calls `IOPMSleepSystem(connection)` once, closes the connection, and maps non-success `IOReturn` values to a typed error. It must not invoke `pmset`, mutate persistent power settings, or retry.
 
-- [ ] **Step 4: Add transition-only output**
+- [x] **Step 4: Add transition-only output**
 
 Output only state changes and decisions; do not emit one line per HID report in auto-sleep mode.
 
-- [ ] **Step 5: Run GREEN, safety scan, and commit**
+- [x] **Step 5: Run GREEN, safety scan, and commit**
 
 ```bash
 swift test --filter SleepRequesterTests
@@ -391,17 +391,17 @@ git commit -m "feat: add dry-run and bounded sleep adapters"
 - Consumes: all prior Task interfaces.
 - Produces: runnable `--auto-sleep --dry-run` and explicitly gated `--execute-sleep` flows.
 
-- [ ] **Step 1: Write an end-to-end test with fake hardware**
+- [x] **Step 1: Write an end-to-end test with fake hardware**
 
 Compose fake HID reports encoding `105 → 60 → deadline → 59 → 70`; assert one dry-run decision, no decision at `105`, and rearm at `70`.
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 ```bash
 swift test --filter AutoSleepIntegrationTests
 ```
 
-- [ ] **Step 3: Wire production composition**
+- [x] **Step 3: Wire production composition**
 
 `main.swift` must:
 
@@ -413,7 +413,7 @@ swift test --filter AutoSleepIntegrationTests
 6. Register the AppKit wake observer used by the coordinator.
 7. Keep the process alive with `RunLoop.main.run()` rather than a polling loop.
 
-- [ ] **Step 4: Add the dry-run helper script**
+- [x] **Step 4: Add the dry-run helper script**
 
 Create an executable script that runs:
 
@@ -425,7 +425,7 @@ swift run -c release macbook-lid-monitor \
 The helper must not duplicate calibrated policy values. It consumes
 `LidSleepPolicy.calibratedDefault`, the single runtime authority.
 
-- [ ] **Step 5: Run GREEN and regression validation**
+- [x] **Step 5: Run GREEN and regression validation**
 
 ```bash
 swift test --filter AutoSleepIntegrationTests
@@ -434,7 +434,7 @@ swift build -c release
 ./scripts/run-diagnostic.sh --list
 ```
 
-- [ ] **Step 6: Review and commit**
+- [x] **Step 6: Review and commit**
 
 Confirm `--watch` cannot reach a sleep requester and real sleep remains explicit. Commit:
 
