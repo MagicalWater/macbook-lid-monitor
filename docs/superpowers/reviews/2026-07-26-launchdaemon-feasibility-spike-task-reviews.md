@@ -175,3 +175,40 @@ git diff --check: passed
 - Open P1: 0
 - Open P2: 0
 - Task 4: Pass
+
+## Task 5 — Add the Separately Gated One-Shot Sleep Probe
+
+### Findings
+
+#### P2-1 — Entry-point extraction left trailing whitespace
+
+The first complete validation passed all behavior tests and release build but `git diff --check` found a trailing blank line in the former placeholder location.
+
+**Resolution:** Normalized the file ending and repeated the full Task validation.
+
+### Re-review
+
+- No arguments, incomplete token, wrong token, and extra arguments all return usage without constructing a sleep request.
+- Dry-run emits one stable `would-request-sleep` line and never calls `SystemSleepOperating`.
+- The exact execute contract calls the injected operation once; failures are visible and never retried.
+- The probe initializes no HID discovery, report stream, coordinator, scheduler, or power observer.
+- The probe executable is not referenced by daemon composition or packaging.
+- Only the dry-run executable path was run during this Task; `--execute-once` was not executed outside unit tests with a fake operation.
+
+### Validation
+
+```text
+SleepProbeApplicationTests: 6 passed
+swift test: 107 tests, 0 failures
+swift build -c release: passed
+sleep probe --dry-run: would-request-sleep
+git diff --check: passed
+real sleep operations: 0
+```
+
+### Disposition
+
+- Open P0: 0
+- Open P1: 0
+- Open P2: 0
+- Task 5: Pass

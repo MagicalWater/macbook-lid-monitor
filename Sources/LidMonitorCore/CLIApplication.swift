@@ -349,7 +349,3 @@ public enum LidMonitorCLIEntryPoint {
         return exitCode.rawValue
     }
 }
-
-public enum LidMonitorSleepProbeEntryPoint {
-    public static func run() -> Int32 { ExitCode.unavailable.rawValue }
-}
