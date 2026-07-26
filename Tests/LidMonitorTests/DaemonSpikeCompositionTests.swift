@@ -10,7 +10,9 @@ final class DaemonSpikeCompositionTests: XCTestCase {
         XCTAssertEqual(fixture.streamFactory.callCount, 1)
         XCTAssertEqual(fixture.stream.startCount, 1)
         XCTAssertEqual(fixture.wakeObserver.startCount, 1)
-        XCTAssertEqual(Array(fixture.events.prefix(2)), [.runtimeStarted, .candidateSelected])
+        XCTAssertEqual(fixture.events.count >= 2, true)
+        if case .runtimeStarted = fixture.events[0] {} else { XCTFail("missing runtime evidence") }
+        if case .candidateSelected = fixture.events[1] {} else { XCTFail("missing candidate evidence") }
 
         session.stop(reason: "test")
         XCTAssertEqual(fixture.stream.stopCount, 1)
@@ -23,7 +25,9 @@ final class DaemonSpikeCompositionTests: XCTestCase {
         XCTAssertThrowsError(try fixture.application.start()) { error in
             XCTAssertEqual(error as? DaemonSpikeError, .candidateUnavailable)
         }
-        XCTAssertEqual(fixture.events, [.runtimeStarted, .candidateUnavailable])
+        XCTAssertEqual(fixture.events.count, 2)
+        if case .runtimeStarted = fixture.events[0] {} else { XCTFail("missing runtime evidence") }
+        XCTAssertEqual(fixture.events[1], .candidateUnavailable)
         XCTAssertEqual(fixture.streamFactory.callCount, 0)
     }
 
@@ -32,7 +36,7 @@ final class DaemonSpikeCompositionTests: XCTestCase {
         fixture.stream.startError = HIDReportStreamError.openFailed(-1)
 
         XCTAssertThrowsError(try fixture.application.start())
-        XCTAssertEqual(fixture.events.last, .streamStartFailed)
+        XCTAssertEqual(fixture.events.last, .hidOpenFailed(registryID: 1, code: -1))
         XCTAssertEqual(fixture.wakeObserver.stopCount, 1)
     }
 
@@ -53,7 +57,10 @@ final class DaemonSpikeCompositionTests: XCTestCase {
 
         XCTAssertEqual(fixture.stream.stopCount, 1)
         XCTAssertEqual(fixture.wakeObserver.stopCount, 1)
-        XCTAssertEqual(fixture.events.filter { $0 == .stopping }.count, 1)
+        XCTAssertEqual(fixture.events.filter { event in
+            if case .stopping = event { return true }
+            return false
+        }.count, 1)
     }
 
     func testProductionCompositionHasNoRealSleepModeDependency() {

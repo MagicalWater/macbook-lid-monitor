@@ -1,17 +1,5 @@
 import Foundation
 
-public enum DaemonSpikeEvidenceEvent: Equatable, Sendable {
-    case runtimeStarted
-    case candidateSelected
-    case candidateUnavailable
-    case streamStartFailed
-    case stopping
-}
-
-public protocol DaemonSpikeEvidenceSinking: Sendable {
-    func emit(_ event: DaemonSpikeEvidenceEvent)
-}
-
 enum DaemonSpikeError: Error, Equatable {
     case candidateUnavailable
 }
@@ -44,7 +32,7 @@ final class DaemonSpikeSession: @unchecked Sendable {
             return true
         }
         guard shouldStop else { return }
-        evidenceSink.emit(.stopping)
+        evidenceSink.emit(.stopping(reason: reason))
         coordinator.stop()
     }
 }
@@ -57,14 +45,14 @@ final class DaemonSpikeApplication {
     }
 
     func start() throws -> DaemonSpikeSession {
-        dependencies.evidenceSink.emit(.runtimeStarted)
+        dependencies.evidenceSink.emit(.runtimeStarted(.current()))
         let ranked = CandidateRanker.rank(try dependencies.enumerator.descriptors())
         guard let selected = ranked.first,
               selected.score >= CandidateRanker.minimumSelectableScore else {
             dependencies.evidenceSink.emit(.candidateUnavailable)
             throw DaemonSpikeError.candidateUnavailable
         }
-        dependencies.evidenceSink.emit(.candidateSelected)
+        dependencies.evidenceSink.emit(.candidateSelected(selected.descriptor, score: selected.score))
 
         let stream: HIDReportStreaming
         do {
@@ -74,9 +62,10 @@ final class DaemonSpikeApplication {
             throw error
         }
         let requester = DryRunSleepRequester { _ in }
+        let recorder = DaemonSpikeReportRecorder(sink: dependencies.evidenceSink)
         let coordinator = LidSleepCoordinator(
             stream: stream,
-            decoder: dependencies.decoder,
+            decoder: EvidenceRecordingLidAngleDecoder(base: dependencies.decoder, recorder: recorder),
             scheduler: dependencies.scheduler,
             wakeObserver: dependencies.wakeObserver,
             sleepRequester: requester,
@@ -85,17 +74,19 @@ final class DaemonSpikeApplication {
         )
         do {
             try coordinator.start()
+            dependencies.evidenceSink.emit(.hidOpened(registryID: selected.descriptor.registryEntryID))
+        } catch let error as HIDReportStreamError {
+            if case let .openFailed(code) = error {
+                dependencies.evidenceSink.emit(.hidOpenFailed(registryID: selected.descriptor.registryEntryID, code: code))
+            } else {
+                dependencies.evidenceSink.emit(.streamStartFailed)
+            }
+            throw error
         } catch {
             dependencies.evidenceSink.emit(.streamStartFailed)
             throw error
         }
         return DaemonSpikeSession(coordinator: coordinator, evidenceSink: dependencies.evidenceSink)
-    }
-}
-
-private struct StandardDaemonEvidenceSink: DaemonSpikeEvidenceSinking {
-    func emit(_ event: DaemonSpikeEvidenceEvent) {
-        FileHandle.standardOutput.write(Data("daemon-spike: \(event)\n".utf8))
     }
 }
 
@@ -110,7 +101,7 @@ public enum LidMonitorDaemonSpikeEntryPoint {
                 decoders: [ReportID1DegreesDecoder(), UInt16TenthsDecoder()]
             ),
             scheduler: DispatchOneShotScheduler(),
-            wakeObserver: IOKitSystemWakeObserver(),
+            wakeObserver: IOKitSystemWakeObserver(onPowerEvent: { event in sink.emit(.power(event)) }),
             evidenceSink: sink,
             now: Date.init
         )

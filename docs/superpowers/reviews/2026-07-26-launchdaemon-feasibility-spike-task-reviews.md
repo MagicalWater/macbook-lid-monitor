@@ -131,3 +131,47 @@ git diff --check: passed
 - Open P1: 0
 - Open P2: 0
 - Task 3: Pass
+
+## Task 4 — Add Bounded Feasibility Evidence
+
+### Findings
+
+#### P1-1 — Concurrent evidence writes could interleave
+
+HID reports, system power callbacks, and signal shutdown can emit from different threads. The initial sink wrote directly to stdout without serialization, which could break the one-complete-line evidence contract.
+
+**Resolution:** Converted the production sink to a lock-protected class with an injectable writer. Every event is fully formatted and encoded before entering the write lock, and tests verify one complete UTF-8 line per write.
+
+#### P2-1 — Formatter closure lacked an explicit Sendable contract
+
+Swift 6 rejected the first implementation because a Sendable sink stored a formatter containing an unannotated closure.
+
+**Resolution:** Made the formatter Sendable and marked its timestamp closure `@Sendable`; concurrency checking remains enabled.
+
+### Re-review
+
+- Runtime evidence includes PID, UID, GID, architecture, and macOS version.
+- Candidate evidence includes registry ID, score, vendor/product, usage page/usage, and transport.
+- HID open success is emitted only after coordinator startup succeeds; open failure records the IOReturn code when available.
+- Valid report evidence is bounded to count 1 and each 100-report milestone, driven only by incoming reports.
+- Raw HID bytes and unsupported/malformed payloads are not logged.
+- Power events are emitted through the IOKit observer tap; only has-powered-on reaches wake recovery.
+- Evidence writes are serialized as complete UTF-8 lines without a logging timer.
+- Report counter saturates safely rather than overflowing.
+
+### Validation
+
+```text
+DaemonSpikeEvidenceTests: 5 passed
+DaemonSpikeCompositionTests: 7 passed
+swift test: 101 tests, 0 failures
+swift build -c release: passed
+git diff --check: passed
+```
+
+### Disposition
+
+- Open P0: 0
+- Open P1: 0
+- Open P2: 0
+- Task 4: Pass
