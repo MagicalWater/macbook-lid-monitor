@@ -548,4 +548,54 @@ stderr bytes: 0
 - Open P1: 0
 - Open P2: 0
 - Task 10: Pass
-- Task 11: blocked pending bootout and explicit approval for one real one-shot sleep probe
+- Task 11: approved and completed below
+
+## Task 11 — Daemon-Context `IOPMSleepSystem` One-Shot Acceptance
+
+### Implementation review
+
+Reviewed single-authority enforcement, root execution context, approval-token gating, exactly-once behavior, probe output and exit code, macOS power-log attribution, residual processes, retry absence, and post-probe system state.
+
+### Findings
+
+No implementation finding was opened. The probe was structurally isolated from the daemon, accepted no sensor input, performed one synchronous `requestSleep()` call, and had no retry path.
+
+### Re-review
+
+- The dry-run LaunchDaemon was booted out before executing the probe.
+- The system launchd label was absent before and after the probe.
+- No daemon-spike or sleep-probe process existed before execution.
+- Probe dry-run emitted exactly `sleep-probe: would-request-sleep`.
+- Release probe SHA-256 was `f0e5f925e02cad9c92bbb3ce6e64201198b90171cba07b6d55b99f5105b6d82b`.
+- The approved root command was executed exactly once with the fixed approval token.
+- The command returned `probe-exit=0` and persisted `sleep-probe: sleep-requested`.
+- macOS independently recorded `Software Sleep pid=75771` at `2026-07-27 00:23:37 +0800` and HID-activity wake at `00:24:08 +0800`.
+- Probe log mtime `00:23:32 +0800` correlates with the software-sleep event.
+- No probe process remained after wake; no automatic retry or second sleep request occurred.
+- The dry-run daemon was not re-bootstraped after the probe.
+- No reboot or shutdown occurred.
+
+### Validation
+
+```text
+daemon system label before probe: absent
+daemon process before probe: absent
+probe process before probe: absent
+probe dry-run: sleep-probe: would-request-sleep
+probe SHA-256: f0e5f925e02cad9c92bbb3ce6e64201198b90171cba07b6d55b99f5105b6d82b
+probe exit: 0
+probe output: sleep-probe: sleep-requested
+macOS sleep: 2026-07-27 00:23:37 +0800 Software Sleep pid=75771
+macOS wake: 2026-07-27 00:24:08 +0800 HID Activity
+daemon process after probe: absent
+probe process after probe: absent
+automatic retry: none
+```
+
+### Disposition
+
+- Open P0: 0
+- Open P1: 0
+- Open P2: 0
+- Task 11: Pass
+- Task 12: blocked pending explicit reboot approval

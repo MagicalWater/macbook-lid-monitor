@@ -244,7 +244,38 @@ IOKit acknowledgement 的 exact-call ordering 由 `IOKitSystemPowerObserverTests
 
 ## One-shot sleep probe
 
-只有 `--dry-run` 已列入安裝前驗證；真實 `--execute-once` 尚未批准／尚未執行。
+Task 11 執行前已 bootout dry-run LaunchDaemon，並確認 system label、daemon process 與 sleep-probe process 均不存在。重新執行 probe dry-run：
+
+```text
+sleep-probe: would-request-sleep
+```
+
+release probe SHA-256：
+
+```text
+f0e5f925e02cad9c92bbb3ce6e64201198b90171cba07b6d55b99f5105b6d82b
+```
+
+使用者明確批准後，只執行一次 root probe。結果：
+
+```text
+probe-exit=0
+sleep-probe: sleep-requested
+```
+
+macOS power-management log 提供獨立證據：
+
+```text
+2026-07-27 00:23:37 +0800 Sleep
+Entering Sleep state due to 'Software Sleep pid=75771'
+
+2026-07-27 00:24:08 +0800 Wake
+Wake from Deep Idle ... HID Activity
+```
+
+probe log mtime 為 `2026-07-27T00:23:32+0800`，與 software-sleep 時間窗一致。喚醒後沒有殘留 probe process、沒有 daemon process、沒有自動 retry，system LaunchDaemon 仍保持 bootout。
+
+Task 11 結論：root/system context 下的一次性 `IOPMSleepSystem` 呼叫可成功要求 macOS 睡眠，且 exactly-once、無重試、無 sensor coupling。
 
 ## 重新開機
 
@@ -260,7 +291,7 @@ Task 7 前景程序停止後，下列路徑均不存在。Task 8 經批准後已
 /Library/Logs/MacBookLidMonitor/Feasibility: present
 ```
 
-目前 system-domain job 已載入，單一 root PID 為 `52638`。Task 10 已通過；Task 11 真實 one-shot sleep probe 尚未批准。
+Task 11 前已 bootout system-domain job。Task 11 完成後 system label、daemon process 與 sleep-probe process 均不存在；暫時 binary／plist／log 仍保留，供後續 Task 12 reboot acceptance 使用。
 
 ## Findings
 
@@ -292,7 +323,7 @@ Task 9 執行前的口頭操作說明曾錯誤套用 `0° = 闔上、90° = 垂�
 
 ## 目前結論
 
-Task 7、Task 8、Task 9 與 Task 10 驗證均通過：
+Task 7 至 Task 11 驗證均通過：
 
 - IOKit power observer 可在一般前景 process 註冊；
 - M1 Pro lid HID 可被辨識、開啟並收到有效 report；
@@ -311,5 +342,8 @@ Task 7、Task 8、Task 9 與 Task 10 驗證均通過：
 - 正常重新開啟分支在 fresh `>=75` report 後取消 recovery 並 `rearmed`；
 - 低值分支在 recovery 到期後輸出一次 `recovery-resleep` 與一次 `would-sleep`，且沒有真實再次睡眠；
 - 三次 cycle 前後 PID 均為 `52638`、`runs=1`、單一 root process、stderr 為空。
+- root one-shot sleep probe 以 exit code `0` 回傳 `sleep-requested`；
+- macOS 獨立記錄 `Software Sleep pid=75771` 與 HID Activity wake；
+- probe 執行後沒有第二次 probe、自動 retry、殘留 daemon 或 probe process。
 
-這代表 **Task 10 通過**，但不代表 daemon-context 真實 `IOPMSleepSystem` 或重開機自動啟動可行性已通過。下一步 Task 11 必須先 bootout dry-run daemon，再另行取得一次真實 one-shot sleep probe 的明確批准。
+這代表 **Task 11 通過**。下一步 Task 12 是 reboot auto-start dry-run acceptance，仍需另外明確批准重新開機。
