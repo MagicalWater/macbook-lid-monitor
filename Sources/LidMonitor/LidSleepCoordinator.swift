@@ -13,9 +13,10 @@ final class LidSleepCoordinator: @unchecked Sendable {
     private let queue = DispatchQueue(label: "macbook-lid-monitor.coordinator")
 
     private var machine: LidSleepStateMachine
-    private var debounceTask: CancellableTask?
-    private var cooldownTask: CancellableTask?
-    private var lastReportedState: LidSleepState = .cooldown
+    private var closeDebounceTask: CancellableTask?
+    private var startupCooldownTask: CancellableTask?
+    private var wakeRecoveryTask: CancellableTask?
+    private var lastReportedState: LidSleepState = .startupCooldown
     private var started = false
 
     init(
@@ -50,7 +51,7 @@ final class LidSleepCoordinator: @unchecked Sendable {
                 }
             }
 
-            scheduleCooldown(from: now())
+            scheduleStartupCooldown(from: now())
 
             do {
                 try stream.start { [weak self] report in
@@ -98,19 +99,16 @@ final class LidSleepCoordinator: @unchecked Sendable {
     private func handleWake(at date: Date) {
         guard started else { return }
         apply(machine.handle(.systemDidWake(at: date)))
-        cooldownTask?.cancel()
-        cooldownTask = nil
-        scheduleCooldown(from: date)
     }
 
-    private func scheduleCooldown(from date: Date) {
+    private func scheduleStartupCooldown(from date: Date) {
         let deadline = date.addingTimeInterval(policy.startupCooldown)
-        cooldownTask?.cancel()
-        cooldownTask = scheduler.schedule(at: deadline) { [weak self] in
+        startupCooldownTask?.cancel()
+        startupCooldownTask = scheduler.schedule(at: deadline) { [weak self] in
             self?.queue.sync {
                 guard let self, self.started else { return }
-                self.cooldownTask = nil
-                self.apply(self.machine.handle(.cooldownElapsed(at: deadline)))
+                self.startupCooldownTask = nil
+                self.apply(self.machine.handle(.startupCooldownElapsed(at: deadline)))
             }
         }
     }
@@ -118,19 +116,33 @@ final class LidSleepCoordinator: @unchecked Sendable {
     private func apply(_ effects: [LidSleepEffect]) {
         for effect in effects {
             switch effect {
-            case let .scheduleDebounce(deadline):
-                debounceTask?.cancel()
-                debounceTask = scheduler.schedule(at: deadline) { [weak self] in
+            case let .scheduleCloseDebounce(deadline):
+                closeDebounceTask?.cancel()
+                closeDebounceTask = scheduler.schedule(at: deadline) { [weak self] in
                     self?.queue.sync {
                         guard let self, self.started else { return }
-                        self.debounceTask = nil
-                        self.apply(self.machine.handle(.debounceElapsed(at: deadline)))
+                        self.closeDebounceTask = nil
+                        self.apply(self.machine.handle(.closeDebounceElapsed(at: deadline)))
                     }
                 }
 
-            case .cancelDebounce:
-                debounceTask?.cancel()
-                debounceTask = nil
+            case .cancelCloseDebounce:
+                closeDebounceTask?.cancel()
+                closeDebounceTask = nil
+
+            case let .scheduleWakeRecovery(deadline):
+                wakeRecoveryTask?.cancel()
+                wakeRecoveryTask = scheduler.schedule(at: deadline) { [weak self] in
+                    self?.queue.sync {
+                        guard let self, self.started else { return }
+                        self.wakeRecoveryTask = nil
+                        self.apply(self.machine.handle(.wakeRecoveryElapsed(at: deadline)))
+                    }
+                }
+
+            case .cancelWakeRecovery:
+                wakeRecoveryTask?.cancel()
+                wakeRecoveryTask = nil
 
             case .requestSleep:
                 try? sleepRequester.requestSleep()
@@ -149,16 +161,18 @@ final class LidSleepCoordinator: @unchecked Sendable {
                 case .closingCandidate: onTransitionEvent(.candidateStarted)
                 case .triggered: onTransitionEvent(.triggered)
                 case .disarmed: onTransitionEvent(.disarmed)
-                case .cooldown: onTransitionEvent(.cooldown)
+                case .startupCooldown, .wakeRecovery: onTransitionEvent(.cooldown)
                 }
             }
         }
     }
 
     private func cancelAllTasks() {
-        debounceTask?.cancel()
-        cooldownTask?.cancel()
-        debounceTask = nil
-        cooldownTask = nil
+        closeDebounceTask?.cancel()
+        startupCooldownTask?.cancel()
+        wakeRecoveryTask?.cancel()
+        closeDebounceTask = nil
+        startupCooldownTask = nil
+        wakeRecoveryTask = nil
     }
 }

@@ -58,7 +58,7 @@ final class LidSleepCoordinatorTests: XCTestCase {
         XCTAssertEqual(fixture.requester.requestCount, 1)
     }
 
-    func testWakeCancelsDebounceAndStartsFreshCooldown() throws {
+    func testWakeCancelsDebounceAndStartsFreshRecovery() throws {
         let fixture = makeFixture()
         try fixture.coordinator.start()
         arm(fixture)
@@ -68,16 +68,10 @@ final class LidSleepCoordinatorTests: XCTestCase {
 
         XCTAssertEqual(
             fixture.scheduler.pendingDeadlines,
-            [now.addingTimeInterval(12)]
+            [now.addingTimeInterval(22)]
         )
         fixture.stream.send(angle: 60, at: now.addingTimeInterval(8))
-        fixture.scheduler.fire(deadline: now.addingTimeInterval(12))
-        fixture.stream.send(angle: 69, at: now.addingTimeInterval(13))
-        XCTAssertEqual(fixture.requester.requestCount, 0)
-
-        fixture.stream.send(angle: 70, at: now.addingTimeInterval(14))
-        fixture.stream.send(angle: 60, at: now.addingTimeInterval(15))
-        fixture.scheduler.fire(deadline: now.addingTimeInterval(17))
+        fixture.scheduler.fire(deadline: now.addingTimeInterval(22))
         XCTAssertEqual(fixture.requester.requestCount, 1)
     }
 

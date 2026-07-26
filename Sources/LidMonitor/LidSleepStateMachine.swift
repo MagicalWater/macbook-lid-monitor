@@ -1,7 +1,8 @@
 import Foundation
 
 enum LidSleepState: Equatable, Sendable {
-    case cooldown
+    case startupCooldown
+    case wakeRecovery(deadline: Date)
     case disarmed
     case open
     case closingCandidate(deadline: Date)
@@ -10,22 +11,26 @@ enum LidSleepState: Equatable, Sendable {
 
 enum LidSleepEvent: Equatable, Sendable {
     case angleChanged(Int, at: Date)
-    case debounceElapsed(at: Date)
-    case cooldownElapsed(at: Date)
+    case closeDebounceElapsed(at: Date)
+    case startupCooldownElapsed(at: Date)
+    case wakeRecoveryElapsed(at: Date)
     case systemDidWake(at: Date)
+    case sleepRequestFailed(at: Date)
     case dataInvalid(at: Date)
 }
 
 enum LidSleepEffect: Equatable, Sendable {
-    case scheduleDebounce(deadline: Date)
-    case cancelDebounce
+    case scheduleCloseDebounce(deadline: Date)
+    case cancelCloseDebounce
+    case scheduleWakeRecovery(deadline: Date)
+    case cancelWakeRecovery
     case requestSleep
     case stateChanged(LidSleepState)
 }
 
 struct LidSleepStateMachine: Sendable {
     private let policy: LidSleepPolicy
-    private(set) var state: LidSleepState = .cooldown
+    private(set) var state: LidSleepState = .startupCooldown
     private var latestAngle: Int?
 
     init(policy: LidSleepPolicy) {
@@ -41,24 +46,24 @@ struct LidSleepStateMachine: Sendable {
             latestAngle = angle
             return handleAngle(angle, at: timestamp)
 
-        case let .debounceElapsed(at: timestamp):
-            return handleDebounceElapsed(at: timestamp)
+        case let .closeDebounceElapsed(at: timestamp):
+            return handleCloseDebounceElapsed(at: timestamp)
 
-        case .cooldownElapsed:
+        case .startupCooldownElapsed:
             if let latestAngle, latestAngle >= policy.reopenThreshold {
                 return transition(to: .open)
             }
             return transition(to: .disarmed)
 
-        case .systemDidWake:
-            latestAngle = nil
-            var effects: [LidSleepEffect] = []
-            if case .closingCandidate = state {
-                effects.append(.cancelDebounce)
-            }
-            state = .cooldown
-            effects.append(.stateChanged(.cooldown))
-            return effects
+        case let .wakeRecoveryElapsed(at: timestamp):
+            return handleWakeRecoveryElapsed(at: timestamp)
+
+        case let .systemDidWake(at: timestamp):
+            return handleSystemWake(at: timestamp)
+
+        case .sleepRequestFailed:
+            guard case .triggered = state else { return [] }
+            return transition(to: .disarmed)
 
         case .dataInvalid:
             return handleInvalidData()
@@ -70,8 +75,13 @@ struct LidSleepStateMachine: Sendable {
         at timestamp: Date
     ) -> [LidSleepEffect] {
         switch state {
-        case .cooldown:
+        case .startupCooldown:
             return []
+
+        case .wakeRecovery:
+            guard angle >= policy.reopenThreshold else { return [] }
+            state = .open
+            return [.cancelWakeRecovery, .stateChanged(.open)]
 
         case .disarmed:
             guard angle >= policy.reopenThreshold else { return [] }
@@ -83,13 +93,13 @@ struct LidSleepStateMachine: Sendable {
             state = .closingCandidate(deadline: deadline)
             return [
                 .stateChanged(.closingCandidate(deadline: deadline)),
-                .scheduleDebounce(deadline: deadline)
+                .scheduleCloseDebounce(deadline: deadline)
             ]
 
         case .closingCandidate:
             guard angle > policy.sleepThreshold else { return [] }
             state = .open
-            return [.cancelDebounce, .stateChanged(.open)]
+            return [.cancelCloseDebounce, .stateChanged(.open)]
 
         case .triggered:
             guard angle >= policy.reopenThreshold else { return [] }
@@ -97,7 +107,7 @@ struct LidSleepStateMachine: Sendable {
         }
     }
 
-    private mutating func handleDebounceElapsed(
+    private mutating func handleCloseDebounceElapsed(
         at timestamp: Date
     ) -> [LidSleepEffect] {
         guard case let .closingCandidate(deadline) = state,
@@ -111,11 +121,47 @@ struct LidSleepStateMachine: Sendable {
         return [.stateChanged(.triggered), .requestSleep]
     }
 
+    private mutating func handleSystemWake(at timestamp: Date) -> [LidSleepEffect] {
+        latestAngle = nil
+        var effects: [LidSleepEffect] = []
+        if case .closingCandidate = state {
+            effects.append(.cancelCloseDebounce)
+        }
+        if case .wakeRecovery = state {
+            effects.append(.cancelWakeRecovery)
+        }
+
+        let deadline = timestamp.addingTimeInterval(policy.wakeRecovery)
+        state = .wakeRecovery(deadline: deadline)
+        effects.append(.stateChanged(.wakeRecovery(deadline: deadline)))
+        effects.append(.scheduleWakeRecovery(deadline: deadline))
+        return effects
+    }
+
+    private mutating func handleWakeRecoveryElapsed(
+        at timestamp: Date
+    ) -> [LidSleepEffect] {
+        guard case let .wakeRecovery(deadline) = state,
+              timestamp >= deadline else {
+            return []
+        }
+
+        guard let latestAngle else {
+            return transition(to: .disarmed)
+        }
+        guard latestAngle < policy.reopenThreshold else {
+            return transition(to: .open)
+        }
+
+        state = .triggered
+        return [.stateChanged(.triggered), .requestSleep]
+    }
+
     private mutating func handleInvalidData() -> [LidSleepEffect] {
         latestAngle = nil
         guard case .closingCandidate = state else { return [] }
         state = .open
-        return [.cancelDebounce, .stateChanged(.open)]
+        return [.cancelCloseDebounce, .stateChanged(.open)]
     }
 
     private mutating func transition(

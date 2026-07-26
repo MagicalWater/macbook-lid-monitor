@@ -32,3 +32,31 @@ usage error: --wake-cooldown is obsolete; use --startup-cooldown and --wake-reco
 - Open P1: 0
 - Open P2: 0
 - Task 1 status: approved
+
+## Task 2 — Angle-Authoritative State Machine
+
+### Initial findings
+
+No P0 or P1 finding was identified after the RED/GREEN implementation. The
+review concentrated on state authority rather than coordinator scheduling,
+which remains Task 3 scope.
+
+### Re-review
+
+- Startup begins in `startupCooldown` and can never request sleep.
+- Startup below `>=75` ends in `disarmed`; `>=75` ends in `open`.
+- A system wake clears all pre-wake angle evidence.
+- Recovery uses only fresh valid reports received after the wake.
+- Fresh `<=68` and `69...74` both request one sleep at the 15-second deadline.
+- Fresh `>=75` cancels recovery immediately and rearms.
+- Missing or invalid fresh recovery data ends in `disarmed` without sleeping.
+- Every later wake replaces the state-machine recovery deadline.
+- A sleep-request failure ends in `disarmed` and requires `>=75` to rearm.
+- State-machine and full regression suites: 69 tests, 0 failures.
+
+### Disposition
+
+- Open P0: 0
+- Open P1: 0
+- Open P2: 0
+- Task 2 status: approved

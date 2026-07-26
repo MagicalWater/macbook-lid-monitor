@@ -181,7 +181,7 @@ git commit -m "feat: split startup and wake recovery policy"
 - Consumes: split `LidSleepPolicy` from Task 1.
 - Produces: states `.startupCooldown`, `.wakeRecovery(deadline:)`, `.disarmed`, `.open`, `.closingCandidate(deadline:)`, `.triggered`; events `.startupCooldownElapsed(at:)`, `.wakeRecoveryElapsed(at:)`, `.sleepRequestFailed(at:)`; effects for all three scheduler paths.
 
-- [ ] **Step 1: Write failing startup and recovery tests**
+- [x] **Step 1: Write failing startup and recovery tests**
 
 Add state-machine tests for these exact sequences:
 
@@ -201,7 +201,7 @@ disarmed + angle 75 -> open
 
 Also verify every `systemDidWake` clears pre-wake angle evidence.
 
-- [ ] **Step 2: Run Task 2 RED**
+- [x] **Step 2: Run Task 2 RED**
 
 Run:
 
@@ -211,7 +211,7 @@ swift test --filter LidSleepStateMachineTests
 
 Expected: compile/test failure because recovery states/events/effects do not exist.
 
-- [ ] **Step 3: Implement explicit states, events, and effects**
+- [x] **Step 3: Implement explicit states, events, and effects**
 
 Use these concrete cases:
 
@@ -249,7 +249,7 @@ Initialize in `.startupCooldown`. Startup completion never requests sleep.
 `systemDidWake` clears `latestAngle`, cancels a pending close debounce when
 needed, enters `.wakeRecovery`, and schedules exactly one wake-recovery deadline.
 
-- [ ] **Step 4: Implement fresh-data recovery semantics**
+- [x] **Step 4: Implement fresh-data recovery semantics**
 
 During `.wakeRecovery`:
 
@@ -263,12 +263,12 @@ deadline + no cached valid angle -> disarmed
 
 Normal close debounce remains `<=sleepThreshold`; recovery uses `<reopenThreshold`.
 
-- [ ] **Step 5: Implement request-failure transition**
+- [x] **Step 5: Implement request-failure transition**
 
 `.sleepRequestFailed` must transition `.triggered -> .disarmed`. It must not
 schedule any task or request another sleep. A later `>=75` report rearms.
 
-- [ ] **Step 6: Run Task 2 GREEN and regression tests**
+- [x] **Step 6: Run Task 2 GREEN and regression tests**
 
 Run:
 
@@ -280,7 +280,7 @@ git diff --check
 
 Expected: all pass.
 
-- [ ] **Step 7: Task 2 review, fix, re-review, and commit**
+- [x] **Step 7: Task 2 review, fix, re-review, and commit**
 
 Review stale-angle clearing, threshold boundaries, exactly-once effects, invalid
 data behavior, and failure terminal state. Require Open P0 = 0 and Open P1 = 0,
