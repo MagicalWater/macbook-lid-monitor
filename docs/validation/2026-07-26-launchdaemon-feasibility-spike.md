@@ -4,7 +4,7 @@
 
 本文件記錄 Phase 1 LaunchDaemon feasibility spike 的驗證證據。此階段的核心目標是確認系統層 daemon 在登入前後是否能開啟 M1 Pro 上蓋角度 HID、持續收到 report，以及接收 IOKit sleep／wake notification。
 
-目前已完成安裝前的前景 dry-run 驗證，以及使用者登入狀態下的 system-domain LaunchDaemon dry-run 驗收。尚未執行登出、睡眠／喚醒、真實 sleep probe 或重新開機驗收。
+目前已完成安裝前的前景 dry-run 驗證、使用者登入狀態下的 system-domain LaunchDaemon dry-run 驗收，以及 loginwindow HID/report continuity 驗收。尚未執行睡眠／喚醒、真實 sleep probe 或重新開機驗收。
 
 ## 安全邊界
 
@@ -120,7 +120,7 @@ first valid report: angle=159 count=1
 stderr: empty
 ```
 
-使用者將上蓋壓低至約 60° 並停留約 3 秒後，單次 close cycle evidence：
+使用者將上蓋壓低至感測器值約 60 並停留約 3 秒後，單次 close cycle evidence：
 
 ```text
 auto-sleep: candidate-started = 1
@@ -154,7 +154,47 @@ stderr: empty
 
 ## Loginwindow
 
-尚未批准／尚未執行。
+使用者明確批准 Task 9 後，於 `2026-07-26T15:44:18Z` 建立登出前基線：
+
+```text
+daemon PID: 52638
+UID/GID: 0/0
+job state: running
+latest report milestone: angle=159 count=300 at 2026-07-26T15:43:27Z
+stderr: empty
+user LaunchAgent: absent
+```
+
+系統登入紀錄顯示：
+
+```text
+console logout: 2026-07-26 23:52 +0800
+console login:  2026-07-26 23:55 +0800
+```
+
+使用者在 loginwindow 期間將上蓋兩次壓低至接近闔上，再重新打開。重新登入後回收的 daemon evidence：
+
+```text
+PID remained: 52638
+launchd runs: 1
+process count: 1
+UID/GID: 0/0
+
+candidate-started: 2
+triggered: 2
+would-sleep: 2
+sleep-requested: 0
+rearmed: 2
+
+2026-07-26T15:53:27Z report-milestone angle=58 count=900
+2026-07-26T15:55:07Z report-milestone angle=160 count=1000
+stderr: empty
+user LaunchAgent: absent
+```
+
+`15:53:27Z` 位於 console logout 與重新 login 之間，且感測器值 `58` 對應本機校準的完全／近乎完全闔上區域。這證明 system LaunchDaemon 在沒有任何使用者登入時仍持續接收有效 HID report、執行 dry-run policy，並於重新打開後恢復到 `160`。
+
+Task 9 操作過程亦重新確認：這些數值是 machine-specific decoded sensor values，不是一般幾何鉸鏈角度。核心 runtime 一直直接比較 `68 / 75` 感測器門檻，未進行錯誤的物理角度換算。
 
 ## Power notification 與睡眠／喚醒
 
@@ -178,7 +218,7 @@ Task 7 前景程序停止後，下列路徑均不存在。Task 8 經批准後已
 /Library/Logs/MacBookLidMonitor/Feasibility: present
 ```
 
-目前 system-domain job 已載入，單一 root PID 為 `52638`。尚未批准 Task 9 登出驗收。
+目前 system-domain job 已載入，單一 root PID 為 `52638`。Task 9 已通過；尚未批准 Task 10 的手動睡眠／喚醒驗收。
 
 ## Findings
 
@@ -200,9 +240,17 @@ Task 7 前景程序停止後，下列路徑均不存在。Task 8 經批准後已
 
 **Resolution：** 先 bootout system job，新增 regression test 並確認 RED，再讓 `DryRunSleepRequester` 直接透過共用 formatter/evidence sink 輸出 `auto-sleep: would-sleep`。111 tests 全數通過後，使用新 SHA-256 binary 完成 uninstall／install／bootstrap 與實機 re-acceptance。
 
+### P2 — Task 9 操作說明一度把 sensor value 誤稱為物理角度
+
+Task 9 執行前的口頭操作說明曾錯誤套用 `0° = 闔上、90° = 垂直、180° = 打開` 的一般幾何模型。這與本專案既有校準資料不符；本機完全闔上約為感測器值 `59`，實體約 90° 開啟時則約為 `148`。
+
+**Impact：** 錯誤只存在於臨時操作說明。核心 decoder、policy、state machine、測試與已安裝 daemon 都直接使用 machine-specific sensor values，現行門檻仍為 `sleepThreshold=68`、`reopenThreshold=75`，沒有進行物理角度換算。
+
+**Resolution：** 中止登出步驟、重新審查 decoder／policy／歷史校準 evidence，作廢錯誤說明，並改以「正常打開／接近闔上」描述人工作業；驗收與文件均以實際 sensor value 判定。
+
 ## 目前結論
 
-Task 7 與 Task 8 驗證均通過：
+Task 7、Task 8 與 Task 9 驗證均通過：
 
 - IOKit power observer 可在一般前景 process 註冊；
 - M1 Pro lid HID 可被辨識、開啟並收到有效 report；
@@ -214,5 +262,8 @@ Task 7 與 Task 8 驗證均通過：
 - 實際壓低上蓋可依序產生 `candidate-started`、`triggered`、`would-sleep`，且不會真的睡眠；
 - stop／bootout 後不會因 `KeepAlive` 自動重啟；
 - 手動 re-bootstrap 可用新 PID 乾淨重啟並重新開啟 HID。
+- 登出至 loginwindow 後，同一 root PID 與同一 launchd run 持續存在；
+- loginwindow 時段內有 timestamped report evidence，包含感測器值 `58` 與兩次完整 dry-run close cycle；
+- 重新登入後 report 持續至 `count=1000`、感測器值回升至 `160`，且沒有 duplicate process、user LaunchAgent 或 stderr。
 
-這代表 **Task 8 通過**，但不代表 loginwindow、睡眠／喚醒、daemon-context 真實睡眠或重開機可行性已通過。下一步 Task 9 仍需另外明確批准登出並停留在 loginwindow。
+這代表 **Task 9 通過**，但不代表睡眠／喚醒、daemon-context 真實睡眠或重開機可行性已通過。下一步 Task 10 仍需另外明確批准一個 bounded manual sleep/wake cycle。

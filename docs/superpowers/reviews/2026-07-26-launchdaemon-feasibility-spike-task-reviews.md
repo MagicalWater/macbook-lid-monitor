@@ -420,3 +420,61 @@ stderr: empty
 - Open P2: 0
 - Task 8: Pass
 - Task 9: blocked pending explicit approval to log out and remain at loginwindow
+
+## Task 9 — Loginwindow HID and Report Continuity Acceptance
+
+### Implementation review
+
+Reviewed pre-logout baseline integrity, console logout/login timing, launchd label and PID continuity, report timestamps inside the logged-out interval, decoded sensor-value movement, dry-run transition counts, duplicate-process checks, user-domain absence, stderr, and fail-open/session assumptions.
+
+### Findings
+
+#### P2-1 — Operator guidance temporarily confused sensor values with physical hinge degrees
+
+The first Task 9 instructions described values such as `0`, `90`, and `180` as ordinary physical opening angles. That contradicted the accepted M1 Pro calibration, where fully closed is approximately sensor value `59`, physical approximately 90° open is around `148`, and fully open is around `189`.
+
+**Impact:** The error was limited to conversational operator guidance before logout. Runtime decoding, thresholds, state-machine comparisons, tests, and the installed LaunchDaemon all continued to use raw decoded sensor values with `68 / 75` policy thresholds. No implementation or prior acceptance evidence was invalidated.
+
+**Resolution:** Stopped before logout, inspected the decoder, calibrated policy, historical hardware validation, and runtime evidence, then replaced the guidance with physical-state wording only: normal open, near-closed, reopen. Documentation now explicitly distinguishes machine-specific sensor values from physical hinge degrees.
+
+### Re-review
+
+- Pre-logout baseline was captured at `2026-07-26T15:44:18Z` with root PID `52638`, one system job, one process, latest report count `300`, and empty stderr.
+- Console history records logout at `23:52 +0800` and login at `23:55 +0800`.
+- The launchd job remained at `runs=1`; PID `52638` did not change across logout/login.
+- Timestamped evidence at `2026-07-26T15:53:27Z` falls inside the loginwindow interval and records sensor value `58`, count `900`.
+- Two loginwindow close cycles emitted two `candidate-started`, two `triggered`, two `would-sleep`, and zero `sleep-requested` events.
+- Two `rearmed` events confirmed reopening above the accepted sensor threshold.
+- Post-login evidence at `2026-07-26T15:55:07Z` records sensor value `160`, count `1000`.
+- Exactly one root daemon process existed after login; no user LaunchAgent existed.
+- stderr remained empty.
+- No manual sleep, reboot, shutdown, or real one-shot sleep probe occurred.
+
+### Validation
+
+```text
+pre-logout baseline: 2026-07-26T15:44:18Z
+console logout: 2026-07-26 23:52 +0800
+console login: 2026-07-26 23:55 +0800
+PID before/after: 52638 / 52638
+launchd runs: 1
+process count: 1
+UID/GID: 0/0
+loginwindow report: 2026-07-26T15:53:27Z angle=58 count=900
+post-login report: 2026-07-26T15:55:07Z angle=160 count=1000
+candidate-started: 2
+triggered: 2
+would-sleep: 2
+rearmed: 2
+sleep-requested: 0
+stderr bytes: 0
+user LaunchAgent: absent
+```
+
+### Disposition
+
+- Open P0: 0
+- Open P1: 0
+- Open P2: 0
+- Task 9: Pass
+- Task 10: blocked pending explicit approval for one bounded manual sleep/wake cycle
