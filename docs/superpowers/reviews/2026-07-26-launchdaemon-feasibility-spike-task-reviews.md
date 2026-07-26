@@ -264,3 +264,76 @@ system paths modified: none
 - Open P1: 0
 - Open P2: 0
 - Task 6: Pass
+
+## Task 7 — Pre-Installation Foreground Spike Validation and Operator Documentation
+
+### Implementation review
+
+Reviewed the foreground daemon composition, explicit IOKit registration evidence, policy-line routing, bounded evidence output, Traditional Chinese operator documentation, SIGTERM cleanup, process residue, and system-path non-modification.
+
+### Findings
+
+#### P1-1 — Power observer registration was only indirectly observable
+
+The first foreground run could infer successful IOKit registration only because coordinator startup completed. That was insufficient for later loginwindow evidence, where registration success and HID success must be independently attributable.
+
+**Resolution:** Added explicit `powerObserverRegistered` and `powerObserverRegistrationFailed` evidence. The success callback runs only after `SystemPowerObserving.start` returns successfully; registration errors remain fail-open and produce stable failure evidence.
+
+#### P1-2 — Daemon policy transitions were not persisted through the evidence sink
+
+The initial daemon composition used empty operational and transition callbacks. Startup cooldown, rearm, triggered, and dry-run `would-sleep` lines therefore could not be captured by launchd stdout routing.
+
+**Resolution:** Wired the existing `OutputFormatter` into the daemon composition and routed policy lines through the same serialized evidence writer used for HID and power events.
+
+#### P2-1 — Existing DevSpace worktree was no longer directly modifiable by the active tool boundary
+
+The original Task 7 worktree was under a restricted DevSpace path. Continuing there would have required non-governed file writes.
+
+**Resolution:** Created a new managed worktree from the accepted Task 6 commit `84a4c2e`, replayed the reviewed uncommitted Task 7 changes, and repeated focused, foreground, and full clean validation. The original worktree was not modified or deleted.
+
+### Re-review
+
+- The daemon executable remains permanently dry-run and exposes no execution argument.
+- IOKit registration success is directly evidenced before HID-open success.
+- Registration failure remains visible and aborts startup without constructing a real sleep path.
+- Startup cooldown, rearm, and later policy transitions use the accepted formatter and one serialized writer.
+- No raw HID report bytes are logged.
+- The final foreground run selected the verified M1 Pro sensor, opened it, received a valid angle report, and rearmed after startup cooldown.
+- SIGTERM emitted one stopping event, exited with code 0, and left no residual daemon-spike process.
+- `/Library/PrivilegedHelperTools`, `/Library/LaunchDaemons`, and the feasibility log path were not created or modified.
+- README and validation instructions are in Traditional Chinese and clearly preserve separate approval gates.
+- No logout, sleep, real one-shot sleep probe, reboot, shutdown, sudo install, or system bootstrap occurred.
+
+### Validation
+
+```text
+DaemonSpikeEvidenceTests: passed
+IOKitSystemPowerObserverTests: passed
+DaemonSpikeCompositionTests: passed
+swift package clean: passed
+swift test: 110 tests, 0 failures
+swift build -c release: passed
+plutil -lint: passed
+bash -n: passed
+shellcheck: passed
+git diff --check: passed
+
+foreground PID: 12790
+foreground UID/GID: 501/20
+power observer registered: evidenced
+selected registry ID: 4294968644
+first valid report: angle 161, count 1
+startup cooldown and rearmed: evidenced
+SIGTERM exit: 0
+residual daemon process: none
+system paths modified: none
+real sleep operations: 0
+```
+
+### Disposition
+
+- Open P0: 0
+- Open P1: 0
+- Open P2: 0
+- Task 7: Pass
+- Task 8: blocked pending explicit user approval to install the temporary LaunchDaemon

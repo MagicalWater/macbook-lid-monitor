@@ -229,3 +229,24 @@ macOS 將第二次低功耗轉換記錄為 DarkWake，而不是與第一次完�
 ```
 
 診斷與前景自動睡眠流程不會安裝系統服務，也不會修改任何持久系統設定，因此不需要額外解除安裝步驟。
+
+## LaunchDaemon 可行性驗證（實驗階段）
+
+目前正式可用的功能仍是前景 CLI。專案正在進行系統層 `LaunchDaemon` 的可行性驗證，但尚未安裝任何常駐服務，也尚未批准正式 daemon。
+
+目前新增的 `macbook-lid-monitor-daemon-spike` 具有以下限制：
+
+- 永遠使用 dry-run，不包含切換為真實睡眠的參數。
+- 只用於驗證系統層 HID、IOKit power notification、程序生命週期與登入前執行環境。
+- 暫時 plist 不含 `KeepAlive`，停止後不應自動重啟。
+- 尚未寫入 `/Library`，也尚未執行 `launchctl bootstrap system`。
+
+下列操作必須分別取得明確批准，不能由一次批准概括授權：
+
+- 安裝暫時 LaunchDaemon
+- 登出並停留在 loginwindow
+- 執行睡眠／喚醒驗收
+- 執行一次性真實睡眠 probe
+- 重新開機驗收
+
+`macbook-lid-monitor-sleep-probe` 與 daemon spike 是分離的 executable。probe 預設也不執行睡眠；只有在另外取得批准後，才允許使用具有固定 approval token 的一次性命令。它不會被 LaunchDaemon plist 啟動。

@@ -29,12 +29,19 @@ enum DaemonSpikeEvidenceEvent: Equatable, Sendable {
     case streamStartFailed
     case firstValidReport(angle: Int, count: UInt64)
     case reportMilestone(angle: Int, count: UInt64)
+    case powerObserverRegistered
+    case powerObserverRegistrationFailed(String)
     case power(SystemPowerEvent)
     case stopping(reason: String)
 }
 
 protocol DaemonSpikeEvidenceSinking: Sendable {
     func emit(_ event: DaemonSpikeEvidenceEvent)
+    func emitPolicyLine(_ line: String)
+}
+
+extension DaemonSpikeEvidenceSinking {
+    func emitPolicyLine(_ line: String) {}
 }
 
 struct DaemonSpikeEvidenceFormatter: Sendable {
@@ -70,6 +77,10 @@ struct DaemonSpikeEvidenceFormatter: Sendable {
             return "\(prefix) event=first-valid-report pid=\(pid) angle=\(angle) count=\(count)"
         case let .reportMilestone(angle, count):
             return "\(prefix) event=report-milestone pid=\(pid) angle=\(angle) count=\(count)"
+        case .powerObserverRegistered:
+            return "\(prefix) event=power-observer-registered pid=\(pid)"
+        case let .powerObserverRegistrationFailed(error):
+            return "\(prefix) event=power-observer-registration-failed pid=\(pid) error=\(error)"
         case let .power(event):
             return "\(prefix) event=power pid=\(pid) power=\(powerName(event))"
         case let .stopping(reason):
@@ -111,8 +122,15 @@ final class StandardDaemonEvidenceSink: DaemonSpikeEvidenceSinking, @unchecked S
     }
 
     func emit(_ event: DaemonSpikeEvidenceEvent) {
-        let line = formatter.line(for: event, at: now()) + "\n"
-        let data = Data(line.utf8)
+        writeLine(formatter.line(for: event, at: now()))
+    }
+
+    func emitPolicyLine(_ line: String) {
+        writeLine(line)
+    }
+
+    private func writeLine(_ line: String) {
+        let data = Data((line + "\n").utf8)
         lock.withLock { write(data) }
     }
 }

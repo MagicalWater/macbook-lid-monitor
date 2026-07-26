@@ -43,6 +43,7 @@ final class DaemonSpikeEvidenceTests: XCTestCase {
 
     func testPowerAndStoppingHaveStableNames() {
         let formatter = DaemonSpikeEvidenceFormatter(timestampFormatter: { _ in "t" }, pid: 1)
+        XCTAssertEqual(formatter.line(for: .powerObserverRegistered, at: Date()), "timestamp=t event=power-observer-registered pid=1")
         XCTAssertEqual(formatter.line(for: .power(.hasPoweredOn), at: Date()), "timestamp=t event=power pid=1 power=has-powered-on")
         XCTAssertEqual(formatter.line(for: .stopping(reason: "signal"), at: Date()), "timestamp=t event=stopping pid=1 reason=signal")
     }
@@ -61,6 +62,18 @@ final class DaemonSpikeEvidenceTests: XCTestCase {
             "timestamp=t event=power pid=1 power=will-sleep\n",
             "timestamp=t event=stopping pid=1 reason=signal\n"
         ])
+    }
+
+    func testSinkSerializesPolicyLinesThroughSameWriter() {
+        let writes = LockedDataWrites()
+        let sink = StandardDaemonEvidenceSink(
+            formatter: DaemonSpikeEvidenceFormatter(timestampFormatter: { _ in "t" }, pid: 1),
+            write: { writes.append($0) }
+        )
+
+        sink.emitPolicyLine("auto-sleep: startup-cooldown")
+
+        XCTAssertEqual(writes.strings, ["auto-sleep: startup-cooldown\n"])
     }
 
 }

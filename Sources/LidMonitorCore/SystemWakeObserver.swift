@@ -8,13 +8,16 @@ protocol SystemWakeObserving: AnyObject, Sendable {
 final class IOKitSystemWakeObserver: SystemWakeObserving, @unchecked Sendable {
     private let powerObserver: SystemPowerObserving
     private let onPowerEvent: @Sendable (SystemPowerEvent) -> Void
+    private let onRegistered: @Sendable () -> Void
 
     init(
         powerObserver: SystemPowerObserving = IOKitSystemPowerObserver(),
-        onPowerEvent: @escaping @Sendable (SystemPowerEvent) -> Void = { _ in }
+        onPowerEvent: @escaping @Sendable (SystemPowerEvent) -> Void = { _ in },
+        onRegistered: @escaping @Sendable () -> Void = {}
     ) {
         self.powerObserver = powerObserver
         self.onPowerEvent = onPowerEvent
+        self.onRegistered = onRegistered
     }
 
     func start(onWake: @escaping @Sendable (Date) -> Void) throws {
@@ -23,6 +26,7 @@ final class IOKitSystemWakeObserver: SystemWakeObserving, @unchecked Sendable {
             guard event == .hasPoweredOn else { return }
             onWake(date)
         }
+        onRegistered()
     }
 
     func stop() {

@@ -62,7 +62,9 @@ final class DaemonSpikeApplication {
             throw error
         }
         let requester = DryRunSleepRequester { _ in }
-        let recorder = DaemonSpikeReportRecorder(sink: dependencies.evidenceSink)
+        let evidenceSink = dependencies.evidenceSink
+        let formatter = OutputFormatter()
+        let recorder = DaemonSpikeReportRecorder(sink: evidenceSink)
         let coordinator = LidSleepCoordinator(
             stream: stream,
             decoder: EvidenceRecordingLidAngleDecoder(base: dependencies.decoder, recorder: recorder),
@@ -70,11 +72,22 @@ final class DaemonSpikeApplication {
             wakeObserver: dependencies.wakeObserver,
             sleepRequester: requester,
             policy: .calibratedDefault,
-            now: dependencies.now
+            now: dependencies.now,
+            onOperationalEvent: { event in
+                evidenceSink.emitPolicyLine(formatter.autoSleepLine(event))
+            },
+            onTransitionEvent: { event in
+                evidenceSink.emitPolicyLine(formatter.autoSleepTransitionLine(event))
+            }
         )
         do {
             try coordinator.start()
             dependencies.evidenceSink.emit(.hidOpened(registryID: selected.descriptor.registryEntryID))
+        } catch let error as SystemPowerNotificationError {
+            dependencies.evidenceSink.emit(
+                .powerObserverRegistrationFailed(String(describing: error))
+            )
+            throw error
         } catch let error as HIDReportStreamError {
             if case let .openFailed(code) = error {
                 dependencies.evidenceSink.emit(.hidOpenFailed(registryID: selected.descriptor.registryEntryID, code: code))
@@ -101,7 +114,10 @@ public enum LidMonitorDaemonSpikeEntryPoint {
                 decoders: [ReportID1DegreesDecoder(), UInt16TenthsDecoder()]
             ),
             scheduler: DispatchOneShotScheduler(),
-            wakeObserver: IOKitSystemWakeObserver(onPowerEvent: { event in sink.emit(.power(event)) }),
+            wakeObserver: IOKitSystemWakeObserver(
+                onPowerEvent: { event in sink.emit(.power(event)) },
+                onRegistered: { sink.emit(.powerObserverRegistered) }
+            ),
             evidenceSink: sink,
             now: Date.init
         )
