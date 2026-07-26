@@ -61,9 +61,11 @@ final class DaemonSpikeApplication {
             dependencies.evidenceSink.emit(.streamStartFailed)
             throw error
         }
-        let requester = DryRunSleepRequester { _ in }
         let evidenceSink = dependencies.evidenceSink
         let formatter = OutputFormatter()
+        let requester = DryRunSleepRequester { event in
+            evidenceSink.emitPolicyLine(formatter.autoSleepLine(event))
+        }
         let recorder = DaemonSpikeReportRecorder(sink: evidenceSink)
         let coordinator = LidSleepCoordinator(
             stream: stream,

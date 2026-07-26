@@ -75,6 +75,25 @@ final class DaemonSpikeCompositionTests: XCTestCase {
         )
     }
 
+    func testDryRunSleepRequestEmitsWouldSleepEvidence() throws {
+        let scheduler = ControlledDaemonScheduler()
+        let fixture = DaemonFixture(scheduler: scheduler)
+        let session = try fixture.application.start()
+
+        fixture.stream.emit(
+            report: HIDReport(reportID: 1, bytes: [1, 161, 0], timestamp: Date(timeIntervalSince1970: 1))
+        )
+        scheduler.runNext()
+
+        fixture.stream.emit(
+            report: HIDReport(reportID: 1, bytes: [1, 60, 0], timestamp: Date(timeIntervalSince1970: 2))
+        )
+        scheduler.runNext()
+
+        XCTAssertTrue(fixture.evidence.policyLines.contains("auto-sleep: would-sleep"))
+        session.stop(reason: "test")
+    }
+
 }
 
 private final class DaemonFixture {
@@ -88,14 +107,17 @@ private final class DaemonFixture {
 
     var events: [DaemonSpikeEvidenceEvent] { evidence.events }
 
-    init(descriptors: [HIDDeviceDescriptor]? = nil) {
+    init(
+        descriptors: [HIDDeviceDescriptor]? = nil,
+        scheduler: OneShotScheduling = DaemonScheduler()
+    ) {
         enumerator = DaemonEnumerator(descriptors: descriptors ?? [Self.sensor])
         streamFactory = DaemonStreamFactory(stream: stream)
         dependencies = DaemonSpikeDependencies(
             enumerator: enumerator,
             streamFactory: { [streamFactory] descriptor in try streamFactory.make(descriptor) },
             decoder: CompositeLidAngleDecoder(decoders: [ReportID1DegreesDecoder()]),
-            scheduler: DaemonScheduler(),
+            scheduler: scheduler,
             wakeObserver: wakeObserver,
             evidenceSink: evidence,
             now: { Date(timeIntervalSince1970: 1) }
@@ -138,8 +160,10 @@ private final class DaemonStream: HIDReportStreaming {
     var startCount = 0
     var stopCount = 0
     var startError: Error?
-    func start(onReport: @escaping @Sendable (HIDReport) -> Void) throws { startCount += 1; if let startError { throw startError } }
+    private var onReport: (@Sendable (HIDReport) -> Void)?
+    func start(onReport: @escaping @Sendable (HIDReport) -> Void) throws { startCount += 1; if let startError { throw startError }; self.onReport = onReport }
     func stop() { stopCount += 1 }
+    func emit(report: HIDReport) { onReport?(report) }
 }
 
 private final class DaemonWakeObserver: SystemWakeObserving, @unchecked Sendable {
@@ -152,9 +176,22 @@ private final class DaemonWakeObserver: SystemWakeObserving, @unchecked Sendable
 private final class DaemonScheduler: OneShotScheduling, @unchecked Sendable {
     func schedule(at deadline: Date, _ action: @escaping @Sendable () -> Void) -> CancellableTask { DaemonTask() }
 }
+private final class ControlledDaemonScheduler: OneShotScheduling, @unchecked Sendable {
+    private var actions: [@Sendable () -> Void] = []
+    func schedule(at deadline: Date, _ action: @escaping @Sendable () -> Void) -> CancellableTask {
+        actions.append(action)
+        return DaemonTask()
+    }
+    func runNext() {
+        guard !actions.isEmpty else { return }
+        actions.removeFirst()()
+    }
+}
 private final class DaemonTask: CancellableTask, @unchecked Sendable { func cancel() {} }
 
 private final class DaemonEvidenceSink: DaemonSpikeEvidenceSinking, @unchecked Sendable {
     var events: [DaemonSpikeEvidenceEvent] = []
+    var policyLines: [String] = []
     func emit(_ event: DaemonSpikeEvidenceEvent) { events.append(event) }
+    func emitPolicyLine(_ line: String) { policyLines.append(line) }
 }

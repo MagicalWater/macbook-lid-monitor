@@ -337,3 +337,86 @@ real sleep operations: 0
 - Open P2: 0
 - Task 7: Pass
 - Task 8: blocked pending explicit user approval to install the temporary LaunchDaemon
+
+## Task 8 — Logged-In LaunchDaemon Dry-Run Acceptance
+
+### Implementation review
+
+Reviewed installation hashes and metadata, system-domain launchd state, root identity, process cardinality, HID and power-observer evidence, real lid-angle trigger behavior, dry-run enforcement, stop/bootout semantics, absence of KeepAlive restart, re-bootstrap behavior, and residual system artifacts.
+
+### Findings
+
+#### P1-1 — Dry-run sleep request was not persisted as evidence
+
+The first root LaunchDaemon run correctly selected and opened the sensor. A real close cycle emitted `candidate-started` and `triggered`, but `would-sleep` was absent. The Mac did not sleep and `sleep-requested` was absent, so the operational path remained dry-run; however, the Task 8 acceptance contract required positive evidence that the dry-run requester was invoked.
+
+**Root cause:** `DaemonSpikeApplication` constructed `DryRunSleepRequester` with an empty callback. Coordinator operational evidence did not receive requester success events.
+
+**Resolution:** Booted out the system job before changing source. Added a controlled-scheduler regression test, verified RED with the exact missing `would-sleep` assertion, wired the requester callback to the shared formatter/evidence sink, and verified GREEN. Rebuilt the release binary, recorded the new hash, uninstalled the old artifact, installed the new artifact, and repeated the full logged-in acceptance.
+
+#### P2-1 — Initial regression-test scheduler executed recursively
+
+The first test scheduler immediately executed every scheduled action, causing startup cooldown and debounce scheduling to recurse synchronously and terminate the test process.
+
+**Resolution:** Replaced it with a controlled queue scheduler and explicitly fired startup cooldown followed by close debounce. The regression then failed only on the intended missing `would-sleep` assertion before the production fix.
+
+### Re-review
+
+- Installed binary and plist matched the pre-install hashes, ownership, group, and modes before the first bootstrap.
+- The first and second accepted daemons ran as UID/GID `0/0` in the `system` launchd domain.
+- Exactly one loaded label and one daemon process existed during each running state.
+- The daemon selected registry ID `4294968644`, registered the IOKit power observer, opened HID, and received a first valid report.
+- After the P1 fix, one real close cycle emitted exactly one `candidate-started`, one `triggered`, and one `would-sleep`.
+- `sleep-requested` remained absent and macOS did not sleep.
+- The binary remains permanently dry-run and still accepts no execution arguments.
+- Stop emitted the stopping evidence; bootout removed the job and process.
+- Waiting five seconds after stop/bootout produced no automatic restart, consistent with the absence of `KeepAlive`.
+- Manual re-bootstrap produced a new root PID `52638`, reopened HID, and received a valid angle report.
+- stderr remained empty throughout accepted runs.
+- Temporary system artifacts remain intentionally installed for the separately gated Task 9 loginwindow validation.
+- No logout, sleep/wake acceptance, real one-shot sleep probe, reboot, or shutdown occurred.
+
+### Validation
+
+```text
+pre-install swift test: 110 tests, 0 failures
+pre-install release build: passed
+pre-install plist lint: passed
+initial binary SHA-256: 5dca7d7e91a6e53cef6cc751805a46717999eb8801e94eb2ef2528cdf5e4c750
+plist SHA-256: 14798aa8cdfd6978e8a522a0a6731c895b897f68d9046975cfdafe8b61fbc5cc
+initial root PID: 41768
+
+regression RED: missing would-sleep assertion failed as expected
+regression GREEN: passed
+swift test after fix: 111 tests, 0 failures
+release build after fix: passed
+replacement binary SHA-256: 4a9fd2ed6c585f26954bd5316fb63253821425e78b67f6970ddedc2fd9a6e853
+
+accepted close cycle PID: 47660
+candidate-started: 1
+triggered: 1
+would-sleep: 1
+sleep-requested: 0
+actual sleep: 0
+
+process after stop/bootout: none
+job after bootout: absent
+automatic restart after 5 seconds: none
+
+re-bootstrap PID: 52638
+re-bootstrap UID/GID: 0/0
+re-bootstrap active count: 1
+re-bootstrap process count: 1
+power observer registered: evidenced
+HID reopened: evidenced
+first valid report: angle 159, count 1
+stderr: empty
+```
+
+### Disposition
+
+- Open P0: 0
+- Open P1: 0
+- Open P2: 0
+- Task 8: Pass
+- Task 9: blocked pending explicit approval to log out and remain at loginwindow

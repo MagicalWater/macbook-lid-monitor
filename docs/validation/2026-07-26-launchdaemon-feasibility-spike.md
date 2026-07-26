@@ -4,7 +4,7 @@
 
 本文件記錄 Phase 1 LaunchDaemon feasibility spike 的驗證證據。此階段的核心目標是確認系統層 daemon 在登入前後是否能開啟 M1 Pro 上蓋角度 HID、持續收到 report，以及接收 IOKit sleep／wake notification。
 
-目前只完成安裝前的前景 dry-run 驗證。尚未安裝 LaunchDaemon，也未執行登出、睡眠、真實 sleep probe 或重新開機驗收。
+目前已完成安裝前的前景 dry-run 驗證，以及使用者登入狀態下的 system-domain LaunchDaemon dry-run 驗收。尚未執行登出、睡眠／喚醒、真實 sleep probe 或重新開機驗收。
 
 ## 安全邊界
 
@@ -12,11 +12,11 @@
 - daemon spike 不接受命令列參數。
 - 暫時 plist 不含 `KeepAlive` 與任何 sleep 參數。
 - one-shot sleep probe 是獨立 executable，不存在於 plist。
-- 本輪未使用 sudo，未修改 `/Library`。
+- Task 8 已使用管理員授權安裝暫時 binary／plist 並 bootstrap system job；未執行真實睡眠。
 
 ## 自動化 baseline
 
-2026-07-26 最終 clean validation：
+Task 7 clean validation：
 
 ```text
 swift package clean: passed
@@ -25,6 +25,16 @@ swift build -c release: passed
 plutil -lint: passed
 bash -n: passed
 shellcheck: passed
+git diff --check: passed
+```
+
+Task 8 P1 修正後 fresh validation：
+
+```text
+DaemonSpikeCompositionTests regression: passed
+swift test: 111 tests, 0 failures
+swift build -c release: passed
+plutil -lint: passed
 git diff --check: passed
 ```
 
@@ -69,7 +79,78 @@ event=stopping reason=signal
 
 ## 登入狀態 LaunchDaemon
 
-尚未批准／尚未執行。
+使用者明確批准 Task 8 後，先在未 bootstrap 狀態安裝：
+
+```text
+binary: /Library/PrivilegedHelperTools/macbook-lid-monitor-daemon-spike
+binary owner/group/mode: root:wheel 0755
+plist: /Library/LaunchDaemons/com.crazydennies.macbook-lid-monitor.feasibility.plist
+plist owner/group/mode: root:wheel 0644
+initial binary SHA-256: 5dca7d7e91a6e53cef6cc751805a46717999eb8801e94eb2ef2528cdf5e4c750
+plist SHA-256: 14798aa8cdfd6978e8a522a0a6731c895b897f68d9046975cfdafe8b61fbc5cc
+bootstrap 前 process: none
+bootstrap 前 system job: absent
+```
+
+首次 bootstrap 後：
+
+```text
+PID: 41768
+UID/GID: 0/0
+job domain: system
+active count: 1
+process count: 1
+power observer: registered
+HID: opened
+first valid report: angle=161 count=1
+stderr: empty
+```
+
+第一次實際壓低上蓋後，日誌出現 `candidate-started` 與 `triggered`，但沒有 `would-sleep`。這暴露出 Task 8 P1：daemon 的 `DryRunSleepRequester` callback 被設成空操作。
+
+bootout 後以 TDD 修正，重新 build、uninstall、install 並 bootstrap。新 binary：
+
+```text
+SHA-256: 4a9fd2ed6c585f26954bd5316fb63253821425e78b67f6970ddedc2fd9a6e853
+PID: 47660
+UID/GID: 0/0
+active count: 1
+process count: 1
+first valid report: angle=159 count=1
+stderr: empty
+```
+
+使用者將上蓋壓低至約 60° 並停留約 3 秒後，單次 close cycle evidence：
+
+```text
+auto-sleep: candidate-started = 1
+auto-sleep: triggered = 1
+auto-sleep: would-sleep = 1
+auto-sleep: sleep-requested = 0
+actual macOS sleep: none
+```
+
+接著執行 stop 與 bootout：
+
+```text
+stopping evidence: emitted
+process after stop/bootout: none
+system job after bootout: absent
+wait 5 seconds: no automatic restart
+```
+
+最後手動 re-bootstrap：
+
+```text
+new PID: 52638
+UID/GID: 0/0
+active count: 1
+process count: 1
+power observer: registered
+HID: reopened
+first valid report: angle=159 count=1
+stderr: empty
+```
 
 ## Loginwindow
 
@@ -89,15 +170,15 @@ event=stopping reason=signal
 
 ## Cleanup
 
-前景程序停止後確認下列路徑均不存在：
+Task 7 前景程序停止後，下列路徑均不存在。Task 8 經批准後已安裝暫時 artifact，且目前為了後續 Task 9 驗收保留：
 
 ```text
-/Library/PrivilegedHelperTools/macbook-lid-monitor-daemon-spike
-/Library/LaunchDaemons/com.crazydennies.macbook-lid-monitor.feasibility.plist
-/Library/Logs/MacBookLidMonitor/Feasibility
+/Library/PrivilegedHelperTools/macbook-lid-monitor-daemon-spike: present
+/Library/LaunchDaemons/com.crazydennies.macbook-lid-monitor.feasibility.plist: present
+/Library/Logs/MacBookLidMonitor/Feasibility: present
 ```
 
-沒有 system-domain job 被安裝或 bootstrap。
+目前 system-domain job 已載入，單一 root PID 為 `52638`。尚未批准 Task 9 登出驗收。
 
 ## Findings
 
@@ -113,14 +194,25 @@ event=stopping reason=signal
 
 **Resolution：** daemon 現在使用既有 `OutputFormatter`，並透過同一個鎖定 writer 輸出 policy line，避免與 HID／power evidence 交錯破壞完整行。
 
+### P1 — DryRunSleepRequester 沒有輸出 would-sleep evidence
+
+首次 logged-in LaunchDaemon close cycle 已產生 `candidate-started` 與 `triggered`，但沒有 `would-sleep`。根因是 daemon composition 建構 `DryRunSleepRequester` 時使用空 callback；coordinator 的 operational callback 只接收 requester 之外的失敗事件，無法補上這筆證據。
+
+**Resolution：** 先 bootout system job，新增 regression test 並確認 RED，再讓 `DryRunSleepRequester` 直接透過共用 formatter/evidence sink 輸出 `auto-sleep: would-sleep`。111 tests 全數通過後，使用新 SHA-256 binary 完成 uninstall／install／bootstrap 與實機 re-acceptance。
+
 ## 目前結論
 
-Task 7 的安裝前前景 spike 驗證通過：
+Task 7 與 Task 8 驗證均通過：
 
 - IOKit power observer 可在一般前景 process 註冊；
 - M1 Pro lid HID 可被辨識、開啟並收到有效 report；
 - calibrated startup cooldown 與 rearm 行為可被觀察；
 - SIGTERM cleanup 正常；
 - 沒有安裝或留下任何 system artifact。
+- system-domain LaunchDaemon 可在使用者登入狀態下以 root 單一實例啟動；
+- root daemon 可註冊 IOKit power observer、開啟同一 HID 並持續收到 report；
+- 實際壓低上蓋可依序產生 `candidate-started`、`triggered`、`would-sleep`，且不會真的睡眠；
+- stop／bootout 後不會因 `KeepAlive` 自動重啟；
+- 手動 re-bootstrap 可用新 PID 乾淨重啟並重新開啟 HID。
 
-這只代表 **Task 7 通過**，不代表 LaunchDaemon、loginwindow、睡眠／喚醒、daemon-context 真實睡眠或重開機可行性已通過。下一步仍受 Task 8 的獨立安裝批准 gate 約束。
+這代表 **Task 8 通過**，但不代表 loginwindow、睡眠／喚醒、daemon-context 真實睡眠或重開機可行性已通過。下一步 Task 9 仍需另外明確批准登出並停留在 loginwindow。
