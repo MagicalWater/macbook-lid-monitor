@@ -13,7 +13,7 @@ Holistic consistency review covering:
 
 | Approved requirement | Implementing Task |
 | --- | --- |
-| Calibrated `60 / 70 / 2s / 5s` defaults | Task 1 |
+| Initial `60 / 70 / 2s / 5s` planning defaults, superseded by final `68 / 75 / 2s / 5s` hardware calibration | Task 1, Task 6 |
 | Pure debounce, hysteresis, disarm, and one-shot state model | Task 2 |
 | Event-driven HID input and one-shot scheduling | Task 3 |
 | `NSWorkspace.didWakeNotification` cooldown | Task 3 |

@@ -124,7 +124,7 @@ No persistent settings file or preference UI is added in this phase.
 2. `--watch` remains read-only and behavior-compatible.
 3. Dry-run emits exactly one `would-sleep` after `<= 60` remains stable for two seconds.
 4. Returning above `60` before the deadline cancels the pending decision.
-5. Values `61...69` after a trigger do not rearm; `>= 70` does.
+5. Values `69...74` after a trigger do not rearm; `>= 75` does.
 6. Startup/wake cooldown prevents immediate sleep, and a startup/wake below `70` remains disarmed until the lid reaches `>= 70`.
 7. Missing, malformed, out-of-range, or stream-failure sensor data never sleeps the Mac.
 8. Real sleep is impossible without `--execute-sleep`.

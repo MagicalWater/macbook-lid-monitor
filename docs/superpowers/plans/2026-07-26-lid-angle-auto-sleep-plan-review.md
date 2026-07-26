@@ -16,7 +16,7 @@ The initial plan mentioned wake cooldown globally but Task 3 only described angl
 
 The state-machine tests only said cooldown blocks closing until elapsed. They did not specify whether a lid already below `70` becomes armed when cooldown ends.
 
-**Resolution:** Added deterministic tests and interfaces for the `disarmed` outcome. Cooldown completion below `70` stays disarmed until a later `>=70` report.
+**Resolution:** Added deterministic tests and interfaces for the `disarmed` outcome. With the final calibration, cooldown completion below `75` stays disarmed until a later `>=75` report.
 
 ### P1-3 — `SleepRequesting` ownership was inconsistent
 
@@ -46,7 +46,7 @@ The new `NSWorkspace` wake adapter requires AppKit, but the package manifest was
 
 The original hardware acceptance asked only to document what happened after five seconds.
 
-**Resolution:** Task 6 now requires the process to remain disarmed below `70`, then rearm only after opening to `>=70` before a new close can trigger.
+**Resolution:** Task 6 now requires the process to remain disarmed below `75`, then rearm only after opening to `>=75` before a new close can trigger.
 
 ## Re-Review
 

@@ -191,10 +191,10 @@ Use deterministic timestamps and cover:
 // Duplicate 60 reports do not extend the deadline.
 // 61 before deadline cancels.
 // Deadline at 2 seconds while latest value <= 60 emits requestSleep once.
-// 61...69 after trigger does not rearm.
+// 69...74 after trigger does not rearm.
 // 70 rearms.
 // Cooldown blocks closing until elapsed.
-// Cooldown ending below 70 enters disarmed; only >=70 enters open.
+// Cooldown ending below 75 enters disarmed; only >=75 enters open.
 // Invalid angle fails open and cancels any candidate.
 ```
 
@@ -271,7 +271,7 @@ Create a fake angle source, manual scheduler, fake wake observer, and spy reques
 // Angle 61 cancels it.
 // Firing the deadline invokes requester once only.
 // A wake event cancels pending debounce and starts one cooldown deadline.
-// Cooldown ending below 70 remains disarmed until a >=70 report.
+// Cooldown ending below 75 remains disarmed until a >=75 report.
 // Stop cancels the deadline and stream.
 // Decode failure dispatches dataInvalid and never sleeps.
 ```
@@ -419,12 +419,11 @@ Create an executable script that runs:
 
 ```bash
 swift run -c release macbook-lid-monitor \
-  --auto-sleep --dry-run \
-  --sleep-threshold 60 \
-  --reopen-threshold 70 \
-  --debounce 2 \
-  --wake-cooldown 5
+  --auto-sleep --dry-run
 ```
+
+The helper must not duplicate calibrated policy values. It consumes
+`LidSleepPolicy.calibratedDefault`, the single runtime authority.
 
 - [ ] **Step 5: Run GREEN and regression validation**
 
@@ -463,18 +462,18 @@ For each cycle record:
 ```text
 start near 90° (~148)
 pause at lowest allowed (~105): must not trigger
-close to 60/59 and hold >2 seconds: exactly one would-sleep
-open only to 61...69: must remain latched
-open to >=70: must rearm
+close to <=68 and hold >2 seconds: exactly one would-sleep
+open only to 69...74: must remain latched
+open to >=75: must rearm
 ```
 
 - [ ] **Step 2: Test cancellation**
 
-Enter `60` for less than two seconds, return above `60`, and verify no `would-sleep` occurs.
+Enter `<=68` for less than two seconds, return above `68`, and verify no `would-sleep` occurs.
 
 - [ ] **Step 3: Test startup cooldown**
 
-Start dry-run while the lid is near `60`; verify no sleep decision during the first five seconds and that it remains disarmed afterward. Open to `>=70`, close again, and verify the normal two-second candidate then triggers exactly once.
+Start dry-run while the lid is at `<=68`; verify no sleep decision during the first five seconds and that it remains disarmed afterward. Open to `>=75`, close again, and verify the normal two-second candidate then triggers exactly once.
 
 - [ ] **Step 4: Document results and README usage**
 
@@ -561,7 +560,7 @@ Start the executable manually with `--auto-sleep --execute-sleep`, close through
 
 - [ ] **Step 3: Reopen and verify recovery**
 
-Verify the process does not immediately request sleep during the five-second cooldown and rearms only after `>=70`.
+Verify the process does not immediately request sleep during the five-second cooldown and rearms only after `>=75`.
 
 - [ ] **Step 4: Document and stop**
 
