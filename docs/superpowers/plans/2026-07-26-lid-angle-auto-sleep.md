@@ -550,23 +550,23 @@ git commit -m "docs: complete auto-sleep safety review"
 - Consumes: reviewed `--execute-sleep` mode and passing dry-run evidence.
 - Produces: one bounded real-sleep result; no background installation.
 
-- [ ] **Step 1: Confirm prerequisites**
+- [x] **Step 1: Confirm prerequisites**
 
 Do not proceed unless the user explicitly approves a real-sleep test after reviewing Task 6 and Task 7 evidence.
 
-- [ ] **Step 2: Run one foreground real-sleep cycle**
+- [x] **Step 2: Run one foreground real-sleep cycle**
 
-Start the executable manually with `--auto-sleep --execute-sleep`, close through `60` for more than two seconds, and verify the Mac enters sleep once.
+Start the executable manually with `--auto-sleep --execute-sleep`, close to `<=68` for more than two seconds, and verify the Mac enters sleep once.
 
-- [ ] **Step 3: Reopen and verify recovery**
+- [x] **Step 3: Reopen and verify recovery**
 
 Verify the process does not immediately request sleep during the five-second cooldown and rearms only after `>=75`.
 
-- [ ] **Step 4: Document and stop**
+- [x] **Step 4: Document and stop**
 
 Record the outcome. Do not create a LaunchAgent or login item in this phase.
 
-- [ ] **Step 5: Commit acceptance evidence**
+- [x] **Step 5: Commit acceptance evidence**
 
 ```bash
 git add docs/validation/2026-07-26-m1-pro-auto-sleep.md

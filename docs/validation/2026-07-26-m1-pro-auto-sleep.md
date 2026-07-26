@@ -233,3 +233,69 @@ still observe whether the bounded real-sleep request actually succeeds.
 
 Task 7 decision: **Pass**. Task 8 remains blocked until the user gives separate,
 explicit approval for one foreground real-sleep acceptance cycle.
+
+## Task 8 bounded real-sleep acceptance
+
+The user explicitly approved one foreground real-sleep cycle after reviewing
+the completed Task 6 and Task 7 evidence. No background service, login item, or
+persistent power-setting change was introduced.
+
+The release executable started with:
+
+```text
+auto-sleep config: mode=execute-sleep sleep-threshold=68 reopen-threshold=75 debounce=2 wake-cooldown=5
+auto-sleep: rearmed
+```
+
+The lid was then moved below the calibrated sleep threshold and held longer
+than the debounce period. The process emitted exactly one request sequence:
+
+```text
+auto-sleep: candidate-started
+auto-sleep: triggered
+auto-sleep: sleep-requested
+```
+
+macOS power-management evidence confirmed a real software sleep rather than
+display dimming only:
+
+```text
+2026-07-26 16:28:30 +0800 Sleep
+Entering Sleep state due to 'Software Sleep pid=17708'
+```
+
+The Mac remained asleep until the user pressed a keyboard key. macOS recorded:
+
+```text
+2026-07-26 16:30:22 +0800 Wake
+Wake from Deep Idle ... trackpadkeyboard ... HID Activity
+```
+
+After wake, the same foreground process emitted:
+
+```text
+auto-sleep: cooldown
+auto-sleep: rearmed
+```
+
+No second `sleep-requested` event occurred. The lid was kept above the reopen
+threshold, and the foreground process was then stopped cleanly with `Ctrl+C`.
+
+Task 8 acceptance results:
+
+- Explicit user approval: Yes
+- Foreground `--execute-sleep`: Yes
+- Real software sleep: Pass
+- Sleep request count: 1
+- Keyboard/trackpad wake: Pass
+- Wake cooldown observed: Pass
+- Rearmed above `75`: Pass
+- Immediate repeat sleep: No
+- Persistent service installed: No
+- Persistent power setting changed: No
+
+The Task 7 P2 visibility limitation is closed for this bounded acceptance
+scenario because both the process emitted `sleep-requested` and macOS independently
+recorded `Software Sleep pid=17708`.
+
+Task 8 decision: **Pass**.
