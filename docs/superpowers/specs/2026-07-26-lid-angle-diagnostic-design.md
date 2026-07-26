@@ -34,6 +34,14 @@ The diagnostic result must distinguish these cases:
 - A shell script for building and running the diagnostic.
 - Documentation covering expected output, limitations, and removal.
 
+### Platform Baseline
+
+- Target hardware: Apple Silicon MacBook Pro, validated first on the user's M1 Pro machine.
+- Minimum deployment target: macOS 13.0.
+- Toolchain: Swift 6.x through the system Xcode Command Line Tools.
+- Package type: Swift Package Manager executable with no third-party runtime dependency.
+- Initial release version: `0.1.0`, declared once in package source and reused by CLI output.
+
 ### Excluded
 
 - Automatic sleep.
@@ -112,6 +120,14 @@ Initial options:
 
 `--watch` will be the default behavior when no mode is supplied.
 
+Argument rules:
+
+- `--list` and `--watch` are mutually exclusive explicit modes.
+- `--raw` is valid only with watch mode, including the implicit default watch mode.
+- `--duration` accepts a finite value greater than `0` and is valid only with watch mode.
+- Unknown options, missing values, invalid numbers, and conflicting modes must print usage to standard error and exit with code `64`.
+- `Ctrl+C` during watch mode is a successful operator-requested stop and exits with code `0`.
+
 ### LidSensorDiscovery
 
 Responsibilities:
@@ -122,6 +138,13 @@ Responsibilities:
 - Explain why each candidate received its rank.
 
 Discovery must remain read-only.
+
+Candidate safety rules:
+
+- Devices classified as keyboard, keypad, mouse, pointer, trackpad, digitizer, or consumer-control input must be excluded before ranking.
+- A candidate must expose at least one non-keyboard/non-pointing HID usage or an IORegistry identity containing a lid, angle, hinge, clamshell, or sensor term.
+- Apple vendor metadata may increase confidence but must not be sufficient by itself.
+- If the highest-ranked candidate does not meet the minimum confidence threshold, the CLI must report all candidate metadata and stop rather than opening a low-confidence device.
 
 ### HIDReportStream
 
@@ -221,11 +244,21 @@ The executable must provide actionable errors for:
 
 Hardware-access failures must not crash the process. The CLI should exit non-zero for startup failures and continue with a warning for individual malformed reports.
 
+Exit codes:
+
+- `0`: successful list/watch completion or operator cancellation with `Ctrl+C`.
+- `64`: invalid command-line usage.
+- `69`: no compatible or sufficiently confident sensor candidate.
+- `74`: candidate found but the device cannot be opened or streaming fails.
+- `70`: unexpected internal failure.
+
 ## 10. Permissions and Safety
 
 The first run should not request administrator privileges by default.
 
 If macOS denies HID access, the tool must report the denial and document the relevant Privacy & Security permission rather than automatically escalating privileges.
+
+The documentation must not promise that granting Input Monitoring is required. It should report the observed denial first and explain that macOS permission behavior can differ by OS release and device classification.
 
 The tool must not:
 
@@ -257,6 +290,14 @@ Candidate matching must be narrow enough to avoid opening the internal keyboard 
 
 The first hardware run is exploratory. Captured reports may be converted into anonymized test fixtures containing only sensor bytes and no personal data.
 
+Hardware validation is successful only when the run records all of the following:
+
+- At least three clearly different physical lid positions.
+- Corresponding raw reports or explicit evidence that reports remain unchanged.
+- The decoded angle or decoder status for each position.
+- The contemporaneous `AppleClamshellState` value.
+- Whether the sensor stream resumes after reopening the display.
+
 ## 12. Decision After Diagnostic
 
 ### Raw angle changes correctly
@@ -269,7 +310,7 @@ Conclude that software cannot reliably infer lid closure from this sensor path. 
 
 ### No sensor is accessible
 
-Investigate device identifiers and permissions once. If no safe read-only path exists, stop rather than introducing kernel-level or SIP-dependent workarounds.
+Perform one bounded second investigation consisting of IOHID metadata inspection, IORegistry metadata inspection, and observed permission-denial analysis. If those three checks do not identify a safe read-only path, stop rather than introducing kernel-level, DriverKit, write-report, administrator-escalation, or SIP-dependent workarounds.
 
 ## 13. Removal
 
