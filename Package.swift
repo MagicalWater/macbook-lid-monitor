@@ -11,7 +11,8 @@ let package = Package(
         .executableTarget(
             name: "LidMonitor",
             linkerSettings: [
-                .linkedFramework("IOKit")
+                .linkedFramework("IOKit"),
+                .linkedFramework("AppKit")
             ]
         ),
         .testTarget(
