@@ -1,5 +1,12 @@
 # M1 Pro Auto-Sleep Dry-Run Validation — 2026-07-26
 
+> **Current authority note:** Task 6–8 below record the original accepted
+> startup/wake-cooldown implementation. The runtime was later refined by
+> `2026-07-26-angle-authoritative-resleep-design.md`: startup remains a
+> five-second fail-open gate, while a real wake now starts a separate
+> fifteen-second fresh-data recovery window. Historical output is preserved
+> verbatim and must not be read as the current runtime configuration.
+
 ## Scope
 
 This document records the bounded hardware acceptance for the foreground
@@ -299,3 +306,29 @@ scenario because both the process emitted `sleep-requested` and macOS independen
 recorded `Software Sleep pid=17708`.
 
 Task 8 decision: **Pass**.
+
+## Angle-authoritative recovery refinement
+
+The post-acceptance implementation now uses this runtime policy:
+
+```text
+auto-sleep config: mode=dry-run sleep-threshold=68 reopen-threshold=75 debounce=2 startup-cooldown=5 wake-recovery=15
+```
+
+Current semantics:
+
+- Startup below `75` remains disarmed and never sleeps immediately.
+- Every real wake clears pre-sleep angle evidence.
+- A fresh valid angle `<75` at the fifteen-second recovery deadline requests
+  one re-sleep; `69...74` remains within the closed-cycle hysteresis band.
+- A fresh `>=75` angle cancels recovery and rearms.
+- Missing or invalid fresh recovery data emits
+  `recovery-sensor-unavailable` and fails open.
+- A failed `IOPMSleepSystem` request emits
+  `sleep-request-failed error=...`, enters `disarmed`, and is not retried.
+
+Automated integration coverage verifies dry-run recovery re-sleep, recovery
+cancellation on reopen, and execute-mode failure visibility. The original Task 8
+real-sleep evidence remains valid for the first sleep request, but it does not
+claim the new two-sleep recovery path has been physically accepted. That bounded
+hardware acceptance remains separately gated.

@@ -1,5 +1,9 @@
 # MacBook Lid Angle Auto-Sleep Implementation Plan
 
+> **Superseded runtime behavior:** This completed plan records the original
+> cooldown/disarm implementation and its acceptance. Current post-wake behavior
+> is governed by `2026-07-26-angle-authoritative-resleep.md`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Extend the existing diagnostic CLI with an event-driven, calibrated, fail-open auto-sleep engine that defaults to dry-run and requires explicit opt-in for real sleep.

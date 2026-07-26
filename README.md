@@ -53,12 +53,44 @@ The helper script intentionally does not duplicate threshold or timing values.
 At startup the executable prints the effective configuration, currently:
 
 ```text
-auto-sleep config: mode=dry-run sleep-threshold=68 reopen-threshold=75 debounce=2 wake-cooldown=5
+auto-sleep config: mode=dry-run sleep-threshold=68 reopen-threshold=75 debounce=2 startup-cooldown=5 wake-recovery=15
 ```
 
 The thresholds are decoded sensor values, not guaranteed physical hinge degrees.
 In dry-run mode, crossing the close threshold for the debounce period prints
 `auto-sleep: would-sleep` but does not request system sleep.
+
+Startup and wake use different safety rules:
+
+- Startup waits five seconds and never sleeps immediately. If no fresh `>=75`
+  angle is observed, the process stays disarmed until the lid is reopened.
+- After a real wake, the process clears pre-sleep angle data and waits fifteen
+  seconds for fresh reports.
+- A fresh angle `<75` at the recovery deadline is still physically closed and
+  requests sleep again. Values `69...74` do not count as reopened.
+- A fresh `>=75` report cancels the pending recovery sleep and rearms.
+- Missing or invalid fresh recovery data fails open without requesting sleep.
+
+The active timing options are:
+
+```text
+--debounce <positive seconds>
+--startup-cooldown <nonnegative seconds>
+--wake-recovery <positive seconds>
+```
+
+The old `--wake-cooldown` option is rejected with migration guidance because
+startup safety and post-wake recovery no longer share one meaning.
+
+If the macOS sleep request fails, the foreground process remains alive and
+prints one diagnostic such as:
+
+```text
+auto-sleep: sleep-request-failed error=power-management-unavailable
+```
+
+The failed request is not retried automatically. The process remains disarmed
+until a fresh `>=75` angle is observed.
 
 Real sleep is deliberately not exposed through the helper script. It remains a
 separate, explicitly approved foreground acceptance step using both
@@ -126,7 +158,10 @@ When no candidate reaches the threshold, use `--list` output as evidence. Do not
 The tool cannot repair a broken clamshell sensor. The auto-sleep workaround is
 event-driven and foreground-only. On the validated M1 Pro, the recorded dry-run,
 idle-energy, operational-safety, and one-cycle real-sleep acceptance gates have
-passed. Real sleep remains an explicit operator action through
+passed for the original one-cycle behavior. The current angle-authoritative
+post-wake recovery refinement is fully covered by automated tests and remains
+separately gated for a bounded real two-sleep acceptance cycle. Real sleep
+remains an explicit operator action through
 `--auto-sleep --execute-sleep`; no background or persistent deployment is
 created by this project.
 

@@ -109,3 +109,44 @@ active output API ambiguous.
 - Open P1: 0
 - Open P2: 0
 - Task 3 status: approved
+
+## Task 4 — Composition, Integration, and Documentation Synchronization
+
+### Initial findings
+
+#### P1-1 — README still advertised the obsolete combined cooldown policy
+
+The runtime and tests used separate startup/recovery fields, but README still
+showed `wake-cooldown=5` and did not explain angle-authoritative re-sleep.
+
+**Resolution:** README now shows `startup-cooldown=5` and
+`wake-recovery=15`, documents `<75` recovery re-sleep, `>=75` cancellation,
+fresh-data fail-open behavior, obsolete-option migration, and request failures.
+
+#### P1-2 — Historical acceptance documents could be mistaken for current authority
+
+The original design, plan, final review, and Task 8 validation correctly recorded
+the old cooldown/disarm behavior, but lacked an explicit supersession marker.
+
+**Resolution:** Added authority notes that preserve historical evidence verbatim
+while directing current runtime interpretation to the angle-authoritative spec,
+plan, task reviews, and final review.
+
+### Re-review
+
+- Dry-run close/wake/closed recovery emits a second `would-sleep` after 15 seconds.
+- Reopening to `>=75` cancels recovery and emits `rearmed`.
+- Injected execute-mode failure is surfaced and disarmed end-to-end.
+- Dry-run composition never constructs or invokes the real IOKit operation.
+- Active source, tests, and README contain no `wake-cooldown=` runtime output.
+- Historical old output is retained only under explicit superseded notes.
+- Integration suite: 6 tests, 0 failures.
+- Full suite: 79 tests, 0 failures.
+- Release build: passed.
+
+### Disposition
+
+- Open P0: 0
+- Open P1: 0
+- Open P2: 0
+- Task 4 status: approved

@@ -1,5 +1,11 @@
 # Lid-Angle Auto-Sleep Whole-Phase Final Review — 2026-07-26
 
+> **Superseded behavior note:** This review remains the historical final review
+> for the original five-second startup/wake cooldown implementation. Current
+> runtime authority is the angle-authoritative re-sleep spec, plan, task reviews,
+> and final review. In particular, wake recovery is now fifteen seconds and a
+> fresh valid angle below `75` requests re-sleep.
+
 ## Review scope
 
 This review covers the complete foreground auto-sleep implementation through
@@ -145,6 +151,11 @@ repeated requests or an unsafe loop. The cost is reduced operational
 visibility. This is not a Task 7 safety blocker, but Task 8 must verify that the
 single bounded request actually sleeps the machine before acceptance is
 claimed.
+
+**Later resolution:** The coordinator now catches request failures explicitly,
+emits `auto-sleep: sleep-request-failed error=...`, transitions to `disarmed`,
+and never retries automatically. Dedicated normal-close and recovery-path tests
+close this historical P2.
 
 ## Verification gate
 

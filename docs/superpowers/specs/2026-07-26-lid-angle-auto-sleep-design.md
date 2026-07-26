@@ -1,5 +1,10 @@
 # MacBook Lid Angle Auto-Sleep Design
 
+> **Superseded:** This document defines the original cooldown/disarm behavior.
+> Current post-wake behavior is governed by
+> `2026-07-26-angle-authoritative-resleep-design.md`. Historical calibration and
+> initial safety reasoning remain valid.
+
 ## Status
 
 Reviewed and ready for implementation after the paired plan and holistic consistency reviews reach Open P0/P1 = 0. This phase extends the existing read-only diagnostic into a safe, event-driven auto-sleep utility.

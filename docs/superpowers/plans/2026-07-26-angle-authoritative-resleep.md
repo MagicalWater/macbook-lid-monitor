@@ -449,7 +449,7 @@ git commit -m "feat: expose recovery and sleep request failures"
 - Consumes: Tasks 1–3 production interfaces.
 - Produces: end-to-end dry-run and injected execute-sleep behavior plus synchronized operator documentation.
 
-- [ ] **Step 1: Write failing integration tests**
+- [x] **Step 1: Write failing integration tests**
 
 Add end-to-end tests for:
 
@@ -462,7 +462,7 @@ execute-sleep close -> injected operation throws -> sleep-request-failed -> disa
 Extend `IntegrationWakeObserver` so tests can store and invoke the wake callback.
 Extend `IntegrationSystemSleepOperation` with an optional deterministic error.
 
-- [ ] **Step 2: Run Task 4 RED**
+- [x] **Step 2: Run Task 4 RED**
 
 Run:
 
@@ -473,13 +473,13 @@ swift test --filter AutoSleepIntegrationTests
 Expected: failure until composition forwards operational errors and recovery
 events correctly.
 
-- [ ] **Step 3: Update composition root**
+- [x] **Step 3: Update composition root**
 
 Pass `onOperationalEvent` into the coordinator so both requester success and
 coordinator-caught failures use the same output path. Ensure dry-run still never
 constructs `IOKitSystemSleepOperation`.
 
-- [ ] **Step 4: Synchronize README and authority documents**
+- [x] **Step 4: Synchronize README and authority documents**
 
 Document:
 
@@ -495,7 +495,7 @@ sleep-request-failed error=...
 Mark the old Task 7 `disarmed-after-wake` behavior as superseded historical
 evidence, not current runtime behavior. Do not rewrite the factual Task 8 log.
 
-- [ ] **Step 5: Run Task 4 GREEN and documentation scans**
+- [x] **Step 5: Run Task 4 GREEN and documentation scans**
 
 Run:
 
@@ -511,7 +511,7 @@ Expected: tests/build pass; no active runtime/document example retains
 `wake-cooldown=`. Historical validation may retain old output only when clearly
 labelled as superseded.
 
-- [ ] **Step 6: Task 4 review, fix, re-review, and commit**
+- [x] **Step 6: Task 4 review, fix, re-review, and commit**
 
 Review composition isolation, dry-run safety, active-vs-historical documentation,
 and public CLI examples. Require Open P0 = 0 and Open P1 = 0, then commit:
