@@ -174,6 +174,11 @@ After a failure:
 - require `>=75` before another normal close cycle;
 - keep the foreground process alive so the operator can inspect the failure.
 
+The same handling applies whether the failed request came from the normal close
+cycle or from a wake-recovery re-sleep decision. A recovery request failure
+cancels the completed recovery path, enters `disarmed`, and cannot schedule
+another request until a later valid `>=75` report rearms the normal close cycle.
+
 This preserves fail-open behavior while making the failure observable.
 
 ## Components and Interfaces
@@ -196,15 +201,18 @@ startupCooldown = 5.0
 wakeRecovery = 15.0
 ```
 
-CLI compatibility may retain `--debounce` and `--wake-cooldown` temporarily, but
-the implementation plan must choose one unambiguous public contract. Preferred
-contract:
+The public CLI contract is fixed as:
 
 ```text
 --debounce 2
 --startup-cooldown 5
 --wake-recovery 15
 ```
+
+`--wake-cooldown` is removed rather than silently reinterpreted. Supplying it
+must produce a usage error that directs the operator to
+`--startup-cooldown` and `--wake-recovery`. This avoids changing the meaning of
+an existing five-second option into a fifteen-second post-wake policy.
 
 ### `LidSleepStateMachine`
 
@@ -305,6 +313,8 @@ status so they consistently describe:
 
 - Runtime defaults are `68 / 75 / 2 / 5 / 15` for close, reopen, debounce,
   startup cooldown, and wake recovery respectively.
+- `--wake-cooldown` is rejected with migration guidance; the supported timing
+  flags are `--debounce`, `--startup-cooldown`, and `--wake-recovery`.
 - A wake while fresh valid angle remains `<75` produces one sleep request after
   15 seconds.
 - Opening to `>=75` before the recovery deadline cancels the request.
