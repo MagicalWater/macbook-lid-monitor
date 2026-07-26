@@ -477,4 +477,75 @@ user LaunchAgent: absent
 - Open P1: 0
 - Open P2: 0
 - Task 9: Pass
-- Task 10: blocked pending explicit approval for one bounded manual sleep/wake cycle
+- Task 10: approved and completed below
+
+## Task 10 — IOKit Sleep/Wake Notification Dry-Run Acceptance
+
+### Implementation review
+
+Reviewed system-domain power callback ordering, runtime sleep progression, acknowledgement coverage, wake-to-recovery mapping, fresh HID continuation, process continuity, duplicate recovery behavior, dry-run enforcement, and both recovery outcomes: explicit reopen and low-value recovery-resleep.
+
+### Findings
+
+#### Acceptance gap 1 — Second cycle missed the low-value recovery branch
+
+The second approved cycle emitted `wake-recovery → rearmed` before the user lowered the lid. The first fresh post-wake HID report was therefore `>=75`; the later low value correctly entered the ordinary close debounce path and emitted `candidate-started → triggered → would-sleep`.
+
+**Disposition:** Not an implementation defect. The runtime behaved according to the accepted state machine, but this cycle did not satisfy the low-value recovery acceptance condition. A separately approved third cycle held the lid low before sleep and throughout the 15-second recovery window.
+
+#### P2-1 — Low-value recovery purpose required clearer operator explanation
+
+The initial instructions did not clearly distinguish the production intent (request sleep again if the machine wakes while the lid remains closed) from the Task 10 dry-run mechanism (record `recovery-resleep` and `would-sleep` without invoking real sleep).
+
+**Resolution:** Clarified that `<75` means the user has not demonstrably reopened the lid, that values `<=68` are acceptable and easier to hold, and that Task 10 validates the decision path only while Task 11 separately validates the real root/system sleep API.
+
+### Re-review
+
+- First cycle baseline was `2026-07-26T16:01:32Z`, PID `52638`, angle `160`, count `1300`.
+- First cycle emitted exactly one `will-sleep`, one `will-power-on`, and one `has-powered-on`, followed by `wake-recovery → rearmed` and a fresh angle `160` report.
+- macOS independently recorded Software Sleep at `2026-07-27 00:02:32 +0800` and HID Activity wake at `00:02:55 +0800`.
+- Second cycle correctly cancelled recovery on a fresh high report, then completed a normal dry-run close path; it was excluded from low-value branch acceptance.
+- Third cycle baseline was `2026-07-26T16:14:18Z`, PID `52638`, angle `159`, count `2100`.
+- Third cycle emitted ordered `will-sleep → will-power-on → has-powered-on → wake-recovery → recovery-resleep → would-sleep → rearmed`.
+- macOS independently recorded Software Sleep at `2026-07-27 00:14:46 +0800` and HID Activity wake at `00:15:13 +0800`.
+- The low-value recovery branch emitted one `recovery-resleep` and one `would-sleep`; no `sleep-requested` event or automatic second real sleep occurred.
+- Unit tests verify `IOAllowPowerChange` precedes forwarding for both `canSleep` and `willSleep`.
+- `has-powered-on` generated one recovery transition per cycle; no duplicate recovery timer or duplicate `would-sleep` was observed.
+- PID remained `52638`, `runs=1`, process count remained one, UID/GID remained `0/0`, and stderr remained empty.
+- No one-shot sleep probe, reboot, or shutdown occurred.
+
+### Validation
+
+```text
+cycle 1:
+will-sleep: 1
+will-power-on: 1
+has-powered-on: 1
+wake-recovery: 1
+rearmed: 1
+fresh report: angle=160 count=1500
+
+cycle 3:
+will-sleep: 1
+will-power-on: 1
+has-powered-on: 1
+wake-recovery: 1
+recovery-resleep: 1
+would-sleep after recovery: 1
+rearmed after reopen: 1
+sleep-requested: 0
+
+PID before/after: 52638 / 52638
+launchd runs: 1
+process count: 1
+UID/GID: 0/0
+stderr bytes: 0
+```
+
+### Disposition
+
+- Open P0: 0
+- Open P1: 0
+- Open P2: 0
+- Task 10: Pass
+- Task 11: blocked pending bootout and explicit approval for one real one-shot sleep probe

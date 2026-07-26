@@ -198,7 +198,49 @@ Task 9 操作過程亦重新確認：這些數值是 machine-specific decoded se
 
 ## Power notification 與睡眠／喚醒
 
-尚未批准／尚未執行。
+Task 10 經三次分別批准的 bounded manual sleep/wake cycle 完成 dry-run 驗收。三次測試均由使用者透過 macOS UI 手動要求睡眠；未執行 one-shot sleep probe，daemon 仍只使用 `DryRunSleepRequester`。
+
+第一次 cycle 驗證正常重新開啟分支：
+
+```text
+pre-sleep: 2026-07-26T16:01:32Z
+PID: 52638
+latest report: angle=160 count=1300
+
+2026-07-26T16:02:27Z power=will-sleep
+2026-07-26T16:02:55Z power=will-power-on
+2026-07-26T16:02:55Z power=has-powered-on
+auto-sleep: wake-recovery
+auto-sleep: rearmed
+2026-07-26T16:03:48Z report-milestone angle=160 count=1500
+```
+
+macOS power log 獨立記錄 `2026-07-27 00:02:32 +0800` 的 Software Sleep，以及 `00:02:55 +0800` 的 HID Activity wake。相同 PID、`runs=1`、單一 root process 與空 stderr 均保持不變。
+
+第二次 cycle 嘗試低值 recovery 分支，但喚醒後第一批 report 先達到 `>=75`，因此正確走入 `wake-recovery → rearmed`，之後壓低上蓋才走一般 `candidate-started → triggered → would-sleep`。此 cycle 證明一般 close path 正常，但不作為 `recovery-resleep` acceptance。
+
+第三次 cycle 在睡眠前即將上蓋維持於低 sensor value，並於喚醒後保持低位超過 15 秒 recovery window：
+
+```text
+pre-sleep: 2026-07-26T16:14:18Z
+PID: 52638
+latest report: angle=159 count=2100
+
+auto-sleep: candidate-started
+2026-07-26T16:14:41Z power=will-sleep
+auto-sleep: triggered
+auto-sleep: would-sleep
+2026-07-26T16:15:13Z power=will-power-on
+2026-07-26T16:15:14Z power=has-powered-on
+auto-sleep: wake-recovery
+auto-sleep: recovery-resleep
+auto-sleep: would-sleep
+auto-sleep: rearmed
+```
+
+macOS power log 獨立記錄 `2026-07-27 00:14:46 +0800` 的 Software Sleep，以及 `00:15:13 +0800` 的 HID Activity wake。`recovery-resleep` 後只出現 `would-sleep`，沒有 `sleep-requested`，因此 daemon 沒有自行造成第二次真實睡眠；重新打開後成功 `rearmed`。
+
+IOKit acknowledgement 的 exact-call ordering 由 `IOKitSystemPowerObserverTests` 驗證：`canSleep` 與 `willSleep` 均先呼叫 `IOAllowPowerChange` 再 forward event；runtime 的完整 sleep progression 亦證明 acknowledgement 沒有阻塞系統睡眠。
 
 ## One-shot sleep probe
 
@@ -218,7 +260,7 @@ Task 7 前景程序停止後，下列路徑均不存在。Task 8 經批准後已
 /Library/Logs/MacBookLidMonitor/Feasibility: present
 ```
 
-目前 system-domain job 已載入，單一 root PID 為 `52638`。Task 9 已通過；尚未批准 Task 10 的手動睡眠／喚醒驗收。
+目前 system-domain job 已載入，單一 root PID 為 `52638`。Task 10 已通過；Task 11 真實 one-shot sleep probe 尚未批准。
 
 ## Findings
 
@@ -250,7 +292,7 @@ Task 9 執行前的口頭操作說明曾錯誤套用 `0° = 闔上、90° = 垂�
 
 ## 目前結論
 
-Task 7、Task 8 與 Task 9 驗證均通過：
+Task 7、Task 8、Task 9 與 Task 10 驗證均通過：
 
 - IOKit power observer 可在一般前景 process 註冊；
 - M1 Pro lid HID 可被辨識、開啟並收到有效 report；
@@ -265,5 +307,9 @@ Task 7、Task 8 與 Task 9 驗證均通過：
 - 登出至 loginwindow 後，同一 root PID 與同一 launchd run 持續存在；
 - loginwindow 時段內有 timestamped report evidence，包含感測器值 `58` 與兩次完整 dry-run close cycle；
 - 重新登入後 report 持續至 `count=1000`、感測器值回升至 `160`，且沒有 duplicate process、user LaunchAgent 或 stderr。
+- system-domain daemon 在三次手動 sleep/wake 中均收到 ordered `will-sleep → will-power-on → has-powered-on` callback；
+- 正常重新開啟分支在 fresh `>=75` report 後取消 recovery 並 `rearmed`；
+- 低值分支在 recovery 到期後輸出一次 `recovery-resleep` 與一次 `would-sleep`，且沒有真實再次睡眠；
+- 三次 cycle 前後 PID 均為 `52638`、`runs=1`、單一 root process、stderr 為空。
 
-這代表 **Task 9 通過**，但不代表睡眠／喚醒、daemon-context 真實睡眠或重開機可行性已通過。下一步 Task 10 仍需另外明確批准一個 bounded manual sleep/wake cycle。
+這代表 **Task 10 通過**，但不代表 daemon-context 真實 `IOPMSleepSystem` 或重開機自動啟動可行性已通過。下一步 Task 11 必須先 bootout dry-run daemon，再另行取得一次真實 one-shot sleep probe 的明確批准。
