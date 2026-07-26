@@ -139,7 +139,7 @@ sleep mode.
 Stop the process and delete:
 
 ```text
-/Users/water/Developer/projects/macbook-lid-monitor
+~/Developer/projects/macbook-lid-monitor
 ```
 
 No system settings or persistent services are installed by the diagnostic or

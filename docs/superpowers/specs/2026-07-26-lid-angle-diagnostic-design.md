@@ -317,7 +317,7 @@ Perform one bounded second investigation consisting of IOHID metadata inspection
 The diagnostic project is self-contained. Removal consists of stopping the process and deleting:
 
 ```text
-/Users/water/Developer/projects/macbook-lid-monitor
+~/Developer/projects/macbook-lid-monitor
 ```
 
 No system settings or persistent services should need cleanup after Phase 1.
