@@ -1,11 +1,11 @@
 # Production LaunchDaemon Task Register
 
-Status: Implementation in progress; Task 1 complete.
+Status: Implementation in progress; Tasks 1–2 complete.
 
 | Task | Purpose | Primary files | Verification | Approval gate | Rollback/safe stop |
 | ---: | --- | --- | --- | --- | --- |
 | 1 | Typed config and modes — complete | `ProductionConfiguration*`, tests | focused + full tests | none | revert commit |
-| 2 | Exact hardware profile | `LidHardwareProfile*`, discovery, tests | profile/fail-open tests | none | revert commit |
+| 2 | Exact hardware profile — complete | `LidHardwareProfile*`, discovery, tests | profile/fail-open tests | none | revert commit |
 | 3 | Freshness/request epochs | state machine/coordinator/tests | stale/duplicate regression | none | revert commit |
 | A | Shared-core stage review | reviews only | clean test/build | none | no system state |
 | 4 | Events and health | production event/health/sink/tests | privacy/format tests | none | revert commit |

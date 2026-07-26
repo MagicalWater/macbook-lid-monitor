@@ -50,3 +50,44 @@ A whitespace-only identifier could pass decoding but could never authorize a har
 ### Disposition
 
 **Task 1 approved and complete.**
+
+## Task 2 — Exact hardware profile registry
+
+### Implementation
+
+- Added one production hardware profile for the verified M1 Pro HID identity.
+- Bound that profile directly to the verified report-ID-1, 3-byte decoder.
+- Added exact-match resolution that rejects zero matches and duplicate matches.
+- Kept `CandidateRanker` available for diagnostics but outside production authorization.
+
+### TDD evidence
+
+- RED: focused tests failed because no production profile registry existed.
+- GREEN: five focused tests pass after minimal registry and decoder binding.
+
+### Immediate review findings
+
+No blocking implementation defect was found. Re-review specifically checked that profile matching
+includes vendor, product, usage page, usage, transport, and non-input-device class, and that the
+profile-bound decoder rejects every unknown report shape rather than falling back to the exploratory
+two-byte decoder.
+
+### Re-review
+
+- Diagnostic score cannot authorize production monitoring: pass.
+- Unknown profile and transport mismatch fail open: pass.
+- Multiple exact devices fail open as ambiguous: pass.
+- Generic/composite decoder is not returned by the production registry: pass.
+- No runtime composition or system mutation was introduced: pass.
+
+### Verification
+
+- Focused: 5 tests, 0 failures.
+- Full: 123 tests, 0 failures.
+- Release build: passed.
+- `git diff --check`: passed.
+- Residual system state: unchanged.
+
+### Disposition
+
+**Task 2 approved and complete.**
