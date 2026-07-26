@@ -91,3 +91,43 @@ git diff --check: passed
 - Open P1: 0
 - Open P2: 0
 - Task 2: Pass
+
+## Task 3 — Build the Permanently Dry-Run Daemon Spike Runtime
+
+### Findings
+
+#### P1-1 — Stream factory failure lacked evidence
+Resolved by emitting `streamStartFailed` for both stream construction and stream start failures.
+
+#### P1-2 — Signal-controller startup failure could leave the coordinator active
+Resolved by explicitly stopping the session before propagating a signal-controller startup error.
+
+#### P1-3 — Dispatch source file descriptors were closed before cancellation completed
+Resolved by moving descriptor closure into the source cancel handler, avoiding descriptor reuse races.
+
+### Re-review
+
+- Production daemon composition constructs `DryRunSleepRequester` directly and exposes no execution mode.
+- Extra command-line arguments are rejected before discovery or HID startup.
+- Candidate ranking threshold and calibrated startup fail-open policy are unchanged.
+- Start, stop, and evidence cleanup are idempotent.
+- SIGTERM/SIGINT handlers only write one byte to a pipe; Swift cleanup runs on the dispatch source queue.
+- HID construction/start failures map to I/O failure; enumeration/no-candidate failures map to unavailable.
+- No terminal or AppKit dependency is present.
+
+### Validation
+
+```text
+DaemonSpikeCompositionTests: 7 passed
+ProcessSignalControllerTests: 2 passed
+swift test: 96 tests, 0 failures
+swift build -c release: passed
+git diff --check: passed
+```
+
+### Disposition
+
+- Open P0: 0
+- Open P1: 0
+- Open P2: 0
+- Task 3: Pass

@@ -350,10 +350,6 @@ public enum LidMonitorCLIEntryPoint {
     }
 }
 
-public enum LidMonitorDaemonSpikeEntryPoint {
-    public static func run() -> Int32 { ExitCode.unavailable.rawValue }
-}
-
 public enum LidMonitorSleepProbeEntryPoint {
     public static func run() -> Int32 { ExitCode.unavailable.rawValue }
 }
