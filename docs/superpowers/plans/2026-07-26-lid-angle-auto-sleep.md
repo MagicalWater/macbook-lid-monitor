@@ -455,7 +455,7 @@ git commit -m "feat: wire safe auto-sleep dry-run flow"
 - Consumes: release dry-run executable from Task 5.
 - Produces: documented evidence and go/no-go decision for real sleep.
 
-- [ ] **Step 1: Run five bounded dry-run cycles**
+- [x] **Step 1: Run five bounded dry-run cycles**
 
 For each cycle record:
 
@@ -467,19 +467,19 @@ open only to 69...74: must remain latched
 open to >=75: must rearm
 ```
 
-- [ ] **Step 2: Test cancellation**
+- [x] **Step 2: Test cancellation**
 
 Enter `<=68` for less than two seconds, return above `68`, and verify no `would-sleep` occurs.
 
-- [ ] **Step 3: Test startup cooldown**
+- [x] **Step 3: Test startup cooldown**
 
 Start dry-run while the lid is at `<=68`; verify no sleep decision during the first five seconds and that it remains disarmed afterward. Open to `>=75`, close again, and verify the normal two-second candidate then triggers exactly once.
 
-- [ ] **Step 4: Document results and README usage**
+- [x] **Step 4: Document results and README usage**
 
 The validation document must list timestamps, observed sensor values, trigger counts, failures, and whether Open P0/P1 findings remain. README must clearly label dry-run as the first required mode.
 
-- [ ] **Step 5: Review and commit**
+- [x] **Step 5: Review and commit**
 
 ```bash
 git add docs/validation/2026-07-26-m1-pro-auto-sleep.md README.md

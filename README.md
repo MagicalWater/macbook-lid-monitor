@@ -1,8 +1,8 @@
 # macbook-lid-monitor
 
-`macbook-lid-monitor` is a read-only macOS diagnostic tool for checking whether a modern MacBook's lid-angle HID sensor still reports usable values when normal clamshell sleep detection is unreliable.
+`macbook-lid-monitor` is a macOS lid-angle sensor diagnostic and a separately gated foreground auto-sleep workaround prototype for cases where normal clamshell sleep detection is unreliable.
 
-Phase 1 is diagnostic only. It does not put the Mac to sleep, change power settings, modify NVRAM, install a LaunchAgent, request administrator privileges, or write HID reports.
+Diagnostic modes are read-only. Auto-sleep must be selected explicitly and defaults to a dry-run that only reports `would-sleep`. Real sleep additionally requires the explicit `--execute-sleep` flag. The project does not change persistent power settings, modify NVRAM, install a LaunchAgent, request administrator privileges, or write HID reports.
 
 ## Requirements
 
@@ -39,6 +39,33 @@ Stop automatically after a fixed number of seconds:
 ```
 
 No arguments defaults to watch mode. Press `Ctrl+C` to stop an unlimited watch.
+
+### Auto-sleep dry-run
+
+Always validate the dry-run first:
+
+```bash
+./scripts/run-auto-sleep-dry-run.sh
+```
+
+The calibrated policy is defined once in `LidSleepPolicy.calibratedDefault`.
+The helper script intentionally does not duplicate threshold or timing values.
+At startup the executable prints the effective configuration, currently:
+
+```text
+auto-sleep config: mode=dry-run sleep-threshold=68 reopen-threshold=75 debounce=2 wake-cooldown=5
+```
+
+The thresholds are decoded sensor values, not guaranteed physical hinge degrees.
+In dry-run mode, crossing the close threshold for the debounce period prints
+`auto-sleep: would-sleep` but does not request system sleep.
+
+Real sleep is deliberately not exposed through the helper script. It remains a
+separate, explicitly approved foreground acceptance step using both
+`--auto-sleep` and `--execute-sleep` after the documented safety reviews pass.
+
+Hardware acceptance evidence is recorded in
+`docs/validation/2026-07-26-m1-pro-auto-sleep.md`.
 
 ## Output
 
@@ -89,12 +116,16 @@ When no candidate reaches the threshold, use `--list` output as evidence. Do not
 ## Safety boundaries
 
 - No HID write or feature-report request
-- No automatic sleep
+- Diagnostic and dry-run modes never request sleep
+- Real sleep requires explicit `--auto-sleep --execute-sleep`
 - No persistent service
+- No persistent power-setting mutation
 - No unrelated keyboard or trackpad capture
 - Input callback bytes are copied before decoding
 
-Phase 1 cannot repair a broken clamshell sensor. Its purpose is to determine whether the independent angle sensor can support a later, separately designed auto-sleep workaround.
+The tool cannot repair a broken clamshell sensor. The auto-sleep workaround is
+event-driven, foreground-only, and must remain in dry-run until the recorded
+hardware and operational safety gates pass.
 
 ## Removal
 
@@ -104,4 +135,5 @@ Stop the process and delete:
 /Users/water/Developer/projects/macbook-lid-monitor
 ```
 
-No system settings or persistent services are installed by Phase 1.
+No system settings or persistent services are installed by the diagnostic or
+foreground auto-sleep flows.
