@@ -31,3 +31,16 @@ enum ExitCode: Int32 {
 enum AppVersion {
     static let current = "0.1.0"
 }
+
+struct HIDReport: Equatable, Sendable {
+    let reportID: UInt32
+    let bytes: [UInt8]
+    let timestamp: Date
+}
+
+enum AngleDecodeResult: Equatable, Sendable {
+    case decoded(Double)
+    case unsupported(reportLength: Int)
+    case malformed(String)
+    case outOfRange(Double)
+}
