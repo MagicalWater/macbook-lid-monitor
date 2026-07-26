@@ -2,6 +2,47 @@ import XCTest
 @testable import LidMonitorCore
 
 final class LidSleepStateMachineTests: XCTestCase {
+    func testStaleCloseSampleCannotRequestSleep() throws {
+        let start = Date(timeIntervalSince1970: 1_000)
+        var machine = LidSleepStateMachine(
+            policy: policy,
+            maximumSampleAge: 1
+        )
+        _ = machine.handle(.angleChanged(90, at: start))
+        _ = machine.handle(.startupCooldownElapsed(at: start))
+        _ = machine.handle(.angleChanged(60, at: start))
+
+        let effects = machine.handle(.closeDebounceElapsed(at: start.addingTimeInterval(2)))
+
+        XCTAssertFalse(effects.contains(.requestSleep))
+        XCTAssertEqual(machine.state, .open)
+    }
+
+    func testStaleRecoverySampleFailsOpen() throws {
+        let start = Date(timeIntervalSince1970: 1_000)
+        var machine = LidSleepStateMachine(
+            policy: policy,
+            maximumSampleAge: 2
+        )
+        _ = machine.handle(.systemDidWake(at: start))
+        _ = machine.handle(.angleChanged(60, at: start.addingTimeInterval(1)))
+
+        let effects = machine.handle(.wakeRecoveryElapsed(at: start.addingTimeInterval(15)))
+
+        XCTAssertFalse(effects.contains(.requestSleep))
+        XCTAssertEqual(machine.state, .disarmed)
+    }
+
+    func testDuplicateWakeCallbackDoesNotReplaceRecoveryEpoch() throws {
+        let start = Date(timeIntervalSince1970: 1_000)
+        var machine = LidSleepStateMachine(policy: policy)
+        let first = machine.handle(.systemDidWake(at: start))
+        let duplicate = machine.handle(.systemDidWake(at: start))
+
+        XCTAssertFalse(first.isEmpty)
+        XCTAssertTrue(duplicate.isEmpty)
+        XCTAssertEqual(machine.state, .wakeRecovery(deadline: start.addingTimeInterval(15)))
+    }
     private let start = Date(timeIntervalSince1970: 1_000)
     private let policy = try! LidSleepPolicy(
         sleepThreshold: 60,

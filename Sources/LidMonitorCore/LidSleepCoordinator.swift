@@ -27,6 +27,7 @@ final class LidSleepCoordinator: @unchecked Sendable {
         wakeObserver: SystemWakeObserving,
         sleepRequester: SleepRequesting,
         policy: LidSleepPolicy,
+        maximumSampleAge: TimeInterval = .infinity,
         now: @escaping @Sendable () -> Date = Date.init,
         onOperationalEvent: @escaping @Sendable (AutoSleepOperationalEvent) -> Void = { _ in },
         onTransitionEvent: @escaping @Sendable (AutoSleepTransitionEvent) -> Void = { _ in }
@@ -40,7 +41,10 @@ final class LidSleepCoordinator: @unchecked Sendable {
         self.now = now
         self.onOperationalEvent = onOperationalEvent
         self.onTransitionEvent = onTransitionEvent
-        machine = LidSleepStateMachine(policy: policy)
+        machine = LidSleepStateMachine(
+            policy: policy,
+            maximumSampleAge: maximumSampleAge > 0 ? maximumSampleAge : 0
+        )
     }
 
     func start() throws {

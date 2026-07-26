@@ -15,6 +15,7 @@ final class ProductionConfigurationTests: XCTestCase {
             XCTAssertEqual(configuration.mode, expected)
             XCTAssertEqual(configuration.policy, .calibratedDefault)
             XCTAssertEqual(configuration.hardwareProfileID, "m1-pro-0x8104-report-id-1-v1")
+            XCTAssertEqual(configuration.sensorFreshness, 5)
         }
     }
 
@@ -52,6 +53,20 @@ final class ProductionConfigurationTests: XCTestCase {
         value["ReopenThreshold"] = 75
         XCTAssertThrowsError(try ProductionConfigurationDecoder().decode(encode(value))) { error in
             XCTAssertEqual(error as? ProductionConfigurationError, .invalidPolicy("invalid-threshold-relationship"))
+        }
+    }
+
+    func testRejectsMissingOrNonpositiveSensorFreshness() {
+        var missing = dictionary()
+        missing.removeValue(forKey: "SensorFreshnessSeconds")
+        XCTAssertThrowsError(try ProductionConfigurationDecoder().decode(encode(missing))) { error in
+            XCTAssertEqual(error as? ProductionConfigurationError, .missingField("SensorFreshnessSeconds"))
+        }
+
+        var invalid = dictionary()
+        invalid["SensorFreshnessSeconds"] = 0.0
+        XCTAssertThrowsError(try ProductionConfigurationDecoder().decode(encode(invalid))) { error in
+            XCTAssertEqual(error as? ProductionConfigurationError, .invalidSensorFreshness(0))
         }
     }
 
@@ -114,6 +129,7 @@ final class ProductionConfigurationTests: XCTestCase {
             "CloseDebounceSeconds": 2.0,
             "StartupCooldownSeconds": 5.0,
             "WakeRecoverySeconds": 15.0,
+            "SensorFreshnessSeconds": 5.0,
         ]
     }
 

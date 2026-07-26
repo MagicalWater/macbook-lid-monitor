@@ -11,6 +11,7 @@ struct ProductionConfiguration: Equatable, Sendable {
     let mode: ProductionMode
     let hardwareProfileID: String
     let policy: LidSleepPolicy
+    let sensorFreshness: TimeInterval
 }
 
 enum ProductionConfigurationError: Error, Equatable, Sendable, CustomStringConvertible {
@@ -20,6 +21,7 @@ enum ProductionConfigurationError: Error, Equatable, Sendable, CustomStringConve
     case unsupportedSchemaVersion(Int)
     case unsupportedMode(String)
     case invalidHardwareProfileID
+    case invalidSensorFreshness(TimeInterval)
     case invalidPolicy(String)
     case configurationIsSymbolicLink
     case configurationIsNotRegularFile
@@ -35,6 +37,7 @@ enum ProductionConfigurationError: Error, Equatable, Sendable, CustomStringConve
         case let .unsupportedSchemaVersion(version): return "unsupported-schema-version(\(version))"
         case let .unsupportedMode(mode): return "unsupported-mode(\(mode))"
         case .invalidHardwareProfileID: return "invalid-hardware-profile-id"
+        case let .invalidSensorFreshness(value): return "invalid-sensor-freshness(\(value))"
         case let .invalidPolicy(reason): return "invalid-policy(\(reason))"
         case .configurationIsSymbolicLink: return "configuration-is-symbolic-link"
         case .configurationIsNotRegularFile: return "configuration-is-not-regular-file"
@@ -49,7 +52,7 @@ struct ProductionConfigurationDecoder: Sendable {
     private static let allowedKeys: Set<String> = [
         "SchemaVersion", "Mode", "HardwareProfileID", "SleepThreshold",
         "ReopenThreshold", "CloseDebounceSeconds", "StartupCooldownSeconds",
-        "WakeRecoverySeconds",
+        "WakeRecoverySeconds", "SensorFreshnessSeconds",
     ]
 
     func decode(_ data: Data) throws -> ProductionConfiguration {
@@ -78,6 +81,10 @@ struct ProductionConfigurationDecoder: Sendable {
         guard !hardwareProfileID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw ProductionConfigurationError.invalidHardwareProfileID
         }
+        let sensorFreshness = try requiredNumber("SensorFreshnessSeconds", from: dictionary)
+        guard sensorFreshness.isFinite, sensorFreshness > 0 else {
+            throw ProductionConfigurationError.invalidSensorFreshness(sensorFreshness)
+        }
 
         do {
             let policy = try LidSleepPolicy(
@@ -91,7 +98,8 @@ struct ProductionConfigurationDecoder: Sendable {
                 schemaVersion: schemaVersion,
                 mode: mode,
                 hardwareProfileID: hardwareProfileID,
-                policy: policy
+                policy: policy,
+                sensorFreshness: sensorFreshness
             )
         } catch let error as ProductionConfigurationError {
             throw error

@@ -30,11 +30,15 @@ enum LidSleepEffect: Equatable, Sendable {
 
 struct LidSleepStateMachine: Sendable {
     private let policy: LidSleepPolicy
+    private let maximumSampleAge: TimeInterval
     private(set) var state: LidSleepState = .startupCooldown
     private var latestAngle: Int?
+    private var latestSampleTimestamp: Date?
+    private var latestWakeTimestamp: Date?
 
-    init(policy: LidSleepPolicy) {
+    init(policy: LidSleepPolicy, maximumSampleAge: TimeInterval = .infinity) {
         self.policy = policy
+        self.maximumSampleAge = maximumSampleAge > 0 ? maximumSampleAge : 0
     }
 
     mutating func handle(_ event: LidSleepEvent) -> [LidSleepEffect] {
@@ -44,6 +48,7 @@ struct LidSleepStateMachine: Sendable {
                 return handleInvalidData()
             }
             latestAngle = angle
+            latestSampleTimestamp = timestamp
             return handleAngle(angle, at: timestamp)
 
         case let .closeDebounceElapsed(at: timestamp):
@@ -113,7 +118,12 @@ struct LidSleepStateMachine: Sendable {
         guard case let .closingCandidate(deadline) = state,
               timestamp >= deadline,
               let latestAngle,
+              isFresh(at: timestamp),
               latestAngle <= policy.sleepThreshold else {
+            if case .closingCandidate = state, !isFresh(at: timestamp) {
+                state = .open
+                return [.cancelCloseDebounce, .stateChanged(.open)]
+            }
             return []
         }
 
@@ -122,7 +132,12 @@ struct LidSleepStateMachine: Sendable {
     }
 
     private mutating func handleSystemWake(at timestamp: Date) -> [LidSleepEffect] {
+        if let latestWakeTimestamp, timestamp <= latestWakeTimestamp {
+            return []
+        }
+        latestWakeTimestamp = timestamp
         latestAngle = nil
+        latestSampleTimestamp = nil
         var effects: [LidSleepEffect] = []
         if case .closingCandidate = state {
             effects.append(.cancelCloseDebounce)
@@ -149,6 +164,9 @@ struct LidSleepStateMachine: Sendable {
         guard let latestAngle else {
             return transition(to: .disarmed)
         }
+        guard isFresh(at: timestamp) else {
+            return transition(to: .disarmed)
+        }
         guard latestAngle < policy.reopenThreshold else {
             return transition(to: .open)
         }
@@ -159,9 +177,15 @@ struct LidSleepStateMachine: Sendable {
 
     private mutating func handleInvalidData() -> [LidSleepEffect] {
         latestAngle = nil
+        latestSampleTimestamp = nil
         guard case .closingCandidate = state else { return [] }
         state = .open
         return [.cancelCloseDebounce, .stateChanged(.open)]
+    }
+
+    private func isFresh(at timestamp: Date) -> Bool {
+        guard let latestSampleTimestamp else { return false }
+        return timestamp.timeIntervalSince(latestSampleTimestamp) <= maximumSampleAge
     }
 
     private mutating func transition(

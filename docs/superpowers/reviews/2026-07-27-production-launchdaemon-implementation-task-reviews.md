@@ -116,3 +116,48 @@ first correcting the authority documents would create undocumented runtime behav
 ### Disposition
 
 **Spec/Plan adjustment approved; Task 3 may proceed.**
+
+## Task 3 — Fresh sensor and request epoch safety
+
+### Implementation
+
+- Added required positive `SensorFreshnessSeconds` to production configuration.
+- Added sample timestamps and configurable maximum age to `LidSleepStateMachine`.
+- Stale close samples now cancel the candidate and return to open without a request.
+- Stale wake-recovery samples fail open into disarmed.
+- Duplicate or out-of-order wake callbacks no longer replace the active recovery epoch.
+- Added a coordinator injection seam while preserving existing CLI behavior with an infinite default.
+
+### TDD evidence
+
+- RED: configuration and state-machine tests failed on missing freshness fields and constructor seam.
+- GREEN: focused configuration/state-machine/coordinator suite passes after minimal changes.
+
+### Immediate review findings
+
+#### P1 — Freshness did not cross the coordinator boundary
+
+The first implementation added state-machine freshness but no production composition seam.
+
+**Resolution:** Added `maximumSampleAge` to `LidSleepCoordinator` and forwarded it into the state
+machine. Nonpositive direct values clamp to zero, which is fail-open.
+
+### Re-review
+
+- Stale close and recovery data cannot request sleep: pass.
+- Wake clears pre-wake data and rejects duplicate callbacks: pass.
+- Duplicate timer delivery remains idempotent through state transitions: pass.
+- Existing calibrated behavior remains unchanged with the compatibility default: pass.
+- Configuration is the production single source for finite freshness: pass.
+
+### Verification
+
+- Focused: 35 tests, 0 failures.
+- Full: 127 tests, 0 failures.
+- Release build: passed.
+- `git diff --check`: passed.
+- Residual system state: unchanged.
+
+### Disposition
+
+**Task 3 approved and complete.**
