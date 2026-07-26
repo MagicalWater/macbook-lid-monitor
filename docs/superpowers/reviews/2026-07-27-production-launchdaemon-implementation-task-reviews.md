@@ -161,3 +161,44 @@ machine. Nonpositive direct values clamp to zero, which is fail-open.
 ### Disposition
 
 **Task 3 approved and complete.**
+
+## Task 4 — Production events and health
+
+### Implementation
+
+- Added production-only lifecycle, health, transition, degradation, and stopping events.
+- Added stable line formatting and a lock-serialized output sink.
+- Added a health model with version/mode/profile, transition time, sample age, and stable error.
+- Raw reports are not representable by the production event model.
+
+### TDD evidence
+
+- RED: focused tests failed because production event/health types did not exist.
+- GREEN: four focused tests pass after minimal implementation.
+
+### Immediate review findings
+
+#### P1 — Health initializer was inaccessible
+
+Private stored properties caused Swift's synthesized initializer to become private.
+
+**Resolution:** Added an explicit internal initializer and repeated focused/full verification.
+
+### Re-review
+
+- Stable lifecycle/error taxonomy: pass.
+- One complete line per event: pass.
+- Raw bytes cannot be logged: pass.
+- Sensor values are limited to explicit transition events: pass.
+- Health snapshot exposes age and stable code without raw data: pass.
+
+### Verification
+
+- Focused: 4 tests, 0 failures.
+- Full: 131 tests, 0 failures.
+- Release build: passed.
+- `git diff --check`: passed.
+
+### Disposition
+
+**Task 4 approved and complete.**

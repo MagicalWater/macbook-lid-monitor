@@ -1,6 +1,6 @@
 # Production LaunchDaemon Task Register
 
-Status: Implementation in progress; Tasks 1–3 complete.
+Status: Implementation in progress; Tasks 1–4 complete.
 
 | Task | Purpose | Primary files | Verification | Approval gate | Rollback/safe stop |
 | ---: | --- | --- | --- | --- | --- |
@@ -8,7 +8,7 @@ Status: Implementation in progress; Tasks 1–3 complete.
 | 2 | Exact hardware profile — complete | `LidHardwareProfile*`, discovery, tests | profile/fail-open tests | none | revert commit |
 | 3 | Freshness/request epochs, including required config freshness — complete | configuration/state machine/coordinator/tests | stale/duplicate regression | none | revert commit |
 | A | Shared-core stage review | reviews only | clean test/build | none | no system state |
-| 4 | Events and health | production event/health/sink/tests | privacy/format tests | none | revert commit |
+| 4 | Events and health — complete | production event/health/sink/tests | privacy/format tests | none | revert commit |
 | 5 | Production executable | application, target, Package.swift, tests | composition/full/release | none | revert commit |
 | 6 | Crash budget | crash budget/application/tests | circuit/no-restart tests | none | revert commit |
 | B | Composition stage review | reviews only | clean test/build/products | none | no system state |
