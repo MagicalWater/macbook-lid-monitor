@@ -14,21 +14,24 @@ enum AutoSleepExecutionMode: Equatable, Sendable {
 struct LidSleepPolicy: Equatable, Sendable {
     let sleepThreshold: Int
     let reopenThreshold: Int
-    let debounce: TimeInterval
-    let wakeCooldown: TimeInterval
+    let closeDebounce: TimeInterval
+    let startupCooldown: TimeInterval
+    let wakeRecovery: TimeInterval
 
     static let calibratedDefault = try! LidSleepPolicy(
         sleepThreshold: 68,
         reopenThreshold: 75,
-        debounce: 2.0,
-        wakeCooldown: 5.0
+        closeDebounce: 2.0,
+        startupCooldown: 5.0,
+        wakeRecovery: 15.0
     )
 
     init(
         sleepThreshold: Int,
         reopenThreshold: Int,
-        debounce: TimeInterval,
-        wakeCooldown: TimeInterval
+        closeDebounce: TimeInterval,
+        startupCooldown: TimeInterval,
+        wakeRecovery: TimeInterval
     ) throws {
         guard (0...360).contains(sleepThreshold) else {
             throw LidSleepPolicyError.invalidSleepThreshold(sleepThreshold)
@@ -39,17 +42,21 @@ struct LidSleepPolicy: Equatable, Sendable {
         guard reopenThreshold > sleepThreshold else {
             throw LidSleepPolicyError.invalidThresholdRelationship
         }
-        guard debounce.isFinite, debounce > 0 else {
-            throw LidSleepPolicyError.invalidDebounce(debounce)
+        guard closeDebounce.isFinite, closeDebounce > 0 else {
+            throw LidSleepPolicyError.invalidCloseDebounce(closeDebounce)
         }
-        guard wakeCooldown.isFinite, wakeCooldown >= 0 else {
-            throw LidSleepPolicyError.invalidWakeCooldown(wakeCooldown)
+        guard startupCooldown.isFinite, startupCooldown >= 0 else {
+            throw LidSleepPolicyError.invalidStartupCooldown(startupCooldown)
+        }
+        guard wakeRecovery.isFinite, wakeRecovery > 0 else {
+            throw LidSleepPolicyError.invalidWakeRecovery(wakeRecovery)
         }
 
         self.sleepThreshold = sleepThreshold
         self.reopenThreshold = reopenThreshold
-        self.debounce = debounce
-        self.wakeCooldown = wakeCooldown
+        self.closeDebounce = closeDebounce
+        self.startupCooldown = startupCooldown
+        self.wakeRecovery = wakeRecovery
     }
 }
 
@@ -57,8 +64,9 @@ enum LidSleepPolicyError: Error, Equatable, Sendable {
     case invalidSleepThreshold(Int)
     case invalidReopenThreshold(Int)
     case invalidThresholdRelationship
-    case invalidDebounce(TimeInterval)
-    case invalidWakeCooldown(TimeInterval)
+    case invalidCloseDebounce(TimeInterval)
+    case invalidStartupCooldown(TimeInterval)
+    case invalidWakeRecovery(TimeInterval)
 }
 
 struct CLIOptions: Equatable, Sendable {
@@ -81,6 +89,7 @@ enum CLIParseError: Error, Equatable, Sendable {
     case durationRequiresWatch
     case missingDurationValue
     case invalidDuration(String)
+    case obsoleteWakeCooldownOption
     case unknownOption(String)
 }
 

@@ -11,8 +11,9 @@ enum CLIParser {
         var executionMode: AutoSleepExecutionMode?
         var sleepThreshold = LidSleepPolicy.calibratedDefault.sleepThreshold
         var reopenThreshold = LidSleepPolicy.calibratedDefault.reopenThreshold
-        var debounce = LidSleepPolicy.calibratedDefault.debounce
-        var wakeCooldown = LidSleepPolicy.calibratedDefault.wakeCooldown
+        var closeDebounce = LidSleepPolicy.calibratedDefault.closeDebounce
+        var startupCooldown = LidSleepPolicy.calibratedDefault.startupCooldown
+        var wakeRecovery = LidSleepPolicy.calibratedDefault.wakeRecovery
         var policyOptions: Set<String> = []
 
         var index = 0
@@ -62,19 +63,28 @@ enum CLIParser {
                 )
                 policyOptions.insert(argument)
             case "--debounce":
-                debounce = try parseNumberOption(
+                closeDebounce = try parseNumberOption(
+                    argument,
+                    arguments: arguments,
+                    index: &index
+                )
+                policyOptions.insert(argument)
+            case "--startup-cooldown":
+                startupCooldown = try parseNumberOption(
+                    argument,
+                    arguments: arguments,
+                    index: &index
+                )
+                policyOptions.insert(argument)
+            case "--wake-recovery":
+                wakeRecovery = try parseNumberOption(
                     argument,
                     arguments: arguments,
                     index: &index
                 )
                 policyOptions.insert(argument)
             case "--wake-cooldown":
-                wakeCooldown = try parseNumberOption(
-                    argument,
-                    arguments: arguments,
-                    index: &index
-                )
-                policyOptions.insert(argument)
+                throw CLIParseError.obsoleteWakeCooldownOption
             default:
                 throw CLIParseError.unknownOption(argument)
             }
@@ -119,8 +129,9 @@ enum CLIParser {
         let policy = try LidSleepPolicy(
             sleepThreshold: sleepThreshold,
             reopenThreshold: reopenThreshold,
-            debounce: debounce,
-            wakeCooldown: wakeCooldown
+            closeDebounce: closeDebounce,
+            startupCooldown: startupCooldown,
+            wakeRecovery: wakeRecovery
         )
 
         return CLIOptions(

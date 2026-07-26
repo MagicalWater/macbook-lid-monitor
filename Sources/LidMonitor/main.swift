@@ -324,7 +324,14 @@ do {
     )
     exitCode = try application.run(options: options)
 } catch let error as CLIParseError {
-    writeError("usage error: \(error)")
+    if error == .obsoleteWakeCooldownOption {
+        writeError(
+            "usage error: --wake-cooldown is obsolete; use "
+                + "--startup-cooldown and --wake-recovery"
+        )
+    } else {
+        writeError("usage error: \(error)")
+    }
     exitCode = .usage
 } catch let error as HIDReportStreamError {
     writeError("HID I/O error: \(error)")

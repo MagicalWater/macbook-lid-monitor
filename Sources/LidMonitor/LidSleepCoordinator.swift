@@ -104,7 +104,7 @@ final class LidSleepCoordinator: @unchecked Sendable {
     }
 
     private func scheduleCooldown(from date: Date) {
-        let deadline = date.addingTimeInterval(policy.wakeCooldown)
+        let deadline = date.addingTimeInterval(policy.startupCooldown)
         cooldownTask?.cancel()
         cooldownTask = scheduler.schedule(at: deadline) { [weak self] in
             self?.queue.sync {

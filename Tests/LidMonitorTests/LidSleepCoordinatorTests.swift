@@ -7,8 +7,9 @@ final class LidSleepCoordinatorTests: XCTestCase {
     private let policy = try! LidSleepPolicy(
         sleepThreshold: 60,
         reopenThreshold: 70,
-        debounce: 2,
-        wakeCooldown: 5
+        closeDebounce: 2,
+        startupCooldown: 5,
+        wakeRecovery: 15
     )
 
     func testStartSubscribesOnceAndSchedulesStartupCooldown() throws {

@@ -53,8 +53,9 @@ struct OutputFormatter: Sendable {
             "mode=\(mode)",
             "sleep-threshold=\(policy.sleepThreshold)",
             "reopen-threshold=\(policy.reopenThreshold)",
-            "debounce=\(number(policy.debounce))",
-            "wake-cooldown=\(number(policy.wakeCooldown))"
+            "debounce=\(number(policy.closeDebounce))",
+            "startup-cooldown=\(number(policy.startupCooldown))",
+            "wake-recovery=\(number(policy.wakeRecovery))"
         ].joined(separator: " ")
     }
 

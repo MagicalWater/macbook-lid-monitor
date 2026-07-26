@@ -33,8 +33,9 @@ final class OutputFormatterTests: XCTestCase {
         let policy = try LidSleepPolicy(
             sleepThreshold: 68,
             reopenThreshold: 75,
-            debounce: 2,
-            wakeCooldown: 5
+            closeDebounce: 2,
+            startupCooldown: 5,
+            wakeRecovery: 15
         )
 
         XCTAssertEqual(
@@ -42,7 +43,7 @@ final class OutputFormatterTests: XCTestCase {
                 executionMode: .dryRun,
                 policy: policy
             ),
-            "auto-sleep config: mode=dry-run sleep-threshold=68 reopen-threshold=75 debounce=2 wake-cooldown=5"
+            "auto-sleep config: mode=dry-run sleep-threshold=68 reopen-threshold=75 debounce=2 startup-cooldown=5 wake-recovery=15"
         )
     }
 

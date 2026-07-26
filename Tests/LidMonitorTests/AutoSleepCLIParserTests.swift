@@ -50,7 +50,8 @@ final class AutoSleepCLIParserTests: XCTestCase {
             "--sleep-threshold", "59",
             "--reopen-threshold", "72",
             "--debounce", "2.5",
-            "--wake-cooldown", "6"
+            "--startup-cooldown", "6",
+            "--wake-recovery", "18"
         ])
 
         XCTAssertEqual(
@@ -60,11 +61,31 @@ final class AutoSleepCLIParserTests: XCTestCase {
                 try LidSleepPolicy(
                     sleepThreshold: 59,
                     reopenThreshold: 72,
-                    debounce: 2.5,
-                    wakeCooldown: 6
+                    closeDebounce: 2.5,
+                    startupCooldown: 6,
+                    wakeRecovery: 18
                 )
             )
         )
+    }
+
+    func testCalibratedDefaultsSplitStartupAndWakeRecovery() {
+        XCTAssertEqual(LidSleepPolicy.calibratedDefault.closeDebounce, 2)
+        XCTAssertEqual(LidSleepPolicy.calibratedDefault.startupCooldown, 5)
+        XCTAssertEqual(LidSleepPolicy.calibratedDefault.wakeRecovery, 15)
+    }
+
+    func testObsoleteWakeCooldownIsRejectedWithMigrationError() {
+        XCTAssertThrowsError(
+            try CLIParser.parse([
+                "--auto-sleep", "--dry-run", "--wake-cooldown", "5"
+            ])
+        ) { error in
+            XCTAssertEqual(
+                error as? CLIParseError,
+                .obsoleteWakeCooldownOption
+            )
+        }
     }
 
     func testThresholdsMustBeWithinSensorRange() {
@@ -101,7 +122,7 @@ final class AutoSleepCLIParserTests: XCTestCase {
         )
     }
 
-    func testDebounceMustBePositiveAndFinite() {
+    func testCloseDebounceMustBePositiveAndFinite() {
         for value in ["0", "-1", "nan", "inf"] {
             XCTAssertThrowsError(
                 try CLIParser.parse([
@@ -112,11 +133,11 @@ final class AutoSleepCLIParserTests: XCTestCase {
         }
     }
 
-    func testWakeCooldownMustBeNonnegativeAndFinite() throws {
+    func testStartupCooldownMustBeNonnegativeAndFinite() throws {
         XCTAssertNoThrow(
             try CLIParser.parse([
                 "--auto-sleep", "--dry-run",
-                "--wake-cooldown", "0"
+                "--startup-cooldown", "0"
             ])
         )
 
@@ -124,7 +145,18 @@ final class AutoSleepCLIParserTests: XCTestCase {
             XCTAssertThrowsError(
                 try CLIParser.parse([
                     "--auto-sleep", "--dry-run",
-                    "--wake-cooldown", value
+                    "--startup-cooldown", value
+                ])
+            )
+        }
+    }
+
+    func testWakeRecoveryMustBePositiveAndFinite() {
+        for value in ["0", "-1", "nan", "inf"] {
+            XCTAssertThrowsError(
+                try CLIParser.parse([
+                    "--auto-sleep", "--dry-run",
+                    "--wake-recovery", value
                 ])
             )
         }
@@ -135,7 +167,8 @@ final class AutoSleepCLIParserTests: XCTestCase {
             "--sleep-threshold",
             "--reopen-threshold",
             "--debounce",
-            "--wake-cooldown"
+            "--startup-cooldown",
+            "--wake-recovery"
         ] {
             XCTAssertThrowsError(
                 try CLIParser.parse(["--auto-sleep", "--dry-run", option])

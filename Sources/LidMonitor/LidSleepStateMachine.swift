@@ -79,7 +79,7 @@ struct LidSleepStateMachine: Sendable {
 
         case .open:
             guard angle <= policy.sleepThreshold else { return [] }
-            let deadline = timestamp.addingTimeInterval(policy.debounce)
+            let deadline = timestamp.addingTimeInterval(policy.closeDebounce)
             state = .closingCandidate(deadline: deadline)
             return [
                 .stateChanged(.closingCandidate(deadline: deadline)),

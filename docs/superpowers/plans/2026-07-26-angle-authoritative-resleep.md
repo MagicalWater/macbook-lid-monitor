@@ -39,7 +39,7 @@
 - Consumes: existing `CLIParser.parse(_:) -> CLIOptions` and `LidSleepPolicy.calibratedDefault`.
 - Produces: `LidSleepPolicy.init(sleepThreshold:reopenThreshold:closeDebounce:startupCooldown:wakeRecovery:)`, properties `closeDebounce`, `startupCooldown`, `wakeRecovery`, and CLI options `--startup-cooldown`, `--wake-recovery`.
 
-- [ ] **Step 1: Write failing policy and CLI tests**
+- [x] **Step 1: Write failing policy and CLI tests**
 
 Update test policy construction to:
 
@@ -82,7 +82,7 @@ XCTAssertThrowsError(
 Add validation tests requiring all three timing values to be finite, with
 `closeDebounce > 0`, `startupCooldown >= 0`, and `wakeRecovery > 0`.
 
-- [ ] **Step 2: Run Task 1 RED**
+- [x] **Step 2: Run Task 1 RED**
 
 Run:
 
@@ -95,7 +95,7 @@ swift test --filter SingleSourceOfTruthTests
 Expected: compile/test failure because the split policy fields, new CLI options,
 and obsolete-option error do not exist.
 
-- [ ] **Step 3: Implement the exact policy model**
+- [x] **Step 3: Implement the exact policy model**
 
 Replace `debounce` and `wakeCooldown` with:
 
@@ -115,7 +115,7 @@ case invalidWakeRecovery(TimeInterval)
 
 Set `calibratedDefault` to `68 / 75 / 2 / 5 / 15`.
 
-- [ ] **Step 4: Implement the CLI migration contract**
+- [x] **Step 4: Implement the CLI migration contract**
 
 Parse:
 
@@ -135,7 +135,7 @@ and throw it immediately for `--wake-cooldown`, without consuming or accepting
 its following value. Keep policy-option-without-auto-sleep validation for the
 three supported options.
 
-- [ ] **Step 5: Update effective configuration output**
+- [x] **Step 5: Update effective configuration output**
 
 Emit exactly:
 
@@ -145,7 +145,7 @@ auto-sleep config: mode=dry-run sleep-threshold=68 reopen-threshold=75 debounce=
 
 Do not retain `wake-cooldown=` in active examples or runtime output.
 
-- [ ] **Step 6: Run Task 1 GREEN and regression tests**
+- [x] **Step 6: Run Task 1 GREEN and regression tests**
 
 Run:
 
@@ -159,7 +159,7 @@ git diff --check
 
 Expected: all pass.
 
-- [ ] **Step 7: Task 1 review, fix, re-review, and commit**
+- [x] **Step 7: Task 1 review, fix, re-review, and commit**
 
 Review public option behavior, finite-value validation, default authority, and
 active output examples. Require Open P0 = 0 and Open P1 = 0, then commit:

@@ -18,5 +18,7 @@ final class SingleSourceOfTruthTests: XCTestCase {
         XCTAssertFalse(script.contains("--reopen-threshold"))
         XCTAssertFalse(script.contains("--debounce"))
         XCTAssertFalse(script.contains("--wake-cooldown"))
+        XCTAssertFalse(script.contains("--startup-cooldown"))
+        XCTAssertFalse(script.contains("--wake-recovery"))
     }
 }
