@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>SchemaVersion</key>
+    <integer>1</integer>
+    <key>Mode</key>
+    <string>disabled</string>
+    <key>HardwareProfileID</key>
+    <string>m1-pro-0x8104-report-id-1-v1</string>
+    <key>SleepThreshold</key>
+    <integer>68</integer>
+    <key>ReopenThreshold</key>
+    <integer>75</integer>
+    <key>CloseDebounceSeconds</key>
+    <real>2.0</real>
+    <key>StartupCooldownSeconds</key>
+    <real>5.0</real>
+    <key>WakeRecoverySeconds</key>
+    <real>15.0</real>
+    <key>SensorFreshnessSeconds</key>
+    <real>5.0</real>
+</dict>
+</plist>

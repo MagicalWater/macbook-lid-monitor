@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>SchemaVersion</key>
+    <integer>1</integer>
+    <key>Product</key>
+    <string>macbook-lid-monitor-daemon</string>
+    <key>Version</key>
+    <string>development</string>
+    <key>BinaryPath</key>
+    <string>/Library/PrivilegedHelperTools/macbook-lid-monitor-daemon</string>
+    <key>PlistPath</key>
+    <string>/Library/LaunchDaemons/com.crazydennies.macbook-lid-monitor.plist</string>
+    <key>ConfigPath</key>
+    <string>/Library/Application Support/MacBookLidMonitor/config.plist</string>
+    <key>CrashBudgetPath</key>
+    <string>/Library/Application Support/MacBookLidMonitor/crash-budget.json</string>
+    <key>BinarySHA256</key>
+    <string>UNPREPARED</string>
+</dict>
+</plist>

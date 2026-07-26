@@ -296,3 +296,47 @@ does not. Clean signal stop does not consume budget.
 ### Disposition
 
 **Task 6 approved and complete.**
+
+## Task 7 — Production plist, config, and manifest
+
+### Implementation
+
+- Added a fixed system LaunchDaemon plist for the production executable.
+- Added a schema-v1 disabled configuration template.
+- Added a version/checksum manifest template with fixed managed paths.
+- Added contract tests and plist lint validation.
+
+### TDD evidence
+
+- RED: all three packaging tests failed because templates did not exist.
+- GREEN: templates decode and lint successfully after implementation.
+
+### Immediate review findings
+
+#### P1 — Plist did not request bounded unexpected-exit recovery
+
+`ThrottleInterval` alone does not restart an unexpected non-zero exit, making the crash budget
+ineffective for controlled recovery.
+
+**Resolution:** Added conditional `KeepAlive.SuccessfulExit=false`. Clean/disabled exits remain
+non-restarting; only non-zero exits are eligible, with launchd throttle plus application circuit.
+
+### Re-review
+
+- Fixed production label/product/path consistency: pass.
+- No feasibility executable or LaunchAgent path: pass.
+- Initial config is disabled and fully schema-valid: pass.
+- Clean exits do not restart; unexpected exits are throttled: pass.
+- Manifest covers binary/plist/config/crash state and checksum slot: pass.
+
+### Verification
+
+- Focused: 3 tests, 0 failures.
+- Full: 144 tests, 0 failures.
+- All three plists: lint passed.
+- Release production daemon: passed.
+- `git diff --check`: passed.
+
+### Disposition
+
+**Task 7 approved and complete.**
