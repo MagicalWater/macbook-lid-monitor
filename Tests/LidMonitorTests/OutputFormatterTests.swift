@@ -14,6 +14,10 @@ final class OutputFormatterTests: XCTestCase {
             formatter.autoSleepLine(.sleepRequested),
             "auto-sleep: sleep-requested"
         )
+        XCTAssertEqual(
+            formatter.autoSleepLine(.sleepRequestFailed("test-sleep-failure")),
+            "auto-sleep: sleep-request-failed error=test-sleep-failure"
+        )
     }
 
     func testAutoSleepStateTransitionsUseCompactMessages() {
@@ -26,6 +30,22 @@ final class OutputFormatterTests: XCTestCase {
             "auto-sleep: candidate-started"
         )
         XCTAssertEqual(formatter.autoSleepTransitionLine(.triggered), "auto-sleep: triggered")
+        XCTAssertEqual(
+            formatter.autoSleepTransitionLine(.startupCooldown),
+            "auto-sleep: startup-cooldown"
+        )
+        XCTAssertEqual(
+            formatter.autoSleepTransitionLine(.wakeRecovery),
+            "auto-sleep: wake-recovery"
+        )
+        XCTAssertEqual(
+            formatter.autoSleepTransitionLine(.recoveryResleep),
+            "auto-sleep: recovery-resleep"
+        )
+        XCTAssertEqual(
+            formatter.autoSleepTransitionLine(.recoverySensorUnavailable),
+            "auto-sleep: recovery-sensor-unavailable"
+        )
     }
 
     func testAutoSleepConfigurationLineReportsEffectivePolicy() throws {

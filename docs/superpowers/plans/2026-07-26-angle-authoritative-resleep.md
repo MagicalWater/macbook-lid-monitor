@@ -307,7 +307,7 @@ git commit -m "feat: make wake recovery angle authoritative"
 - Consumes: Task 2 state-machine effects.
 - Produces: three independent one-shot task slots and operational event `.sleepRequestFailed(String)` plus transitions `.startupCooldown`, `.wakeRecovery`, `.recoveryResleep`, `.recoverySensorUnavailable`.
 
-- [ ] **Step 1: Write failing coordinator scheduling tests**
+- [x] **Step 1: Write failing coordinator scheduling tests**
 
 Add tests asserting:
 
@@ -322,7 +322,7 @@ stop -> all three task slots cancelled
 repeated wake -> previous recovery task cancelled and replaced once
 ```
 
-- [ ] **Step 2: Write failing sleep-request error tests**
+- [x] **Step 2: Write failing sleep-request error tests**
 
 Make `SpySleepRequester` optionally throw a deterministic test error. Verify:
 
@@ -344,7 +344,7 @@ auto-sleep: recovery-resleep
 auto-sleep: recovery-sensor-unavailable
 ```
 
-- [ ] **Step 3: Run Task 3 RED**
+- [x] **Step 3: Run Task 3 RED**
 
 Run:
 
@@ -356,7 +356,7 @@ swift test --filter OutputFormatterTests
 
 Expected: compile/test failure for missing events, task slots, and error handling.
 
-- [ ] **Step 4: Implement independent one-shot task ownership**
+- [x] **Step 4: Implement independent one-shot task ownership**
 
 Replace `debounceTask`/`cooldownTask` with:
 
@@ -370,7 +370,7 @@ private var wakeRecoveryTask: CancellableTask?
 lets the state-machine effect schedule recovery. `cancelAllTasks()` cancels and
 nils all three slots.
 
-- [ ] **Step 5: Implement explicit request success/failure handling**
+- [x] **Step 5: Implement explicit request success/failure handling**
 
 Replace `try?` with:
 
@@ -403,13 +403,13 @@ extension IOKitSystemSleepError: CustomStringConvertible {
 
 For unknown errors, use `String(describing: error)`.
 
-- [ ] **Step 6: Map state changes to compact transition output**
+- [x] **Step 6: Map state changes to compact transition output**
 
 Emit transition-only events without per-report logging. Distinguish recovery
 deadline sleep from normal close trigger by tracking the previous state when
 `.triggered` is reported.
 
-- [ ] **Step 7: Run Task 3 GREEN and regression tests**
+- [x] **Step 7: Run Task 3 GREEN and regression tests**
 
 Run:
 
@@ -423,7 +423,7 @@ git diff --check
 
 Expected: all pass.
 
-- [ ] **Step 8: Task 3 review, fix, re-review, and commit**
+- [x] **Step 8: Task 3 review, fix, re-review, and commit**
 
 Review deadlock risk, task replacement/cancellation, exactly-once request
 semantics, error stability, and no retry. Require Open P0 = 0 and Open P1 = 0,

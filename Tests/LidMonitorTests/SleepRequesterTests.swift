@@ -31,6 +31,17 @@ final class SleepRequesterTests: XCTestCase {
         }
         XCTAssertEqual(operation.requestCount, 1)
     }
+
+    func testIOKitFailureDescriptionsAreStable() {
+        XCTAssertEqual(
+            String(describing: IOKitSystemSleepError.powerManagementUnavailable),
+            "power-management-unavailable"
+        )
+        XCTAssertEqual(
+            String(describing: IOKitSystemSleepError.requestFailed(-536_870_212)),
+            "iokit-request-failed(-536870212)"
+        )
+    }
 }
 
 private enum TestError: Error, Equatable {

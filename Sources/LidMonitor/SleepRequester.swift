@@ -13,6 +13,7 @@ protocol SystemSleepOperating: Sendable {
 enum AutoSleepOperationalEvent: Equatable, Sendable {
     case wouldSleep
     case sleepRequested
+    case sleepRequestFailed(String)
 }
 
 enum AutoSleepTransitionEvent: Equatable, Sendable {
@@ -21,7 +22,10 @@ enum AutoSleepTransitionEvent: Equatable, Sendable {
     case candidateCancelled
     case triggered
     case disarmed
-    case cooldown
+    case startupCooldown
+    case wakeRecovery
+    case recoveryResleep
+    case recoverySensorUnavailable
 }
 
 final class DryRunSleepRequester: SleepRequesting, @unchecked Sendable {
@@ -56,9 +60,22 @@ final class MacOSSleepRequester: SleepRequesting, @unchecked Sendable {
     }
 }
 
-enum IOKitSystemSleepError: Error, Equatable, Sendable {
+enum IOKitSystemSleepError: Error, Equatable, Sendable, CustomStringConvertible {
     case powerManagementUnavailable
     case requestFailed(IOReturn)
+
+    var description: String {
+        switch self {
+        case .powerManagementUnavailable:
+            return "power-management-unavailable"
+        case let .requestFailed(code):
+            return "iokit-request-failed(\(code))"
+        }
+    }
+}
+
+func stableSleepErrorDescription(_ error: Error) -> String {
+    return String(describing: error)
 }
 
 struct IOKitSystemSleepOperation: SystemSleepOperating {

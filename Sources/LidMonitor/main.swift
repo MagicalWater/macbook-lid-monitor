@@ -47,6 +47,7 @@ enum AutoSleepComposition {
             sleepRequester: requester,
             policy: policy,
             now: now,
+            onOperationalEvent: onOperationalEvent,
             onTransitionEvent: onTransitionEvent
         )
     }

@@ -21,6 +21,23 @@ final class LidSleepCoordinatorTests: XCTestCase {
         XCTAssertEqual(fixture.stream.startCount, 1)
         XCTAssertEqual(fixture.wakeObserver.startCount, 1)
         XCTAssertEqual(fixture.scheduler.pendingDeadlines, [now.addingTimeInterval(5)])
+        XCTAssertEqual(fixture.transitions, [.startupCooldown])
+    }
+
+    func testWakeDuringStartupCancelsStartupDeadline() throws {
+        let fixture = makeFixture()
+        try fixture.coordinator.start()
+
+        fixture.wakeObserver.sendWake(at: now.addingTimeInterval(1))
+
+        XCTAssertEqual(
+            fixture.scheduler.pendingDeadlines,
+            [now.addingTimeInterval(16)]
+        )
+        XCTAssertEqual(
+            fixture.transitions,
+            [.startupCooldown, .wakeRecovery]
+        )
     }
 
     func testAngle60SchedulesOneDebounceAnd61CancelsIt() throws {
@@ -73,6 +90,97 @@ final class LidSleepCoordinatorTests: XCTestCase {
         fixture.stream.send(angle: 60, at: now.addingTimeInterval(8))
         fixture.scheduler.fire(deadline: now.addingTimeInterval(22))
         XCTAssertEqual(fixture.requester.requestCount, 1)
+        XCTAssertEqual(
+            fixture.transitions,
+            [.startupCooldown, .rearmed, .candidateStarted, .wakeRecovery, .recoveryResleep]
+        )
+    }
+
+    func testWakeOpenCancelsRecoveryWithoutSleepRequest() throws {
+        let fixture = makeFixture()
+        try fixture.coordinator.start()
+        arm(fixture)
+        fixture.stream.send(angle: 60, at: now.addingTimeInterval(6))
+        fixture.scheduler.fire(deadline: now.addingTimeInterval(8))
+
+        fixture.wakeObserver.sendWake(at: now.addingTimeInterval(20))
+        fixture.stream.send(angle: 70, at: now.addingTimeInterval(21))
+
+        XCTAssertTrue(fixture.scheduler.pendingDeadlines.isEmpty)
+        XCTAssertEqual(fixture.requester.requestCount, 1)
+        XCTAssertEqual(fixture.transitions.suffix(2), [.wakeRecovery, .rearmed])
+    }
+
+    func testInvalidRecoveryDataFailsOpenWithoutSleep() throws {
+        let fixture = makeFixture()
+        try fixture.coordinator.start()
+        arm(fixture)
+        fixture.wakeObserver.sendWake(at: now.addingTimeInterval(20))
+        fixture.stream.send(angle: 60, at: now.addingTimeInterval(21))
+        fixture.stream.sendInvalid(at: now.addingTimeInterval(22))
+        fixture.scheduler.fire(deadline: now.addingTimeInterval(35))
+
+        XCTAssertEqual(fixture.requester.requestCount, 0)
+        XCTAssertEqual(
+            fixture.transitions.suffix(2),
+            [.wakeRecovery, .recoverySensorUnavailable]
+        )
+    }
+
+    func testRepeatedWakeReplacesRecoveryDeadline() throws {
+        let fixture = makeFixture()
+        try fixture.coordinator.start()
+        arm(fixture)
+
+        fixture.wakeObserver.sendWake(at: now.addingTimeInterval(20))
+        fixture.wakeObserver.sendWake(at: now.addingTimeInterval(25))
+
+        XCTAssertEqual(
+            fixture.scheduler.pendingDeadlines,
+            [now.addingTimeInterval(40)]
+        )
+    }
+
+    func testSleepRequestFailureIsReportedOnceAndDisarms() throws {
+        let fixture = makeFixture(requestError: TestSleepRequestError.failed)
+        try fixture.coordinator.start()
+        arm(fixture)
+
+        fixture.stream.send(angle: 60, at: now.addingTimeInterval(6))
+        fixture.scheduler.fire(deadline: now.addingTimeInterval(8))
+        fixture.stream.send(angle: 59, at: now.addingTimeInterval(9))
+
+        XCTAssertEqual(fixture.requester.requestCount, 1)
+        XCTAssertEqual(
+            fixture.operationalEvents,
+            [.sleepRequestFailed("test-sleep-failure")]
+        )
+        XCTAssertEqual(fixture.transitions.suffix(2), [.triggered, .disarmed])
+
+        fixture.stream.send(angle: 70, at: now.addingTimeInterval(10))
+        XCTAssertEqual(fixture.transitions.last, .rearmed)
+    }
+
+    func testRecoverySleepRequestFailureDisarmsWithoutAnotherDeadline() throws {
+        let fixture = makeFixture(requestError: TestSleepRequestError.failed)
+        try fixture.coordinator.start()
+        arm(fixture)
+
+        fixture.wakeObserver.sendWake(at: now.addingTimeInterval(20))
+        fixture.stream.send(angle: 60, at: now.addingTimeInterval(21))
+        fixture.scheduler.fire(deadline: now.addingTimeInterval(35))
+        fixture.stream.send(angle: 59, at: now.addingTimeInterval(36))
+
+        XCTAssertEqual(fixture.requester.requestCount, 1)
+        XCTAssertEqual(
+            fixture.operationalEvents,
+            [.sleepRequestFailed("test-sleep-failure")]
+        )
+        XCTAssertEqual(
+            fixture.transitions.suffix(2),
+            [.recoveryResleep, .disarmed]
+        )
+        XCTAssertTrue(fixture.scheduler.pendingDeadlines.isEmpty)
     }
 
     func testDecodeFailureNeverRequestsSleep() throws {
@@ -107,12 +215,13 @@ final class LidSleepCoordinatorTests: XCTestCase {
         fixture.scheduler.fire(deadline: now.addingTimeInterval(5))
     }
 
-    private func makeFixture() -> Fixture {
+    private func makeFixture(requestError: Error? = nil) -> Fixture {
         let currentDate = now
         let stream = FakeReportStream()
         let scheduler = ManualScheduler()
         let wakeObserver = FakeWakeObserver()
-        let requester = SpySleepRequester()
+        let requester = SpySleepRequester(error: requestError)
+        let recorder = CoordinatorEventRecorder()
         let coordinator = LidSleepCoordinator(
             stream: stream,
             decoder: CompositeLidAngleDecoder(
@@ -122,14 +231,17 @@ final class LidSleepCoordinatorTests: XCTestCase {
             wakeObserver: wakeObserver,
             sleepRequester: requester,
             policy: policy,
-            now: { currentDate }
+            now: { currentDate },
+            onOperationalEvent: recorder.record,
+            onTransitionEvent: recorder.recordTransition
         )
         return Fixture(
             coordinator: coordinator,
             stream: stream,
             scheduler: scheduler,
             wakeObserver: wakeObserver,
-            requester: requester
+            requester: requester,
+            recorder: recorder
         )
     }
 }
@@ -140,6 +252,10 @@ private struct Fixture {
     let scheduler: ManualScheduler
     let wakeObserver: FakeWakeObserver
     let requester: SpySleepRequester
+    let recorder: CoordinatorEventRecorder
+
+    var operationalEvents: [AutoSleepOperationalEvent] { recorder.operationalEvents }
+    var transitions: [AutoSleepTransitionEvent] { recorder.transitions }
 }
 
 private final class FakeReportStream: HIDReportStreaming, @unchecked Sendable {
@@ -233,9 +349,36 @@ private final class FakeWakeObserver: SystemWakeObserving, @unchecked Sendable {
 }
 
 private final class SpySleepRequester: SleepRequesting, @unchecked Sendable {
+    private let error: Error?
     private(set) var requestCount = 0
+
+    init(error: Error? = nil) {
+        self.error = error
+    }
 
     func requestSleep() throws {
         requestCount += 1
+        if let error {
+            throw error
+        }
+    }
+}
+
+private enum TestSleepRequestError: Error, CustomStringConvertible {
+    case failed
+
+    var description: String { "test-sleep-failure" }
+}
+
+private final class CoordinatorEventRecorder: @unchecked Sendable {
+    private(set) var operationalEvents: [AutoSleepOperationalEvent] = []
+    private(set) var transitions: [AutoSleepTransitionEvent] = []
+
+    func record(_ event: AutoSleepOperationalEvent) {
+        operationalEvents.append(event)
+    }
+
+    func recordTransition(_ event: AutoSleepTransitionEvent) {
+        transitions.append(event)
     }
 }

@@ -37,7 +37,7 @@ final class AutoSleepIntegrationTests: XCTestCase {
         stream.emit(angle: policy.reopenThreshold, at: base.addingTimeInterval(11))
         XCTAssertEqual(
             recorder.transitions,
-            [.disarmed, .rearmed, .candidateStarted, .triggered, .rearmed]
+            [.startupCooldown, .disarmed, .rearmed, .candidateStarted, .triggered, .rearmed]
         )
         stream.emit(angle: policy.sleepThreshold, at: base.addingTimeInterval(12))
         scheduler.fire(at: base.addingTimeInterval(14))
@@ -102,7 +102,7 @@ final class AutoSleepIntegrationTests: XCTestCase {
 
         XCTAssertEqual(
             recorder.transitions,
-            [.disarmed, .rearmed, .candidateStarted, .candidateCancelled]
+            [.startupCooldown, .disarmed, .rearmed, .candidateStarted, .candidateCancelled]
         )
         XCTAssertEqual(recorder.events, [])
 

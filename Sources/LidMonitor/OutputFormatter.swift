@@ -37,6 +37,8 @@ struct OutputFormatter: Sendable {
             return "auto-sleep: would-sleep"
         case .sleepRequested:
             return "auto-sleep: sleep-requested"
+        case let .sleepRequestFailed(description):
+            return "auto-sleep: sleep-request-failed error=\(description)"
         }
     }
 
@@ -67,7 +69,10 @@ struct OutputFormatter: Sendable {
         case .candidateCancelled: value = "candidate-cancelled"
         case .triggered: value = "triggered"
         case .disarmed: value = "disarmed"
-        case .cooldown: value = "cooldown"
+        case .startupCooldown: value = "startup-cooldown"
+        case .wakeRecovery: value = "wake-recovery"
+        case .recoveryResleep: value = "recovery-resleep"
+        case .recoverySensorUnavailable: value = "recovery-sensor-unavailable"
         }
         return "auto-sleep: \(value)"
     }

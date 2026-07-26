@@ -9,6 +9,7 @@ final class LidSleepCoordinator: @unchecked Sendable {
     private let sleepRequester: SleepRequesting
     private let policy: LidSleepPolicy
     private let now: @Sendable () -> Date
+    private let onOperationalEvent: @Sendable (AutoSleepOperationalEvent) -> Void
     private let onTransitionEvent: @Sendable (AutoSleepTransitionEvent) -> Void
     private let queue = DispatchQueue(label: "macbook-lid-monitor.coordinator")
 
@@ -27,6 +28,7 @@ final class LidSleepCoordinator: @unchecked Sendable {
         sleepRequester: SleepRequesting,
         policy: LidSleepPolicy,
         now: @escaping @Sendable () -> Date = Date.init,
+        onOperationalEvent: @escaping @Sendable (AutoSleepOperationalEvent) -> Void = { _ in },
         onTransitionEvent: @escaping @Sendable (AutoSleepTransitionEvent) -> Void = { _ in }
     ) {
         self.stream = stream
@@ -36,6 +38,7 @@ final class LidSleepCoordinator: @unchecked Sendable {
         self.sleepRequester = sleepRequester
         self.policy = policy
         self.now = now
+        self.onOperationalEvent = onOperationalEvent
         self.onTransitionEvent = onTransitionEvent
         machine = LidSleepStateMachine(policy: policy)
     }
@@ -51,6 +54,7 @@ final class LidSleepCoordinator: @unchecked Sendable {
                 }
             }
 
+            onTransitionEvent(.startupCooldown)
             scheduleStartupCooldown(from: now())
 
             do {
@@ -98,6 +102,8 @@ final class LidSleepCoordinator: @unchecked Sendable {
 
     private func handleWake(at date: Date) {
         guard started else { return }
+        startupCooldownTask?.cancel()
+        startupCooldownTask = nil
         apply(machine.handle(.systemDidWake(at: date)))
     }
 
@@ -145,7 +151,14 @@ final class LidSleepCoordinator: @unchecked Sendable {
                 wakeRecoveryTask = nil
 
             case .requestSleep:
-                try? sleepRequester.requestSleep()
+                do {
+                    try sleepRequester.requestSleep()
+                } catch {
+                    onOperationalEvent(
+                        .sleepRequestFailed(stableSleepErrorDescription(error))
+                    )
+                    apply(machine.handle(.sleepRequestFailed(at: now())))
+                }
 
             case let .stateChanged(state):
                 let previousState = lastReportedState
@@ -159,9 +172,22 @@ final class LidSleepCoordinator: @unchecked Sendable {
                         onTransitionEvent(.rearmed)
                     }
                 case .closingCandidate: onTransitionEvent(.candidateStarted)
-                case .triggered: onTransitionEvent(.triggered)
-                case .disarmed: onTransitionEvent(.disarmed)
-                case .startupCooldown, .wakeRecovery: onTransitionEvent(.cooldown)
+                case .triggered:
+                    if case .wakeRecovery = previousState {
+                        onTransitionEvent(.recoveryResleep)
+                    } else {
+                        onTransitionEvent(.triggered)
+                    }
+                case .disarmed:
+                    if case .wakeRecovery = previousState {
+                        onTransitionEvent(.recoverySensorUnavailable)
+                    } else {
+                        onTransitionEvent(.disarmed)
+                    }
+                case .startupCooldown:
+                    onTransitionEvent(.startupCooldown)
+                case .wakeRecovery:
+                    onTransitionEvent(.wakeRecovery)
                 }
             }
         }

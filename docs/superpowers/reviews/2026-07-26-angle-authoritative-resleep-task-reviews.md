@@ -60,3 +60,52 @@ which remains Task 3 scope.
 - Open P1: 0
 - Open P2: 0
 - Task 2 status: approved
+
+## Task 3 — Coordinator Scheduling and Failure Visibility
+
+### Initial findings
+
+#### P1-1 — Wake during startup could leave the startup deadline active
+
+The state machine correctly entered wake recovery, but coordinator ownership
+needed an explicit cancellation of the startup one-shot task before applying the
+wake event. Without that cancellation, startup and recovery deadlines could both
+remain scheduled.
+
+**Resolution:** `handleWake(at:)` now cancels and clears
+`startupCooldownTask` before scheduling recovery. A dedicated test proves the
+only remaining deadline is `wake + 15 seconds`.
+
+#### P1-2 — Recovery-path sleep failure needed direct regression coverage
+
+Normal close request failure was covered, but the same no-retry guarantee had
+not been asserted for a request emitted by the recovery deadline.
+
+**Resolution:** Added a recovery failure test verifying one request, one
+`sleep-request-failed` event, transition `recovery-resleep -> disarmed`, no
+remaining deadline, and no retry from subsequent low-angle reports.
+
+#### P2-1 — Legacy `cooldown` transition event was no longer reachable
+
+Keeping the old event after splitting startup and wake recovery would make the
+active output API ambiguous.
+
+**Resolution:** Removed the unused `cooldown` event and formatter branch.
+
+### Re-review
+
+- Startup, close debounce, and wake recovery each own one independent task slot.
+- A wake replaces startup or prior recovery work rather than adding another timer.
+- Recovery `>=75` cancels the deadline and rearms without another request.
+- Missing/invalid recovery data emits `recovery-sensor-unavailable` and fails open.
+- Normal and recovery request failures emit one stable error and enter disarmed.
+- IOKit error descriptions are stable and test-covered.
+- No automatic retry, polling, per-report logging, or process termination exists.
+- Coordinator and full regression suites: 76 tests, 0 failures.
+
+### Disposition
+
+- Open P0: 0
+- Open P1: 0
+- Open P2: 0
+- Task 3 status: approved
