@@ -1,133 +1,161 @@
 # macbook-lid-monitor
 
-`macbook-lid-monitor` is a macOS lid-angle sensor diagnostic and a separately gated foreground auto-sleep workaround prototype for cases where normal clamshell sleep detection is unreliable.
+`macbook-lid-monitor` 是一個 macOS 上蓋角度感測器診斷工具，也提供一個需要明確啟用的前景自動睡眠原型，用於處理原生闔蓋睡眠偵測不可靠的情況。
 
-Diagnostic modes are read-only. Auto-sleep must be selected explicitly and defaults to a dry-run that only reports `would-sleep`. Real sleep additionally requires the explicit `--execute-sleep` flag. The project does not change persistent power settings, modify NVRAM, install a LaunchAgent, request administrator privileges, or write HID reports.
+診斷模式只會讀取資料。自動睡眠必須明確選擇，且預設為只輸出 `would-sleep` 的 dry-run 模式；真正要求 macOS 睡眠時，還必須額外傳入 `--execute-sleep`。本專案不會修改持久電源設定、不會修改 NVRAM、不會安裝 LaunchAgent、不會要求系統管理員權限，也不會寫入 HID report。
 
-## Requirements
+## 系統需求
 
 - Apple Silicon MacBook
-- macOS 13.0 or newer
-- Swift 6.x through Xcode Command Line Tools
+- macOS 13.0 或更新版本
+- 透過 Xcode Command Line Tools 提供的 Swift 6.x
 
-The first validated machine is an M1 Pro MacBook running macOS 26.5.2.
+第一台完成驗證的設備是搭載 M1 Pro、執行 macOS 26.5.2 的 MacBook。
 
-## Usage
+## 使用方式
 
-List ranked read-only candidates without opening a device:
+只列出並排序唯讀候選裝置，不開啟任何 HID 裝置：
 
 ```bash
 ./scripts/run-diagnostic.sh --list
 ```
 
-Watch the best high-confidence candidate:
+監看信心分數最高的候選裝置：
 
 ```bash
 ./scripts/run-diagnostic.sh --watch
 ```
 
-Include copied raw report bytes:
+同時顯示已複製的原始 report bytes：
 
 ```bash
 ./scripts/run-diagnostic.sh --watch --raw
 ```
 
-Stop automatically after a fixed number of seconds:
+在指定秒數後自動停止：
 
 ```bash
 ./scripts/run-diagnostic.sh --watch --raw --duration 120
 ```
 
-No arguments defaults to watch mode. Press `Ctrl+C` to stop an unlimited watch.
+未提供參數時，預設使用 watch 模式。未設定停止時間時，可按 `Ctrl+C` 結束監看。
 
-### Auto-sleep dry-run
+### 自動睡眠 dry-run
 
-Always validate the dry-run first:
+任何真實睡眠測試前，都應先執行 dry-run：
 
 ```bash
 ./scripts/run-auto-sleep-dry-run.sh
 ```
 
-The calibrated policy is defined once in `LidSleepPolicy.calibratedDefault`.
-The helper script intentionally does not duplicate threshold or timing values.
-At startup the executable prints the effective configuration, currently:
+校準後的政策只定義於 `LidSleepPolicy.calibratedDefault`。輔助腳本刻意不重複寫入角度門檻或時間參數，避免產生多個真相來源。
+
+程式啟動時會輸出實際生效的設定，目前預設為：
 
 ```text
 auto-sleep config: mode=dry-run sleep-threshold=68 reopen-threshold=75 debounce=2 startup-cooldown=5 wake-recovery=15
 ```
 
-The thresholds are decoded sensor values, not guaranteed physical hinge degrees.
-In dry-run mode, crossing the close threshold for the debounce period prints
-`auto-sleep: would-sleep` but does not request system sleep.
+上述角度是感測器解碼值，不保證等同於實際鉸鏈物理角度。
 
-Startup and wake use different safety rules:
-
-- Startup waits five seconds and never sleeps immediately. If no fresh `>=75`
-  angle is observed, the process stays disarmed until the lid is reopened.
-- After a real wake, the process clears pre-sleep angle data and waits fifteen
-  seconds for fresh reports.
-- A fresh angle `<75` at the recovery deadline is still physically closed and
-  requests sleep again. Values `69...74` do not count as reopened.
-- A fresh `>=75` report cancels the pending recovery sleep and rearms.
-- Missing or invalid fresh recovery data fails open without requesting sleep.
-
-The active timing options are:
+在 dry-run 模式下，角度低於關閉門檻並持續超過 debounce 時間後，只會輸出：
 
 ```text
---debounce <positive seconds>
---startup-cooldown <nonnegative seconds>
---wake-recovery <positive seconds>
+auto-sleep: would-sleep
 ```
 
-The old `--wake-cooldown` option is rejected with migration guidance because
-startup safety and post-wake recovery no longer share one meaning.
+dry-run 不會向 macOS 發出真正的睡眠要求。
 
-If the macOS sleep request fails, the foreground process remains alive and
-prints one diagnostic such as:
+### 啟動與喚醒規則
+
+啟動與睡眠後喚醒採用不同的安全規則：
+
+- 程式啟動後先等待 5 秒，且不會因啟動時已處於低角度就立即睡眠。
+- 啟動等待結束時，如果沒有取得新的 `>=75` 角度，程式會保持 `disarmed`，直到上蓋重新打開。
+- 真實睡眠後收到喚醒通知時，程式會清除睡眠前的舊角度資料，並進入 15 秒 `wake-recovery`。
+- recovery 到期時，若最新有效角度仍 `<75`，代表上蓋尚未真正重新打開，程式會再次要求睡眠。
+- `69...74` 屬於遲滯區間，不視為重新開蓋。
+- recovery 期間只要取得新的 `>=75` 角度，就會立即取消待執行的再次睡眠並重新啟用自動睡眠。
+- recovery 期間若沒有新的有效資料，或資料格式無效，程式會採用 fail-open：不要求睡眠並進入 `disarmed`。
+
+目前支援的時間參數為：
+
+```text
+--debounce <正數秒數>
+--startup-cooldown <大於或等於 0 的秒數>
+--wake-recovery <正數秒數>
+```
+
+舊的 `--wake-cooldown` 已停止支援。因為啟動安全等待與睡眠後 recovery 已不再具有相同語意，程式會拒絕這個舊參數並提示改用：
+
+```text
+--startup-cooldown
+--wake-recovery
+```
+
+### 睡眠要求失敗
+
+如果 macOS 睡眠 API 呼叫失敗，前景程序不會退出，並會輸出一次明確錯誤，例如：
 
 ```text
 auto-sleep: sleep-request-failed error=power-management-unavailable
 ```
 
-The failed request is not retried automatically. The process remains disarmed
-until a fresh `>=75` angle is observed.
+失敗後不會自動重試。程式會保持 `disarmed`，直到取得新的 `>=75` 角度。
 
-Real sleep is deliberately not exposed through the helper script. It remains a
-separate, explicitly approved foreground acceptance step using both
-`--auto-sleep` and `--execute-sleep` after the documented safety reviews pass.
+### 執行真實睡眠
 
-Hardware acceptance evidence is recorded in
-`docs/validation/2026-07-26-m1-pro-auto-sleep.md`.
+輔助腳本不會啟用真實睡眠。真實睡眠只能以前景方式明確執行：
 
-## Output
+```bash
+swift run -c release macbook-lid-monitor --auto-sleep --execute-sleep
+```
 
-Decoded sample:
+使用真實睡眠前，必須先確認 dry-run、角度校準及安全驗證均已通過。
+
+M1 Pro 的完整實機驗證證據記錄於：
+
+```text
+docs/validation/2026-07-26-m1-pro-auto-sleep.md
+```
+
+## 輸出說明
+
+成功解碼範例：
 
 ```text
 2026-07-26T11:01:58+08:00 angle=173.0 raw=01 AD 00 clamshell=open
 ```
 
-Unsupported report shape:
+不支援的 report 格式範例：
 
 ```text
 2026-07-26T11:00:33+08:00 angle=unsupported reportLength=3 raw=01 AC 00 clamshell=open
 ```
 
-Candidate entries include score, whether the threshold is met, registry ID, vendor/product IDs, usage page/usage, transport, and scoring reasons.
+候選裝置輸出包含：
 
-## Exit codes
+- 排名分數
+- 是否達到可選門檻
+- Registry ID
+- Vendor ID／Product ID
+- Usage Page／Usage
+- Transport
+- 評分原因
 
-| Code | Meaning |
+## 結束碼
+
+| 結束碼 | 說明 |
 | ---: | --- |
-| `0` | Successful list or completed watch |
-| `64` | Invalid command-line usage |
-| `69` | No sufficiently confident candidate or HID enumeration unavailable |
-| `70` | Unexpected internal failure |
-| `74` | HID device open or streaming failure |
+| `0` | 成功列出候選裝置，或正常完成監看 |
+| `64` | 命令列參數錯誤 |
+| `69` | 沒有足夠可信的候選裝置，或無法列舉 HID 裝置 |
+| `70` | 未預期的內部錯誤 |
+| `74` | HID 裝置開啟或資料串流失敗 |
 
-## Sensor identity and decoder status
+## 感測器識別與解碼器狀態
 
-The validated M1 Pro exposes the selected sensor as:
+已驗證的 M1 Pro 使用以下感測器：
 
 ```text
 Vendor ID:  0x05AC
@@ -137,48 +165,67 @@ Usage:      0x008A
 Transport:  SPU
 ```
 
-Observed input reports use three bytes: report ID `1`, a low angle byte, and a high angle byte. For example, `01 AC 00` decodes to `172°`. This decoder is narrowly tied to the captured M1 Pro evidence. The older two-byte tenths decoder remains exploratory and is not treated as authoritative without matching hardware evidence.
+目前觀察到的輸入 report 為 3 bytes：
 
-## Permissions and failures
+1. Report ID `1`
+2. 角度低位元 byte
+3. 角度高位元 byte
 
-The program does not escalate privileges. If macOS denies HID access, it reports the actual open error and exits. The required Privacy & Security surface can vary by macOS release, so this project does not promise that enabling a particular permission will solve every access failure.
+例如：
 
-When no candidate reaches the threshold, use `--list` output as evidence. Do not lower the threshold merely to force a device open.
+```text
+01 AC 00
+```
 
-## Safety boundaries
+會解碼為 `172°`。
 
-- No HID write or feature-report request
-- Diagnostic and dry-run modes never request sleep
-- Real sleep requires explicit `--auto-sleep --execute-sleep`
-- No persistent service
-- No persistent power-setting mutation
-- No unrelated keyboard or trackpad capture
-- Input callback bytes are copied before decoding
+這個解碼器目前只以已擷取的 M1 Pro 證據為權威。舊的 2-byte、十分之一度解碼器仍屬探索用途；在其他硬體上沒有取得相符證據前，不應視為可靠來源。
 
-The tool cannot repair a broken clamshell sensor. The auto-sleep workaround is
-event-driven and foreground-only. On the validated M1 Pro, the recorded dry-run,
-idle-energy, operational-safety, and one-cycle real-sleep acceptance gates have
-passed for the original one-cycle behavior. The current angle-authoritative
-post-wake recovery refinement has also passed one separately approved bounded
-two-sleep acceptance cycle: the second software sleep request occurred after the
-15-second recovery window, and opening to `>=75` after the second wake cancelled
-the third request. macOS recorded the second low-power transition as DarkWake
-rather than a second identical full Sleep; the validation document preserves
-that platform-specific distinction. Real sleep remains an explicit operator action through
-`--auto-sleep --execute-sleep`; no background or persistent deployment is
-created by this project.
+## 權限與錯誤處理
 
-The acceptance evidence is hardware-specific. Other MacBook models or sensor
-report formats must repeat calibration and dry-run validation before using real
-sleep mode.
+程式不會提升權限。如果 macOS 拒絕 HID 存取，程式會輸出實際的開啟錯誤並結束。
 
-## Removal
+不同 macOS 版本可能顯示不同的「隱私權與安全性」權限項目，因此本專案不保證只要開啟某一個特定權限，就一定能解決所有 HID 存取問題。
 
-Stop the process and delete:
+如果沒有候選裝置達到門檻，應先使用 `--list` 輸出作為調查證據，不應只是為了強制開啟裝置而降低候選門檻。
+
+## 安全邊界
+
+- 不寫入 HID，也不發送 feature report request
+- 診斷模式與 dry-run 模式永遠不要求系統睡眠
+- 真實睡眠必須明確傳入 `--auto-sleep --execute-sleep`
+- 不安裝常駐服務
+- 不修改持久電源設定
+- 不擷取無關的鍵盤或觸控板資料
+- HID callback 收到的 bytes 會先複製，再交由解碼器處理
+- 不使用輪詢 loop
+- 僅使用一次性 timer
+- 睡眠 API 失敗不會形成自動重試循環
+
+本工具無法修復損壞的原生闔蓋感測器。自動睡眠 workaround 採用事件驅動，且目前只以前景程序執行。
+
+在已驗證的 M1 Pro 上，目前已完成：
+
+- dry-run 實機驗收
+- 閒置能耗與事件驅動審查
+- 原始單次真實睡眠驗收
+- 角度權威的兩次睡眠驗收
+- 睡眠 API 錯誤可觀測性驗證
+
+兩次睡眠驗收中，第二次睡眠要求確實在第一次喚醒後 15 秒發生；第二次喚醒後開到 `>=75`，成功取消第三次睡眠要求。
+
+macOS 將第二次低功耗轉換記錄為 DarkWake，而不是與第一次完全相同的完整 Sleep。這是平台層 power state 的差異，完整證據保留在 validation 文件中。
+
+真實睡眠始終需要操作者明確執行 `--auto-sleep --execute-sleep`。本專案目前沒有建立任何背景或持久部署。
+
+驗收結果與感測器格式具有硬體相依性。其他 MacBook 型號或其他 report 格式，在使用真實睡眠功能前必須重新完成校準與 dry-run 驗證。
+
+## 移除方式
+
+先停止正在執行的程序，再刪除專案目錄：
 
 ```text
 ~/Developer/projects/macbook-lid-monitor
 ```
 
-No system settings or persistent services are installed by the diagnostic or
-foreground auto-sleep flows.
+診斷與前景自動睡眠流程不會安裝系統服務，也不會修改任何持久系統設定，因此不需要額外解除安裝步驟。
