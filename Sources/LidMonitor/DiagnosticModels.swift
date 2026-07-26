@@ -44,3 +44,9 @@ enum AngleDecodeResult: Equatable, Sendable {
     case malformed(String)
     case outOfRange(Double)
 }
+
+enum ClamshellState: Equatable, Sendable {
+    case open
+    case closed
+    case unavailable
+}
