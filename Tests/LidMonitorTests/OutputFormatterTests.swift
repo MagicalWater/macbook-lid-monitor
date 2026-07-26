@@ -28,6 +28,24 @@ final class OutputFormatterTests: XCTestCase {
         XCTAssertEqual(formatter.autoSleepTransitionLine(.triggered), "auto-sleep: triggered")
     }
 
+    func testAutoSleepConfigurationLineReportsEffectivePolicy() throws {
+        let formatter = OutputFormatter()
+        let policy = try LidSleepPolicy(
+            sleepThreshold: 68,
+            reopenThreshold: 75,
+            debounce: 2,
+            wakeCooldown: 5
+        )
+
+        XCTAssertEqual(
+            formatter.autoSleepConfigurationLine(
+                executionMode: .dryRun,
+                policy: policy
+            ),
+            "auto-sleep config: mode=dry-run sleep-threshold=68 reopen-threshold=75 debounce=2 wake-cooldown=5"
+        )
+    }
+
     func testDecodedWatchLine() {
         let formatter = OutputFormatter(
             timeZone: TimeZone(secondsFromGMT: 8 * 3600)!

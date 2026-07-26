@@ -5,6 +5,7 @@ import XCTest
 final class AutoSleepIntegrationTests: XCTestCase {
     func testDryRunCompositionProcessesCalibratedCloseCycleEndToEnd() throws {
         let base = Date(timeIntervalSince1970: 3_000)
+        let policy = LidSleepPolicy.calibratedDefault
         let stream = IntegrationReportStream()
         let scheduler = IntegrationScheduler()
         let wakeObserver = IntegrationWakeObserver()
@@ -16,7 +17,7 @@ final class AutoSleepIntegrationTests: XCTestCase {
             scheduler: scheduler,
             wakeObserver: wakeObserver,
             executionMode: .dryRun,
-            policy: .calibratedDefault,
+            policy: policy,
             now: { base },
             onOperationalEvent: recorder.record,
             onTransitionEvent: recorder.recordTransition
@@ -28,17 +29,17 @@ final class AutoSleepIntegrationTests: XCTestCase {
         stream.emit(angle: 105, at: base.addingTimeInterval(6))
         XCTAssertEqual(recorder.events, [])
 
-        stream.emit(angle: 60, at: base.addingTimeInterval(7))
+        stream.emit(angle: policy.sleepThreshold, at: base.addingTimeInterval(7))
         scheduler.fire(at: base.addingTimeInterval(9))
-        stream.emit(angle: 59, at: base.addingTimeInterval(10))
+        stream.emit(angle: policy.sleepThreshold - 1, at: base.addingTimeInterval(10))
         XCTAssertEqual(recorder.events, [.wouldSleep])
 
-        stream.emit(angle: 70, at: base.addingTimeInterval(11))
+        stream.emit(angle: policy.reopenThreshold, at: base.addingTimeInterval(11))
         XCTAssertEqual(
             recorder.transitions,
             [.disarmed, .rearmed, .candidateStarted, .triggered, .rearmed]
         )
-        stream.emit(angle: 60, at: base.addingTimeInterval(12))
+        stream.emit(angle: policy.sleepThreshold, at: base.addingTimeInterval(12))
         scheduler.fire(at: base.addingTimeInterval(14))
         XCTAssertEqual(recorder.events, [.wouldSleep, .wouldSleep])
 
@@ -47,6 +48,7 @@ final class AutoSleepIntegrationTests: XCTestCase {
 
     func testExecuteSleepCompositionUsesInjectedSystemOperationOnlyWhenExplicit() throws {
         let base = Date(timeIntervalSince1970: 4_000)
+        let policy = LidSleepPolicy.calibratedDefault
         let stream = IntegrationReportStream()
         let scheduler = IntegrationScheduler()
         let operation = IntegrationSystemSleepOperation()
@@ -57,7 +59,7 @@ final class AutoSleepIntegrationTests: XCTestCase {
             scheduler: scheduler,
             wakeObserver: IntegrationWakeObserver(),
             executionMode: .executeSleep,
-            policy: .calibratedDefault,
+            policy: policy,
             now: { base },
             systemSleepOperation: operation,
             onOperationalEvent: { _ in }
@@ -65,8 +67,8 @@ final class AutoSleepIntegrationTests: XCTestCase {
 
         try coordinator.start()
         scheduler.fire(at: base.addingTimeInterval(5))
-        stream.emit(angle: 70, at: base.addingTimeInterval(6))
-        stream.emit(angle: 60, at: base.addingTimeInterval(7))
+        stream.emit(angle: policy.reopenThreshold, at: base.addingTimeInterval(6))
+        stream.emit(angle: policy.sleepThreshold, at: base.addingTimeInterval(7))
         scheduler.fire(at: base.addingTimeInterval(9))
 
         XCTAssertEqual(operation.requestCount, 1)
@@ -75,6 +77,7 @@ final class AutoSleepIntegrationTests: XCTestCase {
 
     func testCancellingCandidateEmitsCandidateCancelledInsteadOfRearmed() throws {
         let base = Date(timeIntervalSince1970: 5_000)
+        let policy = LidSleepPolicy.calibratedDefault
         let stream = IntegrationReportStream()
         let scheduler = IntegrationScheduler()
         let recorder = IntegrationEventRecorder()
@@ -85,7 +88,7 @@ final class AutoSleepIntegrationTests: XCTestCase {
             scheduler: scheduler,
             wakeObserver: IntegrationWakeObserver(),
             executionMode: .dryRun,
-            policy: .calibratedDefault,
+            policy: policy,
             now: { base },
             onOperationalEvent: recorder.record,
             onTransitionEvent: recorder.recordTransition
@@ -94,7 +97,7 @@ final class AutoSleepIntegrationTests: XCTestCase {
         try coordinator.start()
         scheduler.fire(at: base.addingTimeInterval(5))
         stream.emit(angle: 90, at: base.addingTimeInterval(6))
-        stream.emit(angle: 60, at: base.addingTimeInterval(7))
+        stream.emit(angle: policy.sleepThreshold, at: base.addingTimeInterval(7))
         stream.emit(angle: 90, at: base.addingTimeInterval(8))
 
         XCTAssertEqual(

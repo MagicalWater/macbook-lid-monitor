@@ -268,6 +268,12 @@ private struct DiagnosticApplication {
         executionMode: AutoSleepExecutionMode,
         policy: LidSleepPolicy
     ) throws -> ExitCode {
+        print(
+            formatter.autoSleepConfigurationLine(
+                executionMode: executionMode,
+                policy: policy
+            )
+        )
         let stream = try IOHIDReportStream(descriptor: descriptor)
         let activeFormatter = formatter
         let coordinator = AutoSleepComposition.makeCoordinator(

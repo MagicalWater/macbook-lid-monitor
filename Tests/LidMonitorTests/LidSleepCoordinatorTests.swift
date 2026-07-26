@@ -4,6 +4,12 @@ import XCTest
 
 final class LidSleepCoordinatorTests: XCTestCase {
     private let now = Date(timeIntervalSince1970: 2_000)
+    private let policy = try! LidSleepPolicy(
+        sleepThreshold: 60,
+        reopenThreshold: 70,
+        debounce: 2,
+        wakeCooldown: 5
+    )
 
     func testStartSubscribesOnceAndSchedulesStartupCooldown() throws {
         let fixture = makeFixture()
@@ -120,7 +126,7 @@ final class LidSleepCoordinatorTests: XCTestCase {
             scheduler: scheduler,
             wakeObserver: wakeObserver,
             sleepRequester: requester,
-            policy: .calibratedDefault,
+            policy: policy,
             now: { currentDate }
         )
         return Fixture(

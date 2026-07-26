@@ -24,9 +24,9 @@ The HID value is a machine-specific hinge representation, not a guaranteed physi
 ## Default Policy
 
 ```text
-sleepThreshold = 60
+sleepThreshold = 68
 sleepDebounce = 2 seconds
-reopenThreshold = 70
+reopenThreshold = 75
 wakeCooldown = 5 seconds
 ```
 

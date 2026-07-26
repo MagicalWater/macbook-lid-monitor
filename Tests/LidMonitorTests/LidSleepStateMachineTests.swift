@@ -3,6 +3,12 @@ import XCTest
 
 final class LidSleepStateMachineTests: XCTestCase {
     private let start = Date(timeIntervalSince1970: 1_000)
+    private let policy = try! LidSleepPolicy(
+        sleepThreshold: 60,
+        reopenThreshold: 70,
+        debounce: 2,
+        wakeCooldown: 5
+    )
 
     func testCooldownEndingAtOpenAngleArmsOpenState() {
         var machine = makeMachine()
@@ -142,7 +148,7 @@ final class LidSleepStateMachineTests: XCTestCase {
     }
 
     private func makeMachine() -> LidSleepStateMachine {
-        LidSleepStateMachine(policy: .calibratedDefault)
+        LidSleepStateMachine(policy: policy)
     }
 
     private func armedMachine() -> LidSleepStateMachine {

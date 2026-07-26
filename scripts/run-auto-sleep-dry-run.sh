@@ -9,8 +9,4 @@ cd "${PROJECT_ROOT}"
 swift build -c release
 
 exec .build/release/macbook-lid-monitor \
-  --auto-sleep --dry-run \
-  --sleep-threshold 60 \
-  --reopen-threshold 70 \
-  --debounce 2 \
-  --wake-cooldown 5
+  --auto-sleep --dry-run

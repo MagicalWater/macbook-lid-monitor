@@ -40,6 +40,24 @@ struct OutputFormatter: Sendable {
         }
     }
 
+    func autoSleepConfigurationLine(
+        executionMode: AutoSleepExecutionMode,
+        policy: LidSleepPolicy
+    ) -> String {
+        let mode = switch executionMode {
+        case .dryRun: "dry-run"
+        case .executeSleep: "execute-sleep"
+        }
+        return [
+            "auto-sleep config:",
+            "mode=\(mode)",
+            "sleep-threshold=\(policy.sleepThreshold)",
+            "reopen-threshold=\(policy.reopenThreshold)",
+            "debounce=\(number(policy.debounce))",
+            "wake-cooldown=\(number(policy.wakeCooldown))"
+        ].joined(separator: " ")
+    }
+
     func autoSleepTransitionLine(_ event: AutoSleepTransitionEvent) -> String {
         let value: String
         switch event {
@@ -106,5 +124,11 @@ struct OutputFormatter: Sendable {
 
     private func quoted(_ value: String) -> String {
         "\"\(value.replacingOccurrences(of: "\"", with: "\\\""))\""
+    }
+
+    private func number(_ value: TimeInterval) -> String {
+        value.rounded() == value
+            ? String(Int(value))
+            : String(value)
     }
 }

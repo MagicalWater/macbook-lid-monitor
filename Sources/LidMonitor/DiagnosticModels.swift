@@ -18,8 +18,8 @@ struct LidSleepPolicy: Equatable, Sendable {
     let wakeCooldown: TimeInterval
 
     static let calibratedDefault = try! LidSleepPolicy(
-        sleepThreshold: 60,
-        reopenThreshold: 70,
+        sleepThreshold: 68,
+        reopenThreshold: 75,
         debounce: 2.0,
         wakeCooldown: 5.0
     )
