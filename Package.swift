@@ -5,19 +5,21 @@ let package = Package(
     name: "macbook-lid-monitor",
     platforms: [.macOS(.v13)],
     products: [
-        .executable(name: "macbook-lid-monitor", targets: ["LidMonitor"])
+        .executable(name: "macbook-lid-monitor", targets: ["LidMonitorCLI"]),
+        .executable(name: "macbook-lid-monitor-daemon-spike", targets: ["LidMonitorDaemonSpike"]),
+        .executable(name: "macbook-lid-monitor-sleep-probe", targets: ["LidMonitorSleepProbe"])
     ],
     targets: [
-        .executableTarget(
-            name: "LidMonitor",
+        .target(
+            name: "LidMonitorCore",
             linkerSettings: [
                 .linkedFramework("IOKit"),
                 .linkedFramework("AppKit")
             ]
         ),
-        .testTarget(
-            name: "LidMonitorTests",
-            dependencies: ["LidMonitor"]
-        )
+        .executableTarget(name: "LidMonitorCLI", dependencies: ["LidMonitorCore"]),
+        .executableTarget(name: "LidMonitorDaemonSpike", dependencies: ["LidMonitorCore"]),
+        .executableTarget(name: "LidMonitorSleepProbe", dependencies: ["LidMonitorCore"]),
+        .testTarget(name: "LidMonitorTests", dependencies: ["LidMonitorCore"])
     ]
 )

@@ -1,5 +1,5 @@
 import XCTest
-@testable import LidMonitor
+@testable import LidMonitorCore
 
 final class CLIParserTests: XCTestCase {
     func testNoArgumentsDefaultsToWatch() throws {
@@ -38,4 +38,9 @@ final class CLIParserTests: XCTestCase {
             XCTAssertEqual(error as? CLIParseError, .unknownOption("--unknown"))
         }
     }
+    func testCLIEntryPointMapsInvalidArgumentsToUsage() {
+        let result = LidMonitorCLIEntryPoint.run(arguments: ["--definitely-invalid"])
+        XCTAssertEqual(result, ExitCode.usage.rawValue)
+    }
+
 }

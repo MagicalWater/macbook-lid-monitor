@@ -312,45 +312,48 @@ private func writeError(_ message: String) {
     FileHandle.standardError.write(Data((message + "\n").utf8))
 }
 
-let exitCode: ExitCode
-do {
-    let options = try CLIParser.parse(Array(CommandLine.arguments.dropFirst()))
-    let application = DiagnosticApplication(
-        enumerator: IOHIDDeviceEnumerator(),
-        formatter: OutputFormatter(),
-        decoder: CompositeLidAngleDecoder(
-            decoders: [ReportID1DegreesDecoder(), UInt16TenthsDecoder()]
-        ),
-        clamshellReader: IORegistryClamshellStateReader()
-    )
-    exitCode = try application.run(options: options)
-} catch let error as CLIParseError {
-    if error == .obsoleteWakeCooldownOption {
-        writeError(
-            "usage error: --wake-cooldown is obsolete; use "
-                + "--startup-cooldown and --wake-recovery"
-        )
-    } else {
-        writeError("usage error: \(error)")
+public enum LidMonitorCLIEntryPoint {
+    public static func run(arguments: [String]) -> Int32 {
+        let exitCode: ExitCode
+        do {
+            let options = try CLIParser.parse(arguments)
+            let application = DiagnosticApplication(
+                enumerator: IOHIDDeviceEnumerator(),
+                formatter: OutputFormatter(),
+                decoder: CompositeLidAngleDecoder(
+                    decoders: [ReportID1DegreesDecoder(), UInt16TenthsDecoder()]
+                ),
+                clamshellReader: IORegistryClamshellStateReader()
+            )
+            exitCode = try application.run(options: options)
+        } catch let error as CLIParseError {
+            if error == .obsoleteWakeCooldownOption {
+                writeError(
+                    "usage error: --wake-cooldown is obsolete; use "
+                        + "--startup-cooldown and --wake-recovery"
+                )
+            } else {
+                writeError("usage error: \(error)")
+            }
+            exitCode = .usage
+        } catch let error as HIDReportStreamError {
+            writeError("HID I/O error: \(error)")
+            exitCode = .ioFailure
+        } catch let error as HIDEnumerationError {
+            writeError("HID unavailable: \(error)")
+            exitCode = .unavailable
+        } catch {
+            writeError("internal error: \(error)")
+            exitCode = .internalError
+        }
+        return exitCode.rawValue
     }
-    exitCode = .usage
-} catch let error as HIDReportStreamError {
-    writeError("HID I/O error: \(error)")
-    exitCode = .ioFailure
-} catch let error as HIDEnumerationError {
-    writeError("HID unavailable: \(error)")
-    exitCode = .unavailable
-} catch {
-    writeError("internal error: \(error)")
-    exitCode = .internalError
 }
 
-exit(exitCode.rawValue)
+public enum LidMonitorDaemonSpikeEntryPoint {
+    public static func run() -> Int32 { ExitCode.unavailable.rawValue }
+}
 
-private extension NSLock {
-    func withLock<T>(_ body: () -> T) -> T {
-        lock()
-        defer { unlock() }
-        return body()
-    }
+public enum LidMonitorSleepProbeEntryPoint {
+    public static func run() -> Int32 { ExitCode.unavailable.rawValue }
 }

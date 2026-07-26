@@ -1,6 +1,6 @@
 import Foundation
 import XCTest
-@testable import LidMonitor
+@testable import LidMonitorCore
 
 final class AutoSleepIntegrationTests: XCTestCase {
     func testDryRunCompositionProcessesCalibratedCloseCycleEndToEnd() throws {

@@ -1,6 +1,6 @@
 import Foundation
 import XCTest
-@testable import LidMonitor
+@testable import LidMonitorCore
 
 final class LidSleepCoordinatorTests: XCTestCase {
     private let now = Date(timeIntervalSince1970: 2_000)

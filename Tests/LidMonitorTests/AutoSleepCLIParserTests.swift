@@ -1,5 +1,5 @@
 import XCTest
-@testable import LidMonitor
+@testable import LidMonitorCore
 
 final class AutoSleepCLIParserTests: XCTestCase {
     func testDryRunUsesCalibratedDefaults() throws {

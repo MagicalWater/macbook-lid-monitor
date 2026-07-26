@@ -1,6 +1,6 @@
 import Foundation
 import XCTest
-@testable import LidMonitor
+@testable import LidMonitorCore
 
 final class HIDReportStreamTests: XCTestCase {
     func testStartOpensRegistersAndRunsSession() throws {

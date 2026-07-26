@@ -1,6 +1,6 @@
 import Foundation
 import XCTest
-@testable import LidMonitor
+@testable import LidMonitorCore
 
 final class LidAngleDecoderTests: XCTestCase {
     private let decoder = CompositeLidAngleDecoder(

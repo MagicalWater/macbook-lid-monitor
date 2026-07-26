@@ -1,5 +1,5 @@
 import XCTest
-@testable import LidMonitor
+@testable import LidMonitorCore
 
 final class LidSleepStateMachineTests: XCTestCase {
     private let start = Date(timeIntervalSince1970: 1_000)
