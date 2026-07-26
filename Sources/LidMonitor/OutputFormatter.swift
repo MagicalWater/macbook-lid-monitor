@@ -31,6 +31,15 @@ struct OutputFormatter: Sendable {
         ].joined(separator: " ")
     }
 
+    func autoSleepLine(_ event: AutoSleepOperationalEvent) -> String {
+        switch event {
+        case .wouldSleep:
+            return "auto-sleep: would-sleep"
+        case .sleepRequested:
+            return "auto-sleep: sleep-requested"
+        }
+    }
+
     func watchLine(
         timestamp: Date,
         result: AngleDecodeResult,

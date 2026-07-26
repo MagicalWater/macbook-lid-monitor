@@ -3,6 +3,19 @@ import XCTest
 @testable import LidMonitor
 
 final class OutputFormatterTests: XCTestCase {
+    func testAutoSleepOperationalEventsUseTransitionOnlyMessages() {
+        let formatter = OutputFormatter()
+
+        XCTAssertEqual(
+            formatter.autoSleepLine(.wouldSleep),
+            "auto-sleep: would-sleep"
+        )
+        XCTAssertEqual(
+            formatter.autoSleepLine(.sleepRequested),
+            "auto-sleep: sleep-requested"
+        )
+    }
+
     func testDecodedWatchLine() {
         let formatter = OutputFormatter(
             timeZone: TimeZone(secondsFromGMT: 8 * 3600)!
