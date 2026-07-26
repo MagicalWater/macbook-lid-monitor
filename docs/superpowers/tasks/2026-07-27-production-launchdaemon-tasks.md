@@ -1,6 +1,6 @@
 # Production LaunchDaemon Task Register
 
-Status: Implementation in progress; Tasks 1–5 complete.
+Status: Implementation in progress; Tasks 1–6 complete.
 
 | Task | Purpose | Primary files | Verification | Approval gate | Rollback/safe stop |
 | ---: | --- | --- | --- | --- | --- |
@@ -10,7 +10,7 @@ Status: Implementation in progress; Tasks 1–5 complete.
 | A | Shared-core stage review | reviews only | clean test/build | none | no system state |
 | 4 | Events and health — complete | production event/health/sink/tests | privacy/format tests | none | revert commit |
 | 5 | Production executable — complete | application, target, Package.swift, tests | composition/full/release | none | revert commit |
-| 6 | Crash budget | crash budget/application/tests | circuit/no-restart tests | none | revert commit |
+| 6 | Crash budget — complete | crash budget/application/tests | circuit/no-restart tests | none | revert commit |
 | B | Composition stage review | reviews only | clean test/build/products | none | no system state |
 | 7 | plist/config/manifest templates | packaging files/tests | XCTest + plutil | none | revert commit |
 | 8 | prepare/verify scripts | management script/lib/tests | XCTest/bash/shellcheck | none; must not write `/Library` | delete build artifacts |

@@ -41,6 +41,29 @@ final class ProductionDaemonCompositionTests: XCTestCase {
         XCTAssertTrue(fixture.requesterFactory.requestedModes.isEmpty)
         XCTAssertTrue(fixture.events.events.contains(.healthChanged(.incompatibleHardware)))
     }
+
+    func testOpenCrashCircuitPreventsEnumerationAndRequesterConstruction() throws {
+        let fixture = Fixture(mode: .enabled, descriptors: [Fixture.exactDescriptor], allowsStart: false)
+
+        let result = try fixture.application.start()
+
+        XCTAssertEqual(result, .circuitOpen)
+        XCTAssertEqual(fixture.enumerator.callCount, 0)
+        XCTAssertTrue(fixture.requesterFactory.requestedModes.isEmpty)
+        XCTAssertTrue(fixture.events.events.contains(.healthChanged(.degradedFailOpen)))
+    }
+
+    func testUnexpectedStreamStartupFailureConsumesCrashBudget() {
+        let fixture = Fixture(
+            mode: .dryRun,
+            descriptors: [Fixture.exactDescriptor],
+            streamStartError: CompositionFailure.failed
+        )
+
+        XCTAssertThrowsError(try fixture.application.start())
+        XCTAssertEqual(fixture.unexpectedExitCount, 1)
+        XCTAssertEqual(fixture.cleanExitCount, 0)
+    }
 }
 
 private final class Fixture {
@@ -62,8 +85,15 @@ private final class Fixture {
     let scheduler = CompositionScheduler()
     let requesterFactory = CompositionRequesterFactory()
     let events = CompositionEventSink()
+    private let unexpectedExitCounter = CompositionCounter()
+    private let cleanExitCounter = CompositionCounter()
+    var unexpectedExitCount: Int { unexpectedExitCounter.value }
+    var cleanExitCount: Int { cleanExitCounter.value }
     lazy var application = ProductionDaemonApplication(
         dependencies: ProductionDaemonDependencies(
+            allowsStart: { [allowsStart] _ in allowsStart },
+            recordUnexpectedExit: { [unexpectedExitCounter] _ in unexpectedExitCounter.increment() },
+            recordCleanExit: { [cleanExitCounter] in cleanExitCounter.increment() },
             loadConfiguration: { [configuration] in configuration },
             enumerator: enumerator,
             registry: .production,
@@ -76,7 +106,14 @@ private final class Fixture {
         )
     )
 
-    init(mode: ProductionMode, descriptors: [HIDDeviceDescriptor]) {
+    private let allowsStart: Bool
+
+    init(
+        mode: ProductionMode,
+        descriptors: [HIDDeviceDescriptor],
+        allowsStart: Bool = true,
+        streamStartError: Error? = nil
+    ) {
         configuration = ProductionConfiguration(
             schemaVersion: 1,
             mode: mode,
@@ -85,6 +122,8 @@ private final class Fixture {
             sensorFreshness: 5
         )
         enumerator = CompositionEnumerator(descriptors: descriptors)
+        self.allowsStart = allowsStart
+        stream.startError = streamStartError
     }
 }
 
@@ -96,9 +135,13 @@ private final class CompositionEnumerator: HIDDeviceEnumerating {
 }
 
 private final class CompositionStream: HIDReportStreaming, @unchecked Sendable {
+    var startError: Error?
     private(set) var startCount = 0
     private(set) var stopCount = 0
-    func start(onReport: @escaping @Sendable (HIDReport) -> Void) throws { startCount += 1 }
+    func start(onReport: @escaping @Sendable (HIDReport) -> Void) throws {
+        startCount += 1
+        if let startError { throw startError }
+    }
     func stop() { stopCount += 1 }
 }
 
@@ -127,4 +170,21 @@ private final class CompositionRequesterFactory: @unchecked Sendable {
 private final class CompositionEventSink: ProductionEventSinking, @unchecked Sendable {
     private(set) var events: [ProductionEvent] = []
     func emit(_ event: ProductionEvent) { events.append(event) }
+}
+
+private enum CompositionFailure: Error { case failed }
+
+private final class CompositionCounter: @unchecked Sendable {
+    private let lock = NSLock()
+    private var count = 0
+    var value: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return count
+    }
+    func increment() {
+        lock.lock()
+        count += 1
+        lock.unlock()
+    }
 }

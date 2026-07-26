@@ -6,6 +6,9 @@ enum ProductionDaemonError: Error, Equatable, Sendable {
 }
 
 struct ProductionDaemonDependencies {
+    let allowsStart: @Sendable (Date) throws -> Bool
+    let recordUnexpectedExit: @Sendable (Date) throws -> Void
+    let recordCleanExit: @Sendable () throws -> Void
     let loadConfiguration: @Sendable () throws -> ProductionConfiguration
     let enumerator: HIDDeviceEnumerating
     let registry: LidHardwareProfileRegistry
@@ -20,12 +23,18 @@ struct ProductionDaemonDependencies {
 final class ProductionDaemonSession: @unchecked Sendable {
     private let coordinator: LidSleepCoordinator
     private let sink: ProductionEventSinking
+    private let recordCleanExit: @Sendable () throws -> Void
     private let lock = NSLock()
     private var stopped = false
 
-    init(coordinator: LidSleepCoordinator, sink: ProductionEventSinking) {
+    init(
+        coordinator: LidSleepCoordinator,
+        sink: ProductionEventSinking,
+        recordCleanExit: @escaping @Sendable () throws -> Void
+    ) {
         self.coordinator = coordinator
         self.sink = sink
+        self.recordCleanExit = recordCleanExit
     }
 
     func stop(reason: String) {
@@ -37,16 +46,19 @@ final class ProductionDaemonSession: @unchecked Sendable {
         guard shouldStop else { return }
         sink.emit(.stopping(reason: reason))
         coordinator.stop()
+        try? recordCleanExit()
     }
 }
 
 enum ProductionDaemonStartResult: Equatable {
     case disabled
+    case circuitOpen
     case running(ProductionDaemonSession)
 
     static func == (lhs: ProductionDaemonStartResult, rhs: ProductionDaemonStartResult) -> Bool {
         switch (lhs, rhs) {
         case (.disabled, .disabled): return true
+        case (.circuitOpen, .circuitOpen): return true
         case let (.running(a), .running(b)): return a === b
         default: return false
         }
@@ -61,6 +73,11 @@ final class ProductionDaemonApplication {
     }
 
     func start() throws -> ProductionDaemonStartResult {
+        guard try dependencies.allowsStart(dependencies.now()) else {
+            dependencies.eventSink.emit(.degraded(code: "crash-circuit-open"))
+            dependencies.eventSink.emit(.healthChanged(.degradedFailOpen))
+            return .circuitOpen
+        }
         let configuration = try dependencies.loadConfiguration()
         dependencies.eventSink.emit(
             .started(mode: configuration.mode, profileID: configuration.hardwareProfileID)
@@ -70,7 +87,13 @@ final class ProductionDaemonApplication {
             return .disabled
         }
 
-        let descriptors = try dependencies.enumerator.descriptors()
+        let descriptors: [HIDDeviceDescriptor]
+        do {
+            descriptors = try dependencies.enumerator.descriptors()
+        } catch {
+            try? dependencies.recordUnexpectedExit(dependencies.now())
+            throw error
+        }
         let resolved: ResolvedLidHardwareProfile
         do {
             resolved = try dependencies.registry.resolve(
@@ -84,8 +107,15 @@ final class ProductionDaemonApplication {
 
         let requester = dependencies.requesterFactory(configuration.mode, dependencies.eventSink)
         let sink = dependencies.eventSink
+        let stream: HIDReportStreaming
+        do {
+            stream = try dependencies.streamFactory(resolved.descriptor)
+        } catch {
+            try? dependencies.recordUnexpectedExit(dependencies.now())
+            throw error
+        }
         let coordinator = LidSleepCoordinator(
-            stream: try dependencies.streamFactory(resolved.descriptor),
+            stream: stream,
             decoder: resolved.decoder,
             scheduler: dependencies.scheduler,
             wakeObserver: dependencies.wakeObserver,
@@ -109,11 +139,22 @@ final class ProductionDaemonApplication {
                 }
             }
         )
-        try coordinator.start()
+        do {
+            try coordinator.start()
+        } catch {
+            try? dependencies.recordUnexpectedExit(dependencies.now())
+            throw error
+        }
         dependencies.eventSink.emit(
             .healthChanged(configuration.mode == .dryRun ? .dryRun : .monitoringDisarmed)
         )
-        return .running(ProductionDaemonSession(coordinator: coordinator, sink: dependencies.eventSink))
+        return .running(
+            ProductionDaemonSession(
+                coordinator: coordinator,
+                sink: dependencies.eventSink,
+                recordCleanExit: dependencies.recordCleanExit
+            )
+        )
     }
 }
 
@@ -122,6 +163,30 @@ public enum LidMonitorProductionDaemonEntryPoint {
         guard arguments.isEmpty else { return ExitCode.usage.rawValue }
         let sink = ProductionEventSink()
         let dependencies = ProductionDaemonDependencies(
+            allowsStart: { date in
+                var budget = CrashBudget(
+                    storage: FileCrashBudgetStorage(),
+                    maximumUnexpectedExits: 3,
+                    window: 300
+                )
+                return try budget.allowsStart(at: date)
+            },
+            recordUnexpectedExit: { date in
+                var budget = CrashBudget(
+                    storage: FileCrashBudgetStorage(),
+                    maximumUnexpectedExits: 3,
+                    window: 300
+                )
+                _ = try budget.recordUnexpectedExit(at: date)
+            },
+            recordCleanExit: {
+                var budget = CrashBudget(
+                    storage: FileCrashBudgetStorage(),
+                    maximumUnexpectedExits: 3,
+                    window: 300
+                )
+                try budget.recordCleanExit()
+            },
             loadConfiguration: { try ProductionConfigurationLoader().load() },
             enumerator: IOHIDDeviceEnumerator(),
             registry: .production,
@@ -152,6 +217,8 @@ public enum LidMonitorProductionDaemonEntryPoint {
             switch try ProductionDaemonApplication(dependencies: dependencies).start() {
             case .disabled:
                 return ExitCode.success.rawValue
+            case .circuitOpen:
+                return ExitCode.unavailable.rawValue
             case let .running(session):
                 let finished = DispatchSemaphore(value: 0)
                 let signals = ProcessSignalController()

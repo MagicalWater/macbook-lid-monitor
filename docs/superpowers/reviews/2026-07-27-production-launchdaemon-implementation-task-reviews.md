@@ -250,3 +250,49 @@ check or adding an unsafe annotation.
 ### Disposition
 
 **Task 5 approved and complete.**
+
+## Task 6 — Bounded crash budget and circuit breaker
+
+### Implementation
+
+- Added rolling-window unexpected-exit accounting with persistent JSON state.
+- Added atomic file replacement, explicit reset, clean-exit exclusion, and corrupt-state fail-open.
+- Added startup circuit gating before configuration, HID enumeration, or requester construction.
+- Added unexpected startup failure accounting and clean session-stop recording.
+
+### TDD evidence
+
+- RED: focused tests failed because crash budget/storage/circuit result types did not exist.
+- GREEN: budget and composition focused tests pass after implementation.
+
+### Immediate review findings
+
+#### P0 — Initial implementation only read circuit state
+
+Without consuming budget on unexpected startup failure, repeated launchd starts could never open
+the circuit.
+
+**Resolution:** Added injected unexpected/clean-exit recorders. Enumeration, stream construction,
+and coordinator startup failures consume budget; expected configuration/hardware incompatibility
+does not. Clean signal stop does not consume budget.
+
+### Re-review
+
+- Rolling window and threshold behavior: pass.
+- Corrupt persistent state fails open without rewriting evidence: pass.
+- Circuit-open path starts no HID/requester: pass.
+- Unexpected startup failures consume budget: pass.
+- Clean stop is excluded and reset is explicit: pass.
+- Persistence uses atomic replacement: pass.
+
+### Verification
+
+- Focused: 10 tests, 0 failures.
+- Full: 141 tests, 0 failures.
+- Release production daemon: passed.
+- `git diff --check`: passed.
+- No crash file or other `/Library` artifact was created during tests.
+
+### Disposition
+
+**Task 6 approved and complete.**
