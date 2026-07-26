@@ -15,6 +15,19 @@ final class CandidateRankingTests: XCTestCase {
         XCTAssertTrue(CandidateRanker.rank([keyboard]).isEmpty)
     }
 
+    func testKeyboardTrackpadNameIsExcludedForVendorDefinedUsage() {
+        let topCaseChild = HIDDeviceDescriptor.fixture(
+            name: "Apple Internal Keyboard / Trackpad",
+            vendorID: 0x05AC,
+            productID: 0x0343,
+            usagePage: 0xFF00,
+            usage: 0x000B,
+            inputClass: .other
+        )
+
+        XCTAssertTrue(CandidateRanker.rank([topCaseChild]).isEmpty)
+    }
+
     func testLidAngleIdentityRanksAboveGenericAppleDevice() {
         let lid = HIDDeviceDescriptor.fixture(
             registryEntryID: 2,
@@ -59,6 +72,25 @@ final class CandidateRankingTests: XCTestCase {
             ranked.first?.score ?? 0,
             CandidateRanker.minimumSelectableScore
         )
+    }
+
+    func testKnownAppleHingeOrientationSensorMeetsThreshold() throws {
+        let sensor = HIDDeviceDescriptor.fixture(
+            name: "Apple",
+            vendorID: 0x05AC,
+            productID: 0x8104,
+            usagePage: 0x0020,
+            usage: 0x008A,
+            inputClass: .other
+        )
+
+        let candidate = try XCTUnwrap(CandidateRanker.rank([sensor]).first)
+
+        XCTAssertGreaterThanOrEqual(
+            candidate.score,
+            CandidateRanker.minimumSelectableScore
+        )
+        XCTAssertTrue(candidate.reasons.contains("identity:appleHingeOrientation=+40"))
     }
 
     func testReasonsExplainEveryAwardedScoreComponent() throws {

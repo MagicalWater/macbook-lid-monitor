@@ -2,11 +2,11 @@ import Foundation
 import IOKit
 import IOKit.pwr_mgt
 
-protocol ClamshellStateReading {
+protocol ClamshellStateReading: Sendable {
     func currentState() -> ClamshellState
 }
 
-final class IORegistryClamshellStateReader: ClamshellStateReading {
+final class IORegistryClamshellStateReader: ClamshellStateReading, @unchecked Sendable {
     func currentState() -> ClamshellState {
         let service = IOServiceGetMatchingService(
             kIOMainPortDefault,

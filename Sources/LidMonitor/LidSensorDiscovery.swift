@@ -7,7 +7,7 @@ struct CandidateRanker {
 
     static func rank(_ descriptors: [HIDDeviceDescriptor]) -> [CandidateScore] {
         descriptors
-            .filter { !isExcluded($0.inputClass) }
+            .filter { !isExcluded($0) }
             .map(score)
             .sorted {
                 if $0.score != $1.score {
@@ -17,13 +17,17 @@ struct CandidateRanker {
             }
     }
 
-    private static func isExcluded(_ inputClass: HIDInputClass) -> Bool {
-        switch inputClass {
+    private static func isExcluded(_ descriptor: HIDDeviceDescriptor) -> Bool {
+        switch descriptor.inputClass {
         case .keyboard, .keypad, .mouse, .pointer, .trackpad, .digitizer, .consumerControl:
-            true
+            return true
         case .other:
-            false
+            break
         }
+
+        let normalizedName = descriptor.name.lowercased()
+        return ["keyboard", "keypad", "trackpad", "mouse", "pointer", "digitizer"]
+            .contains { normalizedName.contains($0) }
     }
 
     private static func score(_ descriptor: HIDDeviceDescriptor) -> CandidateScore {
@@ -49,6 +53,14 @@ struct CandidateRanker {
         if descriptor.vendorID == 0x05AC {
             score += 5
             reasons.append("vendor:apple=+5")
+        }
+
+        if descriptor.vendorID == 0x05AC,
+           descriptor.productID == 0x8104,
+           descriptor.usagePage == 0x0020,
+           descriptor.usage == 0x008A {
+            score += 40
+            reasons.append("identity:appleHingeOrientation=+40")
         }
 
         return CandidateScore(descriptor: descriptor, score: score, reasons: reasons)
