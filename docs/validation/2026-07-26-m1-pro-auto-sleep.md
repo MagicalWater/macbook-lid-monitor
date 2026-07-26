@@ -307,6 +307,41 @@ recorded `Software Sleep pid=17708`.
 
 Task 8 decision: **Pass**.
 
+## Angle-authoritative re-sleep Task 5 review
+
+The post-acceptance refinement split startup safety from wake recovery and made
+fresh lid angle authoritative after a real wake. Effective runtime policy is:
+
+```text
+sleep-threshold=68
+reopen-threshold=75
+debounce=2
+startup-cooldown=5
+wake-recovery=15
+```
+
+Clean validation completed with 79 tests and zero failures, plus a passing
+release build. Static review confirmed exactly three one-shot task slots, no
+polling, no power assertion, no persistent service, and no automatic retry after
+a failed `IOPMSleepSystem` call.
+
+A bounded release dry-run hardware idle observation emitted only:
+
+```text
+auto-sleep: startup-cooldown
+auto-sleep: rearmed
+```
+
+CPU samples remained at `0.0%`, accumulated CPU time reached `0:00.01`, and no
+transition or log churn occurred. No real sleep was invoked during Task 5.
+
+- Open P0: 0
+- Open P1: 0
+- Open P2: 0
+- Task 5 decision: **Pass**
+
+The user separately approved Task 6 two-sleep real acceptance after this review.
+
 ## Angle-authoritative recovery refinement
 
 The post-acceptance implementation now uses this runtime policy:

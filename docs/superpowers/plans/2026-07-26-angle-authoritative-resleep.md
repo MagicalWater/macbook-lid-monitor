@@ -534,7 +534,7 @@ git commit -m "docs: align angle-authoritative recovery behavior"
 - Consumes: complete Tasks 1–4 implementation.
 - Produces: final P0/P1 disposition and dry-run acceptance evidence; real sleep remains separately gated.
 
-- [ ] **Step 1: Run full clean validation**
+- [x] **Step 1: Run full clean validation**
 
 Run:
 
@@ -547,7 +547,7 @@ git diff --check
 
 Expected: all pass.
 
-- [ ] **Step 2: Perform static operational-safety review**
+- [x] **Step 2: Perform static operational-safety review**
 
 Verify:
 
@@ -561,7 +561,7 @@ Verify:
 - failed sleep request cannot automatically retry;
 - diagnostic modes cannot construct a sleep requester.
 
-- [ ] **Step 3: Run bounded hardware dry-run recovery acceptance**
+- [x] **Step 3: Run bounded hardware dry-run recovery acceptance**
 
 Start release dry-run in the foreground. Perform:
 
@@ -576,7 +576,7 @@ tests and verify stationary idle behavior on hardware
 Record that no real sleep was invoked in this step. Do not fake an
 `NSWorkspace.didWakeNotification` production event.
 
-- [ ] **Step 4: Write holistic final review**
+- [x] **Step 4: Write holistic final review**
 
 Record test/build evidence, static findings, accepted hardware limitation, and:
 
@@ -588,7 +588,7 @@ Open P1 = 0
 Do not claim real recovery re-sleep acceptance without a separately approved
 foreground execute-sleep cycle.
 
-- [ ] **Step 5: Review, fix, re-review, and commit Task 5**
+- [x] **Step 5: Review, fix, re-review, and commit Task 5**
 
 Require Open P0 = 0 and Open P1 = 0, then commit:
 
