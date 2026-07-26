@@ -150,3 +150,42 @@ plan, task reviews, and final review.
 - Open P1: 0
 - Open P2: 0
 - Task 4 status: approved
+
+## Task 6 Review
+
+### Evidence
+
+- User gave explicit approval after Task 5 passed.
+- Process emitted two and only two `sleep-requested` events.
+- `recovery-resleep` occurred between the requests.
+- The second request occurred fifteen seconds after the first wake.
+- Opening to `>=75` after the second wake emitted `rearmed`.
+- No third sleep request occurred before process shutdown.
+- `pmset` independently attributed both low-power transitions to the same
+  foreground process.
+
+### Finding P2-1 — Second transition was represented as DarkWake
+
+The first request produced a full `Entering Sleep state` entry. The second
+request produced `Entering DarkWake state due to 'Software Sleep'`, followed by
+an HID-triggered FullWake. Treating both as identical full Sleep entries would
+overstate the evidence.
+
+**Resolution:** Validation and final-review documents preserve the exact macOS
+state distinction while accepting the angle-authoritative behavior and timing.
+
+### Re-review
+
+- Two exactly-once process requests: Pass
+- Fifteen-second recovery timing: Pass
+- Open-to-cancel behavior: Pass
+- Third request prevention after reopen: Pass
+- Honest platform evidence wording: Pass
+- Residual process after stop: None
+
+### Final disposition
+
+- Open P0: 0
+- Open P1: 0
+- Open P2: 0
+- Task 6 status: Pass with macOS DarkWake evidence note

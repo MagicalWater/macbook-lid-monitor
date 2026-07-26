@@ -100,3 +100,28 @@ sensor uncertainty, and explicit on system-sleep request failure.
 The feature is eligible for the separately approved foreground Task 6 real
 two-sleep acceptance. Eligibility is not itself evidence that real re-sleep has
 already occurred.
+
+## Post-review Task 6 real acceptance addendum
+
+The user subsequently gave explicit approval for the separately gated two-sleep
+acceptance. The foreground process emitted exactly two `sleep-requested` events,
+with `recovery-resleep` between them. The second request occurred fifteen seconds
+after the first keyboard wake. Opening to `>=75` after the second wake emitted
+`rearmed` and cancelled any third request.
+
+macOS independently recorded the first request as a full Software Sleep and the
+second as `Entering DarkWake state due to 'Software Sleep'`. This distinction is
+retained as a platform evidence note rather than normalized away.
+
+Task 6 disposition:
+
+- Open P0: 0
+- Open P1: 0
+- Open P2: 0
+- Unexpected third request: 0
+- Recovery cancellation failure: 0
+- Functional acceptance: Pass
+- Power-state evidence: Pass with DarkWake note
+
+The complete angle-authoritative re-sleep phase is accepted for the current
+foreground-only scope. This does not approve a LaunchAgent or persistent service.

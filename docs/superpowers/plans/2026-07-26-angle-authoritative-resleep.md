@@ -609,12 +609,12 @@ git commit -m "docs: complete angle-authoritative resleep review"
 - Consumes: Task 5 Open P0/P1 = 0 and explicit user approval.
 - Produces: one bounded real close/sleep/wake/re-sleep/open acceptance result.
 
-- [ ] **Step 1: Confirm explicit approval after Task 5**
+- [x] **Step 1: Confirm explicit approval after Task 5**
 
 Do not start `--execute-sleep` unless the user separately approves this exact
 two-sleep acceptance after reviewing Task 5 evidence.
 
-- [ ] **Step 2: Run one bounded foreground recovery cycle**
+- [x] **Step 2: Run one bounded foreground recovery cycle**
 
 ```text
 open >=75
@@ -624,7 +624,7 @@ wake by keyboard while keeping angle <75
 verify second Software Sleep occurs after approximately 15 seconds
 ```
 
-- [ ] **Step 3: Verify escape window**
+- [x] **Step 3: Verify escape window**
 
 Wake again, open to `>=75` within fifteen seconds, and verify:
 
@@ -634,13 +634,13 @@ rearmed emitted
 no third sleep request
 ```
 
-- [ ] **Step 4: Stop foreground process and document evidence**
+- [x] **Step 4: Stop foreground process and document evidence**
 
 Record process transitions and independent `pmset -g log` Software Sleep/Wake
 entries. Stop the process; confirm no residual process, service, assertion, or
 persistent setting.
 
-- [ ] **Step 5: Review and commit real acceptance**
+- [x] **Step 5: Review and commit real acceptance**
 
 Require no unexpected repeated request and no failed recovery cancellation, then
 commit:

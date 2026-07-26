@@ -307,6 +307,82 @@ recorded `Software Sleep pid=17708`.
 
 Task 8 decision: **Pass**.
 
+## Angle-authoritative re-sleep acceptance
+
+The user separately approved one bounded two-sleep foreground acceptance after
+the angle-authoritative implementation had passed its Task 5 holistic review
+with Open P0/P1/P2 = 0.
+
+The release executable reported the effective policy:
+
+```text
+auto-sleep config: mode=execute-sleep sleep-threshold=68 reopen-threshold=75 debounce=2 startup-cooldown=5 wake-recovery=15
+auto-sleep: startup-cooldown
+auto-sleep: rearmed
+```
+
+The complete process-side transition sequence was:
+
+```text
+auto-sleep: candidate-started
+auto-sleep: triggered
+auto-sleep: sleep-requested
+auto-sleep: wake-recovery
+auto-sleep: recovery-resleep
+auto-sleep: sleep-requested
+auto-sleep: wake-recovery
+auto-sleep: rearmed
+```
+
+Independent macOS power-management evidence recorded:
+
+```text
+2026-07-26 20:16:17 +0800 Sleep
+Entering Sleep state due to 'Software Sleep pid=38595'
+
+2026-07-26 20:16:31 +0800 Wake
+Wake from Deep Idle ... trackpadkeyboard ...
+
+2026-07-26 20:16:46 +0800 Sleep
+Entering DarkWake state due to 'Software Sleep pid=38595'
+
+2026-07-26 20:17:00 +0800 Wake
+DarkWake to FullWake ... due to HID Activity
+```
+
+The second software sleep request occurred exactly fifteen seconds after the
+first keyboard wake. macOS represented the second low-power transition as
+`Entering DarkWake state` rather than a second full `Entering Sleep state`.
+The user observed the expected second sleep behavior, and both the process log
+and `pmset` attribute the transition to the same foreground process and software
+sleep request.
+
+After the second wake, the lid was opened to `>=75` within the recovery window.
+The process emitted `rearmed`; no third `sleep-requested` event or later
+software-sleep entry occurred before the foreground process was stopped.
+
+Acceptance results:
+
+- Explicit approval after Task 5: Yes
+- First software sleep: Pass, full Sleep
+- First keyboard wake while remaining below `75`: Pass
+- Recovery delay: Pass, exactly 15 seconds
+- Second software sleep request: Pass
+- Second macOS state: DarkWake sleep transition, recorded limitation
+- Second HID wake: Pass
+- Open to `>=75` within recovery window: Pass
+- Recovery cancellation and `rearmed`: Pass
+- Third sleep request: None
+- Sleep-request failure output: None
+- Residual foreground process: None after stop
+- Persistent service or power mutation: None
+
+Angle-authoritative re-sleep decision: **Pass with macOS power-state note**.
+The required user-visible and state-machine behavior is accepted. The second
+transition's DarkWake representation remains hardware/OS-specific evidence and
+must not be generalized as proof that every supported Mac will record two
+identical full Sleep entries.
+
 ## Angle-authoritative re-sleep Task 5 review
 
 The post-acceptance refinement split startup safety from wake recovery and made

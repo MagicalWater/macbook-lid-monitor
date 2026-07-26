@@ -159,9 +159,12 @@ The tool cannot repair a broken clamshell sensor. The auto-sleep workaround is
 event-driven and foreground-only. On the validated M1 Pro, the recorded dry-run,
 idle-energy, operational-safety, and one-cycle real-sleep acceptance gates have
 passed for the original one-cycle behavior. The current angle-authoritative
-post-wake recovery refinement is fully covered by automated tests and remains
-separately gated for a bounded real two-sleep acceptance cycle. Real sleep
-remains an explicit operator action through
+post-wake recovery refinement has also passed one separately approved bounded
+two-sleep acceptance cycle: the second software sleep request occurred after the
+15-second recovery window, and opening to `>=75` after the second wake cancelled
+the third request. macOS recorded the second low-power transition as DarkWake
+rather than a second identical full Sleep; the validation document preserves
+that platform-specific distinction. Real sleep remains an explicit operator action through
 `--auto-sleep --execute-sleep`; no background or persistent deployment is
 created by this project.
 
