@@ -1,5 +1,72 @@
 import Dispatch
+import Darwin
 import Foundation
+
+nonisolated(unsafe) private var autoSleepSignalWriteFD: Int32 = -1
+
+private func autoSleepSignalHandler(_ signalNumber: Int32) {
+    guard autoSleepSignalWriteFD >= 0 else { return }
+    var byte = UInt8(truncatingIfNeeded: signalNumber)
+    withUnsafePointer(to: &byte) { pointer in
+        _ = Darwin.write(autoSleepSignalWriteFD, pointer, 1)
+    }
+}
+
+enum AutoSleepComposition {
+    static func makeCoordinator(
+        stream: HIDReportStreaming,
+        decoder: LidAngleDecoding,
+        scheduler: OneShotScheduling,
+        wakeObserver: SystemWakeObserving,
+        executionMode: AutoSleepExecutionMode,
+        policy: LidSleepPolicy,
+        now: @escaping @Sendable () -> Date = Date.init,
+        systemSleepOperation: (any SystemSleepOperating)? = nil,
+        onOperationalEvent: @escaping @Sendable (AutoSleepOperationalEvent) -> Void
+    ) -> LidSleepCoordinator {
+        let requester: any SleepRequesting
+
+        switch executionMode {
+        case .dryRun:
+            requester = DryRunSleepRequester(onEvent: onOperationalEvent)
+        case .executeSleep:
+            requester = ReportingSleepRequester(
+                requester: MacOSSleepRequester(
+                    operation: systemSleepOperation ?? IOKitSystemSleepOperation()
+                ),
+                onEvent: onOperationalEvent
+            )
+        }
+
+        return LidSleepCoordinator(
+            stream: stream,
+            decoder: decoder,
+            scheduler: scheduler,
+            wakeObserver: wakeObserver,
+            sleepRequester: requester,
+            policy: policy,
+            now: now
+        )
+    }
+}
+
+private final class ReportingSleepRequester: SleepRequesting, @unchecked Sendable {
+    let requester: any SleepRequesting
+    let onEvent: @Sendable (AutoSleepOperationalEvent) -> Void
+
+    init(
+        requester: any SleepRequesting,
+        onEvent: @escaping @Sendable (AutoSleepOperationalEvent) -> Void
+    ) {
+        self.requester = requester
+        self.onEvent = onEvent
+    }
+
+    func requestSleep() throws {
+        try requester.requestSleep()
+        onEvent(.sleepRequested)
+    }
+}
 
 private final class FinishController: @unchecked Sendable {
     private let lock = NSLock()
@@ -24,6 +91,88 @@ private final class FinishController: @unchecked Sendable {
 
     func wait() {
         semaphore.wait()
+    }
+}
+
+private final class AutoSleepRunController: @unchecked Sendable {
+    private let lock = NSLock()
+    private let coordinator: LidSleepCoordinator
+    private let mainRunLoop: CFRunLoop
+    private let signalQueue = DispatchQueue(label: "macbook-lid-monitor.signals")
+    private var signalSource: DispatchSourceRead?
+    private var signalReadFD: Int32 = -1
+    private var signalWriteFD: Int32 = -1
+    private var finished = false
+
+    init(coordinator: LidSleepCoordinator) {
+        self.coordinator = coordinator
+        mainRunLoop = CFRunLoopGetMain()
+    }
+
+    func startSignalHandling() throws {
+        var descriptors: [Int32] = [0, 0]
+        let pipeResult = descriptors.withUnsafeMutableBufferPointer { buffer in
+            guard let baseAddress = buffer.baseAddress else { return Int32(-1) }
+            return pipe(baseAddress)
+        }
+        guard pipeResult == 0 else {
+            throw POSIXError(.init(rawValue: errno) ?? .EIO)
+        }
+
+        let readFD = descriptors[0]
+        let writeFD = descriptors[1]
+        let source = DispatchSource.makeReadSource(
+            fileDescriptor: readFD,
+            queue: signalQueue
+        )
+        source.setEventHandler { [weak self] in
+            guard let self else { return }
+            var buffer = [UInt8](repeating: 0, count: 8)
+            _ = buffer.withUnsafeMutableBytes { bytes in
+                Darwin.read(readFD, bytes.baseAddress, bytes.count)
+            }
+            self.finish()
+        }
+
+        lock.withLock {
+            signalReadFD = readFD
+            signalWriteFD = writeFD
+            signalSource = source
+            autoSleepSignalWriteFD = writeFD
+        }
+
+        signal(SIGINT, autoSleepSignalHandler)
+        signal(SIGTERM, autoSleepSignalHandler)
+        source.resume()
+    }
+
+    func finish() {
+        let resources = lock.withLock { () -> (DispatchSourceRead?, Int32, Int32)? in
+            guard !finished else { return nil }
+            finished = true
+            let activeSource = signalSource
+            let readFD = signalReadFD
+            let writeFD = signalWriteFD
+            signalSource = nil
+            signalReadFD = -1
+            signalWriteFD = -1
+            autoSleepSignalWriteFD = -1
+            return (activeSource, readFD, writeFD)
+        }
+        guard let resources else { return }
+        signal(SIGINT, SIG_DFL)
+        signal(SIGTERM, SIG_DFL)
+        resources.0?.cancel()
+        if resources.1 >= 0 { close(resources.1) }
+        if resources.2 >= 0 { close(resources.2) }
+        coordinator.stop()
+        CFRunLoopPerformBlock(
+            mainRunLoop,
+            CFRunLoopMode.defaultMode.rawValue
+        ) { [mainRunLoop] in
+            CFRunLoopStop(mainRunLoop)
+        }
+        CFRunLoopWakeUp(mainRunLoop)
     }
 }
 
@@ -54,11 +203,29 @@ private struct DiagnosticApplication {
             return .unavailable
         }
 
-        guard options.mode == .watch else {
+        switch options.mode {
+        case .list:
             return .success
+        case .watch:
+            return try runWatch(
+                descriptor: selected.descriptor,
+                options: options
+            )
+        case let .autoSleep(executionMode, policy):
+            return try runAutoSleep(
+                descriptor: selected.descriptor,
+                executionMode: executionMode,
+                policy: policy
+            )
         }
+    }
 
-        let stream = try IOHIDReportStream(descriptor: selected.descriptor)
+    private func runWatch(
+        descriptor: HIDDeviceDescriptor,
+        options: CLIOptions
+    ) throws -> ExitCode {
+
+        let stream = try IOHIDReportStream(descriptor: descriptor)
         let controller = FinishController(stream: stream)
         let activeDecoder = decoder
         let activeFormatter = formatter
@@ -91,6 +258,40 @@ private struct DiagnosticApplication {
 
         controller.wait()
         signalSource.cancel()
+        return .success
+    }
+
+    private func runAutoSleep(
+        descriptor: HIDDeviceDescriptor,
+        executionMode: AutoSleepExecutionMode,
+        policy: LidSleepPolicy
+    ) throws -> ExitCode {
+        let stream = try IOHIDReportStream(descriptor: descriptor)
+        let activeFormatter = formatter
+        let coordinator = AutoSleepComposition.makeCoordinator(
+            stream: stream,
+            decoder: decoder,
+            scheduler: DispatchOneShotScheduler(),
+            wakeObserver: WorkspaceSystemWakeObserver(),
+            executionMode: executionMode,
+            policy: policy,
+            onOperationalEvent: { event in
+                print(activeFormatter.autoSleepLine(event))
+            }
+        )
+        let controller = AutoSleepRunController(coordinator: coordinator)
+
+        try controller.startSignalHandling()
+
+        do {
+            try coordinator.start()
+            CFRunLoopRun()
+        } catch {
+            controller.finish()
+            throw error
+        }
+
+        controller.finish()
         return .success
     }
 }
