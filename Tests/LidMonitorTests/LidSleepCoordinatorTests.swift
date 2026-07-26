@@ -333,7 +333,7 @@ private final class FakeWakeObserver: SystemWakeObserving, @unchecked Sendable {
     private(set) var startCount = 0
     private(set) var stopCount = 0
 
-    func start(onWake: @escaping @Sendable (Date) -> Void) {
+    func start(onWake: @escaping @Sendable (Date) -> Void) throws {
         startCount += 1
         callback = onWake
     }

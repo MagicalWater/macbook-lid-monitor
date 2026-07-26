@@ -13,8 +13,7 @@ let package = Package(
         .target(
             name: "LidMonitorCore",
             linkerSettings: [
-                .linkedFramework("IOKit"),
-                .linkedFramework("AppKit")
+                .linkedFramework("IOKit")
             ]
         ),
         .executableTarget(name: "LidMonitorCLI", dependencies: ["LidMonitorCore"]),

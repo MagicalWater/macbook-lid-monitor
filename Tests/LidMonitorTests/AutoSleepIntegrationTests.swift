@@ -282,7 +282,7 @@ private final class IntegrationTask: CancellableTask, @unchecked Sendable {
 private final class IntegrationWakeObserver: SystemWakeObserving, @unchecked Sendable {
     private var callback: (@Sendable (Date) -> Void)?
 
-    func start(onWake: @escaping @Sendable (Date) -> Void) {
+    func start(onWake: @escaping @Sendable (Date) -> Void) throws {
         callback = onWake
     }
 

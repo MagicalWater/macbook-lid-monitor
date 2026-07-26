@@ -281,7 +281,7 @@ private struct DiagnosticApplication {
             stream: stream,
             decoder: decoder,
             scheduler: DispatchOneShotScheduler(),
-            wakeObserver: WorkspaceSystemWakeObserver(),
+            wakeObserver: IOKitSystemWakeObserver(),
             executionMode: executionMode,
             policy: policy,
             onOperationalEvent: { event in

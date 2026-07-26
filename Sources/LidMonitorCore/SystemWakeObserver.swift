@@ -1,42 +1,25 @@
-import AppKit
 import Foundation
 
 protocol SystemWakeObserving: AnyObject, Sendable {
-    func start(onWake: @escaping @Sendable (Date) -> Void)
+    func start(onWake: @escaping @Sendable (Date) -> Void) throws
     func stop()
 }
 
-final class WorkspaceSystemWakeObserver: SystemWakeObserving, @unchecked Sendable {
-    private let lock = NSLock()
-    private var observer: NSObjectProtocol?
+final class IOKitSystemWakeObserver: SystemWakeObserving, @unchecked Sendable {
+    private let powerObserver: SystemPowerObserving
 
-    func start(onWake: @escaping @Sendable (Date) -> Void) {
-        lock.lock()
-        defer { lock.unlock() }
-        guard observer == nil else { return }
+    init(powerObserver: SystemPowerObserving = IOKitSystemPowerObserver()) {
+        self.powerObserver = powerObserver
+    }
 
-        observer = NSWorkspace.shared.notificationCenter.addObserver(
-            forName: NSWorkspace.didWakeNotification,
-            object: nil,
-            queue: nil
-        ) { _ in
-            onWake(Date())
+    func start(onWake: @escaping @Sendable (Date) -> Void) throws {
+        try powerObserver.start { event, date in
+            guard event == .hasPoweredOn else { return }
+            onWake(date)
         }
     }
 
     func stop() {
-        let existing: NSObjectProtocol?
-        lock.lock()
-        existing = observer
-        observer = nil
-        lock.unlock()
-
-        if let existing {
-            NSWorkspace.shared.notificationCenter.removeObserver(existing)
-        }
-    }
-
-    deinit {
-        stop()
+        powerObserver.stop()
     }
 }

@@ -48,7 +48,7 @@ final class LidSleepCoordinator: @unchecked Sendable {
             guard !started else { return }
             started = true
 
-            wakeObserver.start { [weak self] date in
+            try wakeObserver.start { [weak self] date in
                 self?.queue.sync {
                     self?.handleWake(at: date)
                 }
