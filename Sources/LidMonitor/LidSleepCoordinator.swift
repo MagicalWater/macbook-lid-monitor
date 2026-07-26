@@ -15,6 +15,7 @@ final class LidSleepCoordinator: @unchecked Sendable {
     private var machine: LidSleepStateMachine
     private var debounceTask: CancellableTask?
     private var cooldownTask: CancellableTask?
+    private var lastReportedState: LidSleepState = .cooldown
     private var started = false
 
     init(
@@ -135,8 +136,16 @@ final class LidSleepCoordinator: @unchecked Sendable {
                 try? sleepRequester.requestSleep()
 
             case let .stateChanged(state):
+                let previousState = lastReportedState
+                lastReportedState = state
+
                 switch state {
-                case .open: onTransitionEvent(.rearmed)
+                case .open:
+                    if case .closingCandidate = previousState {
+                        onTransitionEvent(.candidateCancelled)
+                    } else {
+                        onTransitionEvent(.rearmed)
+                    }
                 case .closingCandidate: onTransitionEvent(.candidateStarted)
                 case .triggered: onTransitionEvent(.triggered)
                 case .disarmed: onTransitionEvent(.disarmed)

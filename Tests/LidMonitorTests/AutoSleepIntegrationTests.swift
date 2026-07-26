@@ -72,6 +72,39 @@ final class AutoSleepIntegrationTests: XCTestCase {
         XCTAssertEqual(operation.requestCount, 1)
         coordinator.stop()
     }
+
+    func testCancellingCandidateEmitsCandidateCancelledInsteadOfRearmed() throws {
+        let base = Date(timeIntervalSince1970: 5_000)
+        let stream = IntegrationReportStream()
+        let scheduler = IntegrationScheduler()
+        let recorder = IntegrationEventRecorder()
+
+        let coordinator = AutoSleepComposition.makeCoordinator(
+            stream: stream,
+            decoder: CompositeLidAngleDecoder(decoders: [ReportID1DegreesDecoder()]),
+            scheduler: scheduler,
+            wakeObserver: IntegrationWakeObserver(),
+            executionMode: .dryRun,
+            policy: .calibratedDefault,
+            now: { base },
+            onOperationalEvent: recorder.record,
+            onTransitionEvent: recorder.recordTransition
+        )
+
+        try coordinator.start()
+        scheduler.fire(at: base.addingTimeInterval(5))
+        stream.emit(angle: 90, at: base.addingTimeInterval(6))
+        stream.emit(angle: 60, at: base.addingTimeInterval(7))
+        stream.emit(angle: 90, at: base.addingTimeInterval(8))
+
+        XCTAssertEqual(
+            recorder.transitions,
+            [.disarmed, .rearmed, .candidateStarted, .candidateCancelled]
+        )
+        XCTAssertEqual(recorder.events, [])
+
+        coordinator.stop()
+    }
 }
 
 private final class IntegrationReportStream: HIDReportStreaming, @unchecked Sendable {
