@@ -105,7 +105,9 @@ do {
     let application = DiagnosticApplication(
         enumerator: IOHIDDeviceEnumerator(),
         formatter: OutputFormatter(),
-        decoder: CompositeLidAngleDecoder(decoders: [UInt16TenthsDecoder()]),
+        decoder: CompositeLidAngleDecoder(
+            decoders: [ReportID1DegreesDecoder(), UInt16TenthsDecoder()]
+        ),
         clamshellReader: IORegistryClamshellStateReader()
     )
     exitCode = try application.run(options: options)
