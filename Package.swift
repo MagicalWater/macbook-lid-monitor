@@ -6,6 +6,7 @@ let package = Package(
     platforms: [.macOS(.v13)],
     products: [
         .executable(name: "macbook-lid-monitor", targets: ["LidMonitorCLI"]),
+        .executable(name: "macbook-lid-monitor-daemon", targets: ["LidMonitorDaemon"]),
         .executable(name: "macbook-lid-monitor-daemon-spike", targets: ["LidMonitorDaemonSpike"]),
         .executable(name: "macbook-lid-monitor-sleep-probe", targets: ["LidMonitorSleepProbe"])
     ],
@@ -17,6 +18,7 @@ let package = Package(
             ]
         ),
         .executableTarget(name: "LidMonitorCLI", dependencies: ["LidMonitorCore"]),
+        .executableTarget(name: "LidMonitorDaemon", dependencies: ["LidMonitorCore"]),
         .executableTarget(name: "LidMonitorDaemonSpike", dependencies: ["LidMonitorCore"]),
         .executableTarget(name: "LidMonitorSleepProbe", dependencies: ["LidMonitorCore"]),
         .testTarget(name: "LidMonitorTests", dependencies: ["LidMonitorCore"])

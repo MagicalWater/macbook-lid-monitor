@@ -202,3 +202,51 @@ Private stored properties caused Swift's synthesized initializer to become priva
 ### Disposition
 
 **Task 4 approved and complete.**
+
+## Task 5 — Production daemon composition
+
+### Implementation
+
+- Added a new `macbook-lid-monitor-daemon` executable and dedicated production entry point.
+- Added a production application composition root; spike/probe entry points are not reused.
+- Disabled mode exits before HID enumeration or requester construction.
+- Dry-run and enabled requester construction occurs only after exact profile resolution.
+- Injected production freshness, policy, event sink, stream, scheduler, wake observer, and requester.
+- Added idempotent signal-driven session shutdown.
+
+### TDD evidence
+
+- RED: focused tests failed because production application/dependency/result types did not exist.
+- GREEN: three focused composition tests pass after minimal implementation.
+
+### Immediate review findings
+
+#### P1 — Dependency container incorrectly conformed to `Sendable`
+
+The first compile exposed that the existing `HIDDeviceEnumerating` protocol is not Sendable.
+Marking the dependency container Sendable would have claimed a concurrency guarantee not provided
+by the injected enumerator.
+
+**Resolution:** Removed the unnecessary Sendable conformance rather than weakening the compiler
+check or adding an unsafe annotation.
+
+### Re-review
+
+- Disabled mode cannot open HID or construct any sleep requester: pass.
+- Dry-run cannot construct the native real-sleep requester: pass.
+- Enabled mode resolves the exact hardware profile before requester construction: pass.
+- No command-line or environment production override exists: pass.
+- Signal shutdown is idempotent: pass.
+- Production target builds independently; spike/probe products remain separate: pass.
+
+### Verification
+
+- Focused: 3 tests, 0 failures.
+- Full: 134 tests, 0 failures.
+- Release product `macbook-lid-monitor-daemon`: passed.
+- `git diff --check`: passed.
+- Residual system state: unchanged; no service or `/Library` mutation.
+
+### Disposition
+
+**Task 5 approved and complete.**
