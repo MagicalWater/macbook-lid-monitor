@@ -76,6 +76,7 @@ policy:
   closeDebounceSeconds: Double
   startupCooldownSeconds: Double
   wakeRecoverySeconds: Double
+  sensorFreshnessSeconds: Double
 ```
 
 Validation rules:
@@ -84,7 +85,7 @@ Validation rules:
 - all fields must be present;
 - `sleepThreshold < reopenThreshold`;
 - thresholds must be within the profile's accepted decoded range;
-- debounce and wake recovery must be positive; startup cooldown non-negative;
+- debounce, wake recovery, and sensor freshness must be positive; startup cooldown non-negative;
 - enabled mode requires an approved profile and exact package/config permissions;
 - no environment variable or command-line override is permitted in production.
 

@@ -6,7 +6,7 @@ Status: Implementation in progress; Tasks 1–2 complete.
 | ---: | --- | --- | --- | --- | --- |
 | 1 | Typed config and modes — complete | `ProductionConfiguration*`, tests | focused + full tests | none | revert commit |
 | 2 | Exact hardware profile — complete | `LidHardwareProfile*`, discovery, tests | profile/fail-open tests | none | revert commit |
-| 3 | Freshness/request epochs | state machine/coordinator/tests | stale/duplicate regression | none | revert commit |
+| 3 | Freshness/request epochs, including required config freshness | configuration/state machine/coordinator/tests | stale/duplicate regression | none | revert commit |
 | A | Shared-core stage review | reviews only | clean test/build | none | no system state |
 | 4 | Events and health | production event/health/sink/tests | privacy/format tests | none | revert commit |
 | 5 | Production executable | application, target, Package.swift, tests | composition/full/release | none | revert commit |

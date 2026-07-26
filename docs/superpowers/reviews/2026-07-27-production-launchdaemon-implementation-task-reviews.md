@@ -91,3 +91,28 @@ two-byte decoder.
 ### Disposition
 
 **Task 2 approved and complete.**
+
+## Pre-Task 3 Spec/Plan deviation review
+
+### Finding — configured freshness had no schema field
+
+The approved Spec required a configured sensor freshness limit, while schema version 1 and the
+Task 1 implementation listed no field capable of carrying that value. Implementing Task 3 without
+first correcting the authority documents would create undocumented runtime behavior.
+
+### Resolution
+
+- Added required positive `SensorFreshnessSeconds` to schema version 1.
+- Updated Task 3 to extend configuration under TDD before state-machine changes.
+- Kept schema version at 1 because production packaging has not yet shipped or been accepted; no
+  installed consumer exists to migrate.
+
+### Re-review
+
+- Spec freshness invariant now has an explicit configuration source: pass.
+- Plan orders schema coverage before freshness behavior: pass.
+- No implementation was changed before this review: pass.
+
+### Disposition
+
+**Spec/Plan adjustment approved; Task 3 may proceed.**

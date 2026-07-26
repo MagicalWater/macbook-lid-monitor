@@ -22,12 +22,12 @@
 - Create: `Tests/LidMonitorTests/ProductionConfigurationTests.swift`
 
 **Steps:**
-- [ ] Write tests for all three modes, schema rejection, policy ordering/ranges, missing fields, unsupported overrides, ownership/mode validation seams, and stable errors.
-- [ ] Run focused tests and confirm RED.
-- [ ] Implement minimal typed decoding and validation.
-- [ ] Run focused and full tests.
-- [ ] Update spec/task status and record Task 1 review.
-- [ ] Commit Task 1 independently.
+- [x] Write tests for all three modes, schema rejection, policy ordering/ranges, missing fields, unsupported overrides, ownership/mode validation seams, and stable errors.
+- [x] Run focused tests and confirm RED.
+- [x] Implement minimal typed decoding and validation.
+- [x] Run focused and full tests.
+- [x] Update spec/task status and record Task 1 review.
+- [x] Commit Task 1 independently.
 
 **Completion:** Invalid or unsafe configuration cannot produce an enabled runtime configuration.
 
@@ -61,6 +61,7 @@
 - Test: `Tests/LidMonitorTests/LidSleepCoordinatorTests.swift`
 
 **Steps:**
+- [ ] Extend schema-v1 configuration with required positive `SensorFreshnessSeconds` and regression coverage.
 - [ ] Add failing tests for stale close sample, stale recovery sample, pre-wake sample rejection, duplicate wake callback, duplicate timer callback, and exactly-one request per epoch.
 - [ ] Implement minimal freshness/epoch state.
 - [ ] Prove existing calibrated behavior remains unchanged for fresh data.
