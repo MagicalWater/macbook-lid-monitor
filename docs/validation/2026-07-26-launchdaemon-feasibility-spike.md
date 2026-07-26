@@ -279,7 +279,29 @@ Task 11 結論：root/system context 下的一次性 `IOPMSleepSystem` 呼叫可
 
 ## 重新開機
 
-尚未批准／尚未執行。
+Task 12 經明確批准後完成一次完整重新開機 dry-run 驗收。FileVault 在重開機前確認為 Off；已安裝 plist 只有固定 daemon binary、`RunAtLoad=true`、`ThrottleInterval=30`，沒有 `KeepAlive`、參數或真實睡眠模式。
+
+重開機前 instance 在 shutdown signal 時留下：
+
+```text
+2026-07-26T16:31:29Z runtime-started pid=80025 uid=0 gid=0
+2026-07-26T16:31:29Z first-valid-report pid=80025 angle=158 count=1
+2026-07-26T16:31:49Z stopping pid=80025 reason=signal
+```
+
+macOS boot time 為 `2026-07-27 00:32:11 +0800`。system LaunchDaemon 在 boot 後約 14 秒、使用者登入前自動啟動：
+
+```text
+2026-07-26T16:32:25Z runtime-started pid=271 uid=0 gid=0
+2026-07-26T16:32:26Z candidate-selected pid=271
+2026-07-26T16:32:26Z power-observer-registered pid=271
+2026-07-26T16:32:26Z hid-opened pid=271
+2026-07-26T16:32:27Z first-valid-report pid=271 angle=158 count=1
+```
+
+console login history 顯示 `water console Mon Jul 27 00:34`，因此上述 runtime start、candidate selection、power observer registration、HID open 與第一筆有效 report 均發生於 loginwindow 階段。
+
+使用者在 loginwindow 完成兩次安全的上蓋壓低／重新打開；daemon evidence 記錄兩組 `candidate-started → triggered → would-sleep → rearmed`。登入後同一 PID `271`、`runs=1`、單一 root process 繼續執行，report milestone 已到 `count=200`。stderr 為空、沒有 user LaunchAgent，也沒有重開機後的真實 sleep event。
 
 ## Cleanup
 
@@ -291,7 +313,7 @@ Task 7 前景程序停止後，下列路徑均不存在。Task 8 經批准後已
 /Library/Logs/MacBookLidMonitor/Feasibility: present
 ```
 
-Task 11 前已 bootout system-domain job。Task 11 完成後 system label、daemon process 與 sleep-probe process 均不存在；暫時 binary／plist／log 仍保留，供後續 Task 12 reboot acceptance 使用。
+Task 12 重開機前已重新 bootstrap dry-run system job。重開機後 job 自動載入，單一 root PID 為 `271`；暫時 binary／plist／log 仍保留，供 Task 13 uninstall acceptance 使用。
 
 ## Findings
 
@@ -323,7 +345,7 @@ Task 9 執行前的口頭操作說明曾錯誤套用 `0° = 闔上、90° = 垂�
 
 ## 目前結論
 
-Task 7 至 Task 11 驗證均通過：
+Task 7 至 Task 12 驗證均通過：
 
 - IOKit power observer 可在一般前景 process 註冊；
 - M1 Pro lid HID 可被辨識、開啟並收到有效 report；
@@ -342,6 +364,12 @@ Task 7 至 Task 11 驗證均通過：
 - 正常重新開啟分支在 fresh `>=75` report 後取消 recovery 並 `rearmed`；
 - 低值分支在 recovery 到期後輸出一次 `recovery-resleep` 與一次 `would-sleep`，且沒有真實再次睡眠；
 - 三次 cycle 前後 PID 均為 `52638`、`runs=1`、單一 root process、stderr 為空。
+- root/system-context one-shot probe 已由 macOS power log 證明成功呼叫 `IOPMSleepSystem`，且只有一次 request、沒有 retry 或殘留 process；
+- 重新開機後 LaunchDaemon 於 boot 約 14 秒自動啟動，早於 console login；
+- pre-login 階段已完成 candidate selection、power observer registration、HID open、first valid report 與兩次完整 dry-run close/rearm cycle；
+- 登入後仍是同一 PID `271`、`runs=1`、單一 root process，沒有 duplicate authority、stderr 或真實睡眠。
+
+這代表 **Task 12 通過**。LaunchDaemon 在重新開機後可於使用者登入前自動啟動、開啟 M1 Pro lid HID 並持續執行 mechanically enforced dry-run policy。下一步 Task 13 是 uninstall acceptance 與 whole-phase final review。
 - root one-shot sleep probe 以 exit code `0` 回傳 `sleep-requested`；
 - macOS 獨立記錄 `Software Sleep pid=75771` 與 HID Activity wake；
 - probe 執行後沒有第二次 probe、自動 retry、殘留 daemon 或 probe process。

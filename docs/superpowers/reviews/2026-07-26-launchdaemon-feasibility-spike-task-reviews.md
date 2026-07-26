@@ -598,4 +598,58 @@ automatic retry: none
 - Open P1: 0
 - Open P2: 0
 - Task 11: Pass
-- Task 12: blocked pending explicit reboot approval
+- Task 12: approved and completed below
+
+## Task 12 — Reboot Pre-login Auto-start Acceptance
+
+### Implementation review
+
+Reviewed pre-reboot safety state, FileVault status, installed artifact hashes, plist execution mode, shutdown handling, boot ordering, launchd auto-start timing, pre-login device publication, loginwindow HID/report delivery, dry-run policy output, process authority, restart behavior, and post-login continuity.
+
+### Findings
+
+No implementation finding was opened. The HID device was published and opened immediately during boot; no event-driven publication race or restart workaround was required.
+
+### Re-review
+
+- FileVault was Off before reboot.
+- Installed daemon SHA-256 remained `4a9fd2ed6c585f26954bd5316fb63253821425e78b67f6970ddedc2fd9a6e853`.
+- Installed plist SHA-256 remained `14798aa8cdfd6978e8a522a0a6731c895b897f68d9046975cfdafe8b61fbc5cc`.
+- The plist contained `RunAtLoad=true`, no `KeepAlive`, no arguments, and no execute-sleep mode.
+- The pre-reboot PID `80025` recorded `stopping reason=signal`.
+- macOS boot time was `2026-07-27 00:32:11 +0800`.
+- PID `271` recorded `runtime-started` at `00:32:25`, about 14 seconds after boot.
+- Candidate selection, power-observer registration, HID open, and first valid report all completed by `00:32:27`.
+- Console login occurred at `00:34`, so all startup/HID evidence above occurred at loginwindow.
+- Two loginwindow close cycles each emitted `candidate-started → triggered → would-sleep → rearmed`.
+- No `sleep-requested` or post-boot real sleep event occurred.
+- After login the same PID `271` remained active with `runs=1`, process count one, UID/GID `0/0`.
+- Report delivery continued to count `200`; stderr remained empty.
+- No user LaunchAgent or duplicate authority existed.
+
+### Validation
+
+```text
+boot: 2026-07-27 00:32:11 +0800
+runtime-started: 2026-07-27 00:32:25 +0800
+first-valid-report: 2026-07-27 00:32:27 +0800
+console login: 2026-07-27 00:34 +0800
+post-boot PID: 271
+launchd runs: 1
+process count: 1
+UID/GID: 0/0
+loginwindow close cycles: 2
+would-sleep: 2
+sleep-requested: 0
+post-login report count: 200
+stderr bytes: 0
+user LaunchAgent: absent
+```
+
+### Disposition
+
+- Open P0: 0
+- Open P1: 0
+- Open P2: 0
+- Task 12: Pass
+- Task 13: ready for uninstall acceptance and whole-phase final review
