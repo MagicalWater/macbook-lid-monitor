@@ -1255,6 +1255,48 @@ another enabled retry.
 **Task 13 diagnostic dry-run path approved for real-system execution.** It cannot request real
 sleep. The enabled retry remains blocked until this diagnostic path is accepted.
 
+## Task 13 — Enabled retry evidence model correction
+
+### Root cause
+
+The first enabled acceptance required `event=sleep-requested` as the sole proof that the daemon
+initiated sleep. That event is emitted only after `IOPMSleepSystem` returns, so the acceptance
+incorrectly coupled proof of the pre-sleep request to an API return boundary that may occur only
+after wake. The completed dry-run acceptance already proved the complete sensor, candidate,
+debounce, and requester-attempt path.
+
+### Resolution
+
+- `sleep-request-attempted` is now the required exactly-once pre-call evidence.
+- `sleep-requested` is treated as optional post-call return evidence and may occur zero or one time.
+- The enabled acceptance waits for exactly one attempted event plus wake-recovery evidence.
+- Same-PID and single-authority checks remain mandatory across the cycle.
+- More than one attempted event or more than one return event fails the acceptance.
+- Success and every failure path still restore installed, loaded, disabled state.
+
+### Re-review
+
+- Proof of daemon intent occurs before the blocking system API: pass.
+- Exactly-once request authority remains enforced: pass.
+- API return timing no longer creates a false negative: pass.
+- Wake evidence remains independent and mandatory: pass.
+- PID continuity remains mandatory: pass.
+- Sandbox coverage includes a valid cycle with no post-call return event: pass.
+
+### Fresh verification
+
+- Production management focused tests: 36 tests, 0 failures.
+- Full suite: 182 tests, 0 failures.
+- `bash -n`: passed.
+- `shellcheck -x`: passed.
+- Release production daemon: passed.
+- `git diff --check`: passed.
+
+### Disposition
+
+**Corrected enabled acceptance command approved for a fresh separately authorized real cycle.**
+Recovery resleep remains separately gated.
+
 ## Task 13 — Real-system dry-run path closure
 
 ### Evidence

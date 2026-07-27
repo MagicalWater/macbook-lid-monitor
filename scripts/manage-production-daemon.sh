@@ -349,7 +349,7 @@ accept_task12_sleep_wake() {
 
 accept_task13_enabled_once() {
     require_root_for_system
-    local mode before_pid process_count log_offset sleep_count=0 wake_found=0
+    local mode before_pid process_count log_offset attempt_count=0 returned_count=0 wake_found=0
     mode="$(/usr/libexec/PlistBuddy -c 'Print :Mode' "$MANAGED_CONFIG")"
     [[ "$mode" == "disabled" ]] || { printf 'error: expected disabled starting mode\n' >&2; return 65; }
     cleanup_task13_enabled_once_to_disabled() {
@@ -365,11 +365,13 @@ accept_task13_enabled_once() {
     upgrade_package
     set_enabled_mode
     if [[ -n "$SYSTEM_ROOT" ]]; then
-        printf 'timestamp=test event=sleep-requested pid=1\n' >> "$MANAGED_STDOUT_LOG"
-        printf 'timestamp=test event=state-changed pid=1 state=monitoring-disarmed\n' >> "$MANAGED_STDOUT_LOG"
+        {
+            printf 'timestamp=test event=transition pid=1 name=sleep-request-attempted\n'
+            printf 'timestamp=test event=state-changed pid=1 state=monitoring-disarmed\n'
+        } >> "$MANAGED_STDOUT_LOG"
         before_pid=1
         log_offset=0
-        sleep_count=1
+        attempt_count=1
         wake_found=1
     else
         sleep 2
@@ -380,22 +382,25 @@ accept_task13_enabled_once() {
         log_offset="$(stat -f '%z' "$MANAGED_STDOUT_LOG")"
         printf 'armed task=13 scope=enabled-once pid=%s action=close-lid-within-180-seconds\n' "$before_pid"
         for _ in {1..180}; do
-            sleep_count="$(dd if="$MANAGED_STDOUT_LOG" bs=1 skip="$log_offset" 2>/dev/null | grep -c 'event=sleep-requested' || true)"
-            if [[ "$sleep_count" -ge 1 ]] && dd if="$MANAGED_STDOUT_LOG" bs=1 skip="$log_offset" 2>/dev/null | grep -q 'event=state-changed.*state=monitoring-disarmed'; then
+            attempt_count="$(dd if="$MANAGED_STDOUT_LOG" bs=1 skip="$log_offset" 2>/dev/null | grep -c 'event=transition.*name=sleep-request-attempted' || true)"
+            if [[ "$attempt_count" -ge 1 ]] && dd if="$MANAGED_STDOUT_LOG" bs=1 skip="$log_offset" 2>/dev/null | grep -q 'event=state-changed.*state=monitoring-disarmed'; then
                 wake_found=1
                 break
             fi
             sleep 1
         done
     fi
-    [[ "$sleep_count" == 1 ]] || { printf 'error: expected exactly one sleep request, got %s\n' "$sleep_count" >&2; return 70; }
+    attempt_count="$(dd if="$MANAGED_STDOUT_LOG" bs=1 skip="$log_offset" 2>/dev/null | grep -c 'event=transition.*name=sleep-request-attempted' || true)"
+    returned_count="$(dd if="$MANAGED_STDOUT_LOG" bs=1 skip="$log_offset" 2>/dev/null | grep -c 'event=sleep-requested' || true)"
+    [[ "$attempt_count" == 1 ]] || { printf 'error: expected exactly one sleep-request-attempted event, got %s\n' "$attempt_count" >&2; return 70; }
+    [[ "$returned_count" -le 1 ]] || { printf 'error: expected at most one sleep-requested return event, got %s\n' "$returned_count" >&2; return 70; }
     [[ "$wake_found" -eq 1 ]] || { printf 'error: wake-recovery production evidence missing\n' >&2; return 70; }
     if [[ -z "$SYSTEM_ROOT" ]]; then
         process_count="$({ pgrep -f '^/Library/PrivilegedHelperTools/macbook-lid-monitor-daemon$' || true; } | wc -l | tr -d ' ')"
         [[ "$process_count" == 1 ]] || { printf 'error: expected one daemon after wake, got %s\n' "$process_count" >&2; return 70; }
         [[ "$(pgrep -f '^/Library/PrivilegedHelperTools/macbook-lid-monitor-daemon$')" == "$before_pid" ]] || { printf 'error: daemon PID changed across enabled sleep/wake\n' >&2; return 70; }
     fi
-    printf 'verified task=13 scope=enabled-once sleep-request-count=1 wake-evidence=true pid-stable=true\n'
+    printf 'verified task=13 scope=enabled-once attempt-count=1 return-count=%s wake-evidence=true pid-stable=true\n' "$returned_count"
     disable_job
     bootout_job
     bootstrap_job
