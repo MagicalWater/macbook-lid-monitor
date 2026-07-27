@@ -1038,6 +1038,35 @@ is printed to the terminal.
 **Controlled sleep/wake acceptance command approved.** Real execution remains pending the one
 explicit sudo command already authorized by the user.
 
+## Task 12 — Sleep/wake real system acceptance closure
+
+### Evidence
+
+- The command built and upgraded the installed daemon to version `aeefff4d910d` with checksum
+  `10e4f57e2666f74936f808374cae7d5ddb7b28365ad4cb1338de325061e021eb` before testing.
+- Dry-run started with exactly one production PID: `75302`.
+- `/usr/bin/pmset sleepnow` performed the only real sleep request.
+- After wake, the daemon emitted the production wake-recovery evidence.
+- The same PID survived the sleep/wake cycle.
+- The command restored disabled mode and emitted the accepted Task 12 result.
+
+### Final-state re-review
+
+The immediate diagnostics after disabled bootstrap reported `process-count=1`. A separate review
+after the bounded launch/exit window confirmed:
+
+- Mode: disabled.
+- System job: loaded, not running.
+- Last exit code: zero.
+- Resident daemon PID: absent.
+- Installed version and checksum match the tested build.
+
+### Disposition
+
+**Task 12 approved and complete.** Logged-in, loginwindow, and real sleep/wake dry-run scopes all
+have system evidence. Enabled sensor-driven sleep, recovery resleep, reboot, and uninstall remain
+separately gated in later tasks.
+
 ## Task 12 — Sleep/wake first real attempt incident
 
 ### Finding
