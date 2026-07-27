@@ -25,14 +25,16 @@ launchd, Bash, plist tooling, `shellcheck`, `shasum`, macOS process tools.
 2. For every Task: write failing tests, prove RED, implement minimally, prove focused GREEN, run
    required full checks, perform immediate review, fix findings, re-review, document evidence, and
    commit independently.
-3. Run a stage implementation review after Tasks 1–5, Tasks 6–13, and Tasks 14–18.
+3. Run a stage implementation review after Tasks 1–5, Tasks 6–13, and Tasks 14–21.
 4. Do not use historical Task 12–14 system evidence as current deployment evidence.
 5. Tasks 1–14 do not mutate `/Library`, launchd, sleep state, or reboot state.
 6. Task 15 requires explicit merge/push authorization before formal-main integration.
 7. Task 16 requires explicit install/bootstrap approval.
-8. Task 17 requires independent approvals for one real sleep, recovery resleep, and persistent
-   activation.
-9. Task 18 requires explicit reboot preparation approval; the user manually restarts the Mac.
+8. Task 17 requires explicit dry-run mode/acceptance approval because it mutates managed config and
+   launchd state even though it cannot request real sleep.
+9. Tasks 18, 19, and 20 require independent approvals for one real sleep, recovery resleep, and
+   persistent activation.
+10. Task 21 requires explicit reboot preparation approval; the user manually restarts the Mac.
 10. No successful closure may call `disable`, `bootout`, rollback, or `uninstall` after final
     activation except as emergency failure cleanup followed by a complete redeployment.
 
@@ -455,10 +457,10 @@ git commit -m "feat: verify installed set before enabled runtime"
 
 ## Stage B — Deployment lifecycle and operations
 
-### Task 6: Shell installed-set verifier and managed metadata contract
+### Task 6: Shell installed-set verifier, managed metadata, and lifecycle guard
 
-**Purpose:** Give every mutating command one shared preflight rather than duplicating partial
-checks.
+**Purpose:** Give every mutating command one shared integrity preflight and serialize lifecycle
+mutation rather than duplicating partial checks or relying on operator timing.
 
 **Files:**
 
@@ -469,6 +471,8 @@ checks.
 
 - [ ] Write sandbox tests for expected/actual checksums, normalized config, owner/group/mode/type,
   link count, unsafe ancestors, prohibited plist environment, and stable key-value output.
+- [ ] Add a concurrent sandbox test proving a second install/upgrade/rollback/uninstall lifecycle
+  mutation fails before changing files while the first operation holds the guard.
 - [ ] Prove RED with `swift test --filter ProductionManagementScriptTests`.
 - [ ] Implement and source these stable shell interfaces:
 
@@ -477,12 +481,18 @@ verify_managed_metadata PATH EXPECTED_TYPE EXPECTED_OWNER EXPECTED_GROUP EXPECTE
 normalized_config_sha256 CONFIG_PATH
 verify_installed_set
 installed_identity_lines
+with_lifecycle_guard COMMAND [ARGUMENTS...]
 ```
 
 `verify_installed_set` returns non-zero on any mismatch and emits stable error keys without changing
-mode, job state, or files.
+mode, job state, or files. `with_lifecycle_guard` uses an atomic transient lock directory below the
+root-owned support directory, rejects symlink/unsafe ancestors, records no password/token, cleans up
+on normal/signal exit, and returns a stable busy error for concurrent mutation.
 - [ ] Require verification before bootstrap, dry-run, bounded acceptance, activation, baseline,
   upgrade, rollback, and reboot finish.
+- [ ] Require the lifecycle guard around install, upgrade, rollback, uninstall, and any future
+  whole-set replacement; mode-only operations use installed verification but not the whole-set
+  lifecycle guard.
 - [ ] Run focused/full/static checks, immediate review, and commit
   `feat: add shared installed set verification`.
 
@@ -723,39 +733,74 @@ uninstall_package
 - [ ] Run package `prepare` and `verify` from that exact commit.
 - [ ] Do not install in this Task.
 
-### Task 16: Disabled installation and fresh dry-run acceptance
+### Task 16: Disabled production installation
 
 **Approval:** Explain exact `/Library` paths and launchd effects, then obtain explicit approval.
 
-**Purpose:** Install the approved release disabled and prove the full non-sleeping production path.
+**Purpose:** Install the approved release in its safest persistent state and verify artifact/job
+identity before any monitoring mode is started.
 
 - [ ] Capture broad pre-install residual inventory and explicitly dispose of the historical
   user-owned `/private/tmp/macbook-lid-monitor-task15-final-test.log` only with user approval.
 - [ ] Install root-owned artifacts in disabled mode, create the managed lease, bootstrap the job,
   and verify loaded/disabled/zero PID plus every checksum and permission.
+- [ ] Verify acceptance state is absent/invalidated, health state is absent or disabled, crash state
+  is valid, and no foreground real-sleep process or duplicate authority exists.
+- [ ] Record disabled-install evidence and immediate review. Leave loaded/disabled/zero PID.
+
+### Task 17: Fresh installed dry-run acceptance
+
+**Approval:** Explain that managed config and the system job will change to dry-run, but no real
+sleep requester can be constructed; obtain explicit approval before the mutation.
+
+**Purpose:** Prove the complete installed sensor/power path without granting real-sleep authority.
+
 - [ ] Run logged-in installed dry-run close/debounce/would-sleep/reopen/rearm acceptance.
 - [ ] Run installed dry-run sleep/wake continuity acceptance without sensor-driven real sleep.
 - [ ] Verify one PID in dry-run, no duplicate authority, crash state, health, logs, and emergency
   disable; return loaded/disabled/zero PID.
-- [ ] Record evidence and immediate review; do not activate.
+- [ ] Record matching dry-run acceptance identity and immediate review; do not perform real sleep or
+  activation.
 
-### Task 17: Bounded real-sleep acceptance and persistent activation
+### Task 18: Bounded one-sleep acceptance
 
-**Approvals:** Obtain separate explicit approvals for enabled-once sleep, recovery resleep, and
-persistent activation.
+**Approval:** Explain that closing the lid will issue one real sleep request and obtain explicit
+approval immediately before the command.
 
-**Purpose:** Produce fresh hardware evidence, then deliberately leave the validated package enabled.
+**Purpose:** Produce fresh exactly-once sensor-driven sleep evidence while retaining fail-safe
+cleanup to disabled.
 
 - [ ] Run one bounded sensor-driven sleep; prove exactly one attempt, stable PID, wake evidence,
   and automatic return to disabled.
+- [ ] Bind the pass result to the exact installed acceptance identity.
+- [ ] Perform immediate review and leave loaded/disabled/zero PID.
+
+### Task 19: Bounded recovery-resleep acceptance
+
+**Approval:** Explain that the Mac will sleep, wake while still below threshold, then issue one
+recovery resleep request; obtain separate explicit approval.
+
+**Purpose:** Produce fresh bounded recovery evidence without granting persistent authority.
+
 - [ ] Run one bounded recovery-resleep cycle; prove exactly two attempts, one recovery transition,
   no third request, stable PID, and automatic return to disabled.
-- [ ] Review the complete acceptance identity against the installed set.
-- [ ] After independent activation approval, run `activate` and verify installed/enabled/loaded,
+- [ ] Bind the pass result to the exact installed acceptance identity.
+- [ ] Perform immediate review and leave loaded/disabled/zero PID.
+
+### Task 20: Persistent production activation
+
+**Approval:** Review the complete dry-run, one-sleep, and recovery-resleep identity; explain that the
+daemon will remain capable of real sleep after the command exits; obtain explicit approval.
+
+**Purpose:** Deliberately enter and preserve the validated long-term enabled state.
+
+- [ ] Re-verify installed identity, target compatibility, crash state, managed authority metadata,
+  and all required acceptance stages.
+- [ ] Run `activate` and verify installed/enabled/loaded,
   exactly one running PID, managed authority held, healthy monitoring, and no cleanup to disabled.
 - [ ] Record activation evidence and leave enabled.
 
-### Task 18: Enabled reboot, pre-login operation, baseline, and holistic closure
+### Task 21: Enabled reboot, pre-login operation, baseline, and holistic closure
 
 **Approval:** Obtain explicit approval before preparing reboot evidence. The script never reboots;
 the user restarts manually.
@@ -796,7 +841,7 @@ single-authority=verified
 
 ## Plan completion rule
 
-The implementation Plan is complete only when Tasks 1–18 and all stage/holistic reviews pass. A
+The implementation Plan is complete only when Tasks 1–21 and all stage/holistic reviews pass. A
 Task may be marked complete only with its own fresh review and verification evidence. System Tasks
 cannot be pre-approved by Plan closure. The final system state is part of the product result, not
 temporary acceptance scaffolding.

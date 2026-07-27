@@ -51,8 +51,8 @@ residual-state proof, and holistic implementation review. Pass.
 P4-P0: package preparation from an unmerged detached worktree would violate the Spec's real-package
 provenance rule.
 
-P4-P0: one combined approval for enabled sleep, recovery resleep, and persistent activation would
-hide materially different consequences.
+P4-P0: one Task containing enabled sleep, recovery resleep, and persistent activation would force
+three materially different approval gates to share one Task review and completion decision.
 
 P4-P1: reboot and operational baseline were initially split such that a reboot finding could leave
 the service in an ambiguous final mode.
@@ -60,8 +60,10 @@ the service in an ambiguous final mode.
 ### Resolution and re-review
 
 - Task 15 is a distinct formal-main integration/package gate.
-- Task 17 retains three separate approvals.
-- Task 18 owns enabled reboot, pre-login, post-reboot baseline, and final live-state review as one
+- Tasks 18, 19, and 20 now independently own enabled-once, recovery-resleep, and persistent
+  activation, each with its own immediate review and terminal state.
+- Task 17 separately owns the `/Library` dry-run mutation and evidence even though it cannot sleep.
+- Task 21 owns enabled reboot, pre-login, post-reboot baseline, and final live-state review as one
   terminal stage; emergency cleanup makes the Milestone incomplete until redeployed.
 
 Pass.
@@ -82,6 +84,12 @@ contradicting the three-stage governance rule.
 P5-P1: several shell Tasks described behavior without locking stable function boundaries, leaving
 too much interface invention to implementation time.
 
+P5-P0: the first formal Task decomposition still grouped three independent approval gates in one
+Task, violating the one-primary-responsibility review rule.
+
+P5-P1: the Spec required serialized install/upgrade/rollback/uninstall mutation, but the initial
+Plan had no explicit lifecycle guard or concurrency test.
+
 ### Resolution and re-review
 
 Acceptance identity is tied to installed artifacts/policy/compatibility. Artifact-changing upgrade
@@ -89,6 +97,10 @@ or rollback invalidates acceptance and finishes disabled; evidence-only commits 
 while continuing to name the installed release identity. All commit commands now explicitly stage
 new and modified files. Stage C now has an independent review. Tasks 6–12 name their stable shell
 interfaces and transaction boundaries. Pass.
+The deployment tail was expanded from Tasks 15–18 to Tasks 15–21 so install, dry-run, one-sleep,
+recovery-resleep, activation, and reboot each have a distinct Task review. Pass.
+Task 6 now defines an atomic transient lifecycle guard, stable busy behavior, cleanup, and a
+concurrent mutation regression test. Pass.
 
 ## Disposition
 

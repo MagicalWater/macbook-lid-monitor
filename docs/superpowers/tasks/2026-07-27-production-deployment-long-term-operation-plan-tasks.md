@@ -24,7 +24,7 @@ Plan Task P1
 | P1 | Lock file/component responsibilities | Plan file map | every changed concern has one primary owner; existing patterns preserved |
 | P2 | Decompose runtime and packaging implementation | Tasks 1–13 | TDD order, exact files/tests/commands, no system mutation |
 | P3 | Define automated release gate | Task 14 | complete full/static/package/clean-checkout evidence |
-| P4 | Define formal integration and real deployment | Tasks 15–18 | explicit merge/install/sleep/activate/reboot gates and safe terminal states |
+| P4 | Define formal integration and real deployment | Tasks 15–21 | explicit merge/install/dry-run/sleep/recovery/activate/reboot gates and safe terminal states |
 | P5 | Verify Spec coverage, dependency order, rollback, and closure | complete Plan | one-to-one Spec traceability and no placeholder/ambiguous approval |
 
 ## Closure conditions

@@ -57,8 +57,10 @@ installed package.
 - Stage A, Stage B, and Stage C each have an independently named implementation review: pass.
 - Commands that create files explicitly stage those files before commit: pass.
 - Shell lifecycle responsibilities have stable interfaces before implementation begins: pass.
+- Install/upgrade/rollback/uninstall are serialized by an explicit tested lifecycle guard: pass.
 - No system mutation occurs before the automated release gate and formal-main integration: pass.
-- Install, real sleep, recovery, activation, reboot, merge/push remain separately gated: pass.
+- Install, dry-run mutation, real sleep, recovery, activation, reboot, and merge/push are distinct
+  Tasks with separate gates: pass.
 - Every failure has disabled/booted-out or redeployment-safe disposition: pass.
 - Final success cannot be disabled or uninstalled: pass.
 

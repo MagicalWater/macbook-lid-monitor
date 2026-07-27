@@ -26,7 +26,7 @@ Plan Tasks P1–P5
 
 ## Closure checks
 
-- Tasks 1–18 cover every Spec requirement.
+- Tasks 1–21 cover every Spec requirement.
 - Runtime safety precedes deployment authority.
 - Root/system operations begin only after the non-mutating release gate and formal-main gate.
 - Merge/push, install, each real-sleep acceptance, activation, and reboot remain separate approvals.
