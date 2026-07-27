@@ -407,6 +407,82 @@ clean standalone shellcheck result.
 reviewed further without mutation, but no install, bootstrap, `/Library` write, or launchd mutation
 may occur until the user explicitly approves that gate.
 
+## Task 9 — Install and control lifecycle
+
+### Implementation
+
+- Added explicit `install`, `bootstrap`, `status`, `disable`, `stop`, and `bootout` commands.
+- Added a sandbox-only system-root seam constrained to the repository `.build` directory.
+- Added `accept-task9`, a single sudo command that prepares as the invoking non-root user and then
+  performs the complete disabled install/control acceptance sequence.
+- Installation refuses symlinked managed paths, preserves unrelated files, verifies staging, and
+  requires the initial config mode to be exactly `disabled`.
+
+### TDD evidence
+
+- RED: lifecycle tests initially failed because commands and system-root seam did not exist.
+- GREEN: sandbox install/control and complete `accept-task9` lifecycle tests pass.
+
+### Immediate review findings
+
+#### P1 — Test root was initially unrestricted
+
+An arbitrary absolute `MLM_TEST_ROOT` could have redirected supposedly sandboxed mutation outside
+the repository.
+
+**Resolution:** Restricted the seam to `$REPO_ROOT/.build/*` and added a regression test.
+
+#### P1 — Initial install did not re-assert disabled mode
+
+Relying only on the template could allow a modified staging config to install dry-run/enabled.
+
+**Resolution:** Installation now reads staging `Mode` and rejects every value except `disabled`.
+
+#### P1 — Single-command acceptance could create root-owned build artifacts
+
+Running prepare directly under sudo would contaminate repository build ownership.
+
+**Resolution:** `accept-task9` performs prepare through `sudo -u "$SUDO_USER"`, then resumes root-only
+system mutation. It contains no password handling.
+
+### Re-review
+
+- Managed paths and parents reject symlinks: pass.
+- Sandbox root cannot escape repository `.build`: pass.
+- Initial install is forced disabled: pass.
+- Unrelated files are preserved: pass.
+- Bootstrap/status/disable/stop/bootout command flow: pass.
+- One-command root acceptance has no password pipe or embedded credential handling: pass.
+
+### Verification before real mutation
+
+- Focused management tests: 12 tests, 0 failures.
+- Full suite: 156 tests, 0 failures.
+- `bash -n`: passed.
+- `shellcheck`: passed.
+- Release production daemon: passed.
+- `git diff --check`: passed.
+
+### Controlled system acceptance evidence
+
+- Pre-state: production binary/plist/config/manifest and system job absent.
+- Installed package version: `25693f158874`.
+- Installed binary checksum equals manifest checksum.
+- Binary owner/mode: `root:wheel`, `0755`.
+- Plist/config/manifest owner/mode: `root:wheel`, `0644`.
+- Initial and final config mode: `disabled`.
+- System LaunchDaemon loaded; disabled process exits cleanly with `last exit code = 0`.
+- No resident daemon PID remains in disabled mode.
+- No duplicate GUI-domain authority exists.
+- Production log contains only `started` and `health-changed state=disabled` events.
+- Production error log is empty.
+- Crash budget state is absent.
+
+### Disposition
+
+**Task 9 approved and complete.** The installed system remains loaded in `disabled` mode with no
+resident process and no sleep authority.
+
 ## Task 9 — Install and control lifecycle (pre-acceptance review)
 
 ### Implementation
