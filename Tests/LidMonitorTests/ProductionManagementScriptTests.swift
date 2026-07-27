@@ -463,13 +463,13 @@ final class ProductionManagementScriptTests: XCTestCase {
         )
         try runScript("accept-task14-reboot-start", environment: [
             "MLM_TEST_ROOT": sandbox.path,
-            "MLM_TEST_BOOT_EPOCH": "100",
+            "MLM_TEST_BOOT_EPOCH": "1700000000",
         ])
         XCTAssertTrue(FileManager.default.fileExists(atPath: manifest.path))
 
         try runScript("accept-task14-reboot-finish", environment: [
             "MLM_TEST_ROOT": sandbox.path,
-            "MLM_TEST_BOOT_EPOCH": "200",
+            "MLM_TEST_BOOT_EPOCH": "1700000100",
         ])
         XCTAssertFalse(FileManager.default.fileExists(atPath: manifest.path))
     }
@@ -479,6 +479,8 @@ final class ProductionManagementScriptTests: XCTestCase {
         XCTAssertTrue(text.contains("accept-task14-reboot-start)"))
         XCTAssertTrue(text.contains("accept-task14-reboot-finish)"))
         XCTAssertTrue(text.contains("reboot not detected"))
+        XCTAssertTrue(text.contains("migration=legacy-usec"))
+        XCTAssertTrue(text.contains("usec = [0-9]+"))
         XCTAssertTrue(text.contains("verified task=14 scope=rollback"))
         XCTAssertTrue(text.contains("verify_uninstalled_state"))
         XCTAssertFalse(text.contains("shutdown -r"))

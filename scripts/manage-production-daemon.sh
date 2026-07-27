@@ -714,7 +714,7 @@ current_boot_epoch() {
         printf '%s\n' "$MLM_TEST_BOOT_EPOCH"
         return
     fi
-    sysctl -n kern.boottime | sed -E 's/.*sec = ([0-9]+).*/\1/'
+    sysctl -n kern.boottime | sed -E 's/^\{ sec = ([0-9]+), usec = [0-9]+ \}.*$/\1/'
 }
 
 accept_task14_reboot_start() {
@@ -748,7 +748,7 @@ accept_task14_reboot_start() {
 accept_task14_reboot_finish() {
     require_root_for_system
     assert_regular_source "$MANAGED_TASK14_STATE"
-    local schema start_boot current_boot expected_current expected_rollback actual_current mode process_count actual_rollback
+    local schema start_boot current_boot expected_current expected_rollback actual_current mode process_count actual_rollback state_mtime
     schema="$(awk -F= '$1 == "schema" {print $2}' "$MANAGED_TASK14_STATE")"
     start_boot="$(awk -F= '$1 == "boot_epoch" {print $2}' "$MANAGED_TASK14_STATE")"
     expected_current="$(awk -F= '$1 == "current_version" {print $2}' "$MANAGED_TASK14_STATE")"
@@ -758,7 +758,16 @@ accept_task14_reboot_finish() {
         return 65
     }
     current_boot="$(current_boot_epoch)"
-    [[ "$current_boot" -gt "$start_boot" ]] || { printf 'error: reboot not detected\n' >&2; return 70; }
+    if [[ "$start_boot" -ge 1000000000 ]]; then
+        [[ "$current_boot" -gt "$start_boot" ]] || { printf 'error: reboot not detected
+' >&2; return 70; }
+    else
+        state_mtime="${MLM_TEST_STATE_MTIME:-$(stat -f '%m' "$MANAGED_TASK14_STATE")}"
+        [[ "$state_mtime" -lt "$current_boot" ]] || { printf 'error: legacy reboot state predates no detected boot
+' >&2; return 70; }
+        printf 'verified task=14 scope=reboot-proof migration=legacy-usec state-mtime=%s boot-epoch=%s
+' "$state_mtime" "$current_boot"
+    fi
     actual_current="$(/usr/libexec/PlistBuddy -c 'Print :Version' "$MANAGED_MANIFEST")"
     mode="$(/usr/libexec/PlistBuddy -c 'Print :Mode' "$MANAGED_CONFIG")"
     [[ "$actual_current" == "$expected_current" ]] || { printf 'error: post-reboot version mismatch\n' >&2; return 70; }
