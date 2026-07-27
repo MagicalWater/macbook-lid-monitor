@@ -6,7 +6,7 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 source "$SCRIPT_DIR/lib/production-package-common.sh"
 
 usage() {
-    printf '%s\n' 'usage: manage-production-daemon.sh prepare|verify|install|bootstrap|status|stop|bootout|disable|accept-task9' >&2
+    printf '%s\n' 'usage: manage-production-daemon.sh prepare|verify|install|bootstrap|status|stop|bootout|disable|upgrade|rollback|accept-task9' >&2
     exit 64
 }
 
@@ -83,6 +83,96 @@ disable_job() {
     if [[ -z "$SYSTEM_ROOT" ]]; then chown root:wheel "$MANAGED_CONFIG"; fi
     stop_job
     printf 'disabled label=%s\n' "$LAUNCHD_LABEL"
+}
+
+backup_current_set() {
+    verify_managed_set
+    assert_regular_source "$MANAGED_BINARY"
+    assert_regular_source "$MANAGED_PLIST"
+    assert_regular_source "$MANAGED_CONFIG"
+    assert_regular_source "$MANAGED_MANIFEST"
+    rm -rf -- "$MANAGED_ROLLBACK"
+    mkdir -p -- "$MANAGED_ROLLBACK"
+    cp -p -- "$MANAGED_BINARY" "$MANAGED_ROLLBACK/macbook-lid-monitor-daemon"
+    cp -p -- "$MANAGED_PLIST" "$MANAGED_ROLLBACK/com.crazydennies.macbook-lid-monitor.plist"
+    cp -p -- "$MANAGED_CONFIG" "$MANAGED_ROLLBACK/config.plist"
+    cp -p -- "$MANAGED_MANIFEST" "$MANAGED_ROLLBACK/manifest.plist"
+}
+
+verify_managed_set() {
+    assert_regular_source "$MANAGED_BINARY"
+    assert_regular_source "$MANAGED_MANIFEST"
+    local expected actual
+    expected="$(/usr/libexec/PlistBuddy -c 'Print :BinarySHA256' "$MANAGED_MANIFEST")"
+    actual="$(sha256_file "$MANAGED_BINARY")"
+    [[ "$expected" == "$actual" ]] || {
+        printf 'error: installed checksum mismatch\n' >&2
+        return 65
+    }
+}
+
+restore_rollback_set() {
+    if [[ "${MLM_FAIL_UPGRADE_STAGE:-}" == "rollback-restore" ]]; then
+        printf 'error: injected rollback restore failure\n' >&2
+        return 70
+    fi
+    assert_regular_source "$MANAGED_ROLLBACK/macbook-lid-monitor-daemon"
+    assert_regular_source "$MANAGED_ROLLBACK/com.crazydennies.macbook-lid-monitor.plist"
+    assert_regular_source "$MANAGED_ROLLBACK/config.plist"
+    assert_regular_source "$MANAGED_ROLLBACK/manifest.plist"
+    install -m 0755 "$MANAGED_ROLLBACK/macbook-lid-monitor-daemon" "$MANAGED_BINARY.tmp"
+    install -m 0644 "$MANAGED_ROLLBACK/com.crazydennies.macbook-lid-monitor.plist" "$MANAGED_PLIST.tmp"
+    install -m 0644 "$MANAGED_ROLLBACK/config.plist" "$MANAGED_CONFIG.tmp"
+    install -m 0644 "$MANAGED_ROLLBACK/manifest.plist" "$MANAGED_MANIFEST.tmp"
+    mv -f -- "$MANAGED_BINARY.tmp" "$MANAGED_BINARY"
+    mv -f -- "$MANAGED_PLIST.tmp" "$MANAGED_PLIST"
+    mv -f -- "$MANAGED_CONFIG.tmp" "$MANAGED_CONFIG"
+    mv -f -- "$MANAGED_MANIFEST.tmp" "$MANAGED_MANIFEST"
+    if [[ -z "$SYSTEM_ROOT" ]]; then
+        chown root:wheel "$MANAGED_BINARY" "$MANAGED_PLIST" "$MANAGED_CONFIG" "$MANAGED_MANIFEST"
+    fi
+    verify_managed_set
+}
+
+rollback_upgrade() {
+    require_root_for_system
+    bootout_job
+    restore_rollback_set
+    bootstrap_job
+    printf 'rolled-back label=%s\n' "$LAUNCHD_LABEL"
+}
+
+upgrade_package() {
+    require_root_for_system
+    verify_package
+    backup_current_set
+    bootout_job
+    local failed=0
+    install -m 0755 "$STAGING_DIR/macbook-lid-monitor-daemon" "$MANAGED_BINARY.tmp"
+    install -m 0644 "$STAGING_DIR/com.crazydennies.macbook-lid-monitor.plist" "$MANAGED_PLIST.tmp"
+    install -m 0644 "$STAGING_DIR/config.plist" "$MANAGED_CONFIG.tmp"
+    install -m 0644 "$STAGING_DIR/manifest.plist" "$MANAGED_MANIFEST.tmp"
+    mv -f -- "$MANAGED_BINARY.tmp" "$MANAGED_BINARY"
+    mv -f -- "$MANAGED_PLIST.tmp" "$MANAGED_PLIST"
+    mv -f -- "$MANAGED_CONFIG.tmp" "$MANAGED_CONFIG"
+    mv -f -- "$MANAGED_MANIFEST.tmp" "$MANAGED_MANIFEST"
+    if [[ "${MLM_FAIL_UPGRADE_STAGE:-}" == "after-activation" || "${MLM_FAIL_UPGRADE_STAGE:-}" == "rollback-restore" ]]; then failed=1; fi
+    if [[ "$failed" -eq 0 ]]; then
+        bootstrap_job || failed=1
+    fi
+    if [[ "$failed" -ne 0 ]]; then
+        if ! restore_rollback_set; then
+            printf 'error: rollback failed; job remains booted out\n' >&2
+            return 71
+        fi
+        bootstrap_job || {
+            printf 'error: rollback bootstrap failed; job remains fail-open\n' >&2
+            return 71
+        }
+        printf 'error: upgrade failed and rollback restored previous set\n' >&2
+        return 70
+    fi
+    printf 'upgraded label=%s\n' "$LAUNCHD_LABEL"
 }
 
 print_residual_state() {
@@ -197,6 +287,8 @@ case "$1" in
     stop) stop_job ;;
     bootout) bootout_job ;;
     disable) disable_job ;;
+    upgrade) upgrade_package ;;
+    rollback) rollback_upgrade ;;
     accept-task9) accept_task9 ;;
     *) usage ;;
 esac

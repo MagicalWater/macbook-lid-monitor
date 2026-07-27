@@ -483,6 +483,76 @@ system mutation. It contains no password handling.
 **Task 9 approved and complete.** The installed system remains loaded in `disabled` mode with no
 resident process and no sleep authority.
 
+## Task 10 — Upgrade and rollback implementation
+
+### Implementation
+
+- Added one rollback slot under the managed application-support directory.
+- Added installed-set checksum preflight before any upgrade mutation.
+- Added atomic activation for binary, plist, config, and manifest.
+- Added automatic restore when activation or bootstrap fails.
+- Added explicit rollback command and post-restore checksum verification.
+- Added fail-open behavior when rollback restore/bootstrap itself fails.
+
+### TDD evidence
+
+- RED: upgrade/rollback tests failed because commands and rollback slot did not exist.
+- GREEN: successful upgrade, injected activation failure, corrupt-installed preflight, and rollback
+  failure tests pass in the constrained sandbox root.
+
+### Immediate review findings
+
+#### P0 — Initial rollback implementation did not validate the installed set
+
+Backing up an already-corrupt installed set would create an unusable rollback authority.
+
+**Resolution:** Added `verify_managed_set` before backup and a corrupt-manifest regression test.
+
+#### P0 — Restored rollback set was not integrity-checked
+
+A copy operation alone did not prove the previous set was usable.
+
+**Resolution:** Restore now verifies binary checksum against the restored manifest before any
+bootstrap.
+
+#### P0 — Rollback failure could attempt to continue
+
+If restore or rollback bootstrap fails, continuing would risk an unknown active authority.
+
+**Resolution:** The command returns a distinct failure and leaves the job booted out/fail-open.
+
+#### P1 — First success fixture accidentally violated preflight
+
+The test changed an installed binary without updating its manifest, so the new preflight correctly
+rejected it before exercising upgrade.
+
+**Resolution:** Fixed fixtures to model a valid previous version, proving activation and rollback
+paths rather than only preflight rejection.
+
+### Re-review
+
+- Current installed set must be checksum-valid before backup: pass.
+- Exactly one rollback slot is retained: pass.
+- New set activation uses temporary files and rename: pass.
+- Activation/bootstrap failure restores the previous set: pass.
+- Restored set checksum is verified before bootstrap: pass.
+- Rollback failure leaves service fail-open and returns failure: pass.
+- No real installed-version mutation occurred during implementation verification: pass.
+
+### Verification
+
+- Focused management tests: 16 tests, 0 failures.
+- Full suite: 160 tests, 0 failures.
+- `bash -n`: passed.
+- `shellcheck`: passed.
+- Release production daemon: passed.
+- `git diff --check`: passed.
+
+### Disposition
+
+**Task 10 implementation approved.** Controlled mutation of the installed Task 9 version remains
+blocked pending the explicit installed-version approval gate.
+
 ## Task 9 — Install and control lifecycle (pre-acceptance review)
 
 ### Implementation

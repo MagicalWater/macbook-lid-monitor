@@ -157,6 +157,82 @@ final class ProductionManagementScriptTests: XCTestCase {
         )
     }
 
+    func testUpgradeReplacesManagedVersionAndKeepsOneRollbackSlot() throws {
+        let sandbox = root.appendingPathComponent(".build/production-package-upgrade-root")
+        try? FileManager.default.removeItem(at: sandbox)
+        defer { try? FileManager.default.removeItem(at: sandbox) }
+        try seedStaging()
+        try runScript("install", environment: ["MLM_TEST_ROOT": sandbox.path])
+        let installedBinary = sandbox.appendingPathComponent("Library/PrivilegedHelperTools/macbook-lid-monitor-daemon")
+        try Data("old".utf8).write(to: installedBinary)
+        try synchronizeInstalledManifestChecksum(in: sandbox)
+
+        try seedStaging()
+        try runScript("upgrade", environment: ["MLM_TEST_ROOT": sandbox.path])
+
+        XCTAssertEqual(try Data(contentsOf: installedBinary), try Data(contentsOf: root.appendingPathComponent(".build/production-package/macbook-lid-monitor-daemon")))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: sandbox.appendingPathComponent("Library/Application Support/MacBookLidMonitor/rollback/macbook-lid-monitor-daemon").path))
+    }
+
+    func testUpgradeFailureAutomaticallyRestoresPreviousSet() throws {
+        let sandbox = root.appendingPathComponent(".build/production-package-upgrade-failure-root")
+        try? FileManager.default.removeItem(at: sandbox)
+        defer { try? FileManager.default.removeItem(at: sandbox) }
+        try seedStaging()
+        try runScript("install", environment: ["MLM_TEST_ROOT": sandbox.path])
+        let installedBinary = sandbox.appendingPathComponent("Library/PrivilegedHelperTools/macbook-lid-monitor-daemon")
+        let previous = Data("previous-version".utf8)
+        try previous.write(to: installedBinary)
+        try synchronizeInstalledManifestChecksum(in: sandbox)
+        try seedStaging()
+
+        XCTAssertThrowsError(
+            try runScript(
+                "upgrade",
+                environment: [
+                    "MLM_TEST_ROOT": sandbox.path,
+                    "MLM_FAIL_UPGRADE_STAGE": "after-activation",
+                ]
+            )
+        )
+        XCTAssertEqual(try Data(contentsOf: installedBinary), previous)
+    }
+
+    func testUpgradeRejectsCorruptInstalledManifestBeforeActivation() throws {
+        let sandbox = root.appendingPathComponent(".build/production-package-upgrade-corrupt-root")
+        try? FileManager.default.removeItem(at: sandbox)
+        defer { try? FileManager.default.removeItem(at: sandbox) }
+        try seedStaging()
+        try runScript("install", environment: ["MLM_TEST_ROOT": sandbox.path])
+        let manifest = sandbox.appendingPathComponent("Library/Application Support/MacBookLidMonitor/manifest.plist")
+        var value = try XCTUnwrap(
+            PropertyListSerialization.propertyList(from: Data(contentsOf: manifest), format: nil) as? [String: Any]
+        )
+        value["BinarySHA256"] = "corrupt"
+        try PropertyListSerialization.data(fromPropertyList: value, format: .xml, options: 0).write(to: manifest)
+
+        XCTAssertThrowsError(try runScript("upgrade", environment: ["MLM_TEST_ROOT": sandbox.path]))
+    }
+
+    func testRollbackFailureLeavesNewSetInactiveAndReturnsFailure() throws {
+        let sandbox = root.appendingPathComponent(".build/production-package-rollback-failure-root")
+        try? FileManager.default.removeItem(at: sandbox)
+        defer { try? FileManager.default.removeItem(at: sandbox) }
+        try seedStaging()
+        try runScript("install", environment: ["MLM_TEST_ROOT": sandbox.path])
+        try seedStaging()
+
+        XCTAssertThrowsError(
+            try runScript(
+                "upgrade",
+                environment: [
+                    "MLM_TEST_ROOT": sandbox.path,
+                    "MLM_FAIL_UPGRADE_STAGE": "rollback-restore",
+                ]
+            )
+        )
+    }
+
     private func seedStaging() throws {
         let staging = root.appendingPathComponent(".build/production-package")
         try? FileManager.default.removeItem(at: staging)
@@ -185,6 +261,26 @@ final class ProductionManagementScriptTests: XCTestCase {
         let data = try PropertyListSerialization.data(fromPropertyList: manifest, format: .xml, options: 0)
         try data.write(to: manifestURL)
         try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: binary.path)
+    }
+
+    private func synchronizeInstalledManifestChecksum(in sandbox: URL) throws {
+        let binary = sandbox.appendingPathComponent("Library/PrivilegedHelperTools/macbook-lid-monitor-daemon")
+        let manifestURL = sandbox.appendingPathComponent("Library/Application Support/MacBookLidMonitor/manifest.plist")
+        var manifest = try XCTUnwrap(
+            PropertyListSerialization.propertyList(
+                from: Data(contentsOf: manifestURL),
+                format: nil
+            ) as? [String: Any]
+        )
+        manifest["BinarySHA256"] = try commandOutput(
+            "/usr/bin/shasum",
+            ["-a", "256", binary.path]
+        ).split(separator: " ").first.map(String.init)
+        try PropertyListSerialization.data(
+            fromPropertyList: manifest,
+            format: .xml,
+            options: 0
+        ).write(to: manifestURL)
     }
 
     private func commandOutput(_ executable: String, _ arguments: [String]) throws -> String {
