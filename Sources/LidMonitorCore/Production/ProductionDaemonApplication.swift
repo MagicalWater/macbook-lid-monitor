@@ -2,6 +2,7 @@ import Foundation
 
 enum ProductionDaemonError: Error, Equatable, Sendable {
     case incompatibleHardware
+    case installedSetInvalid
     case sleepAuthorityUnavailable
     case unsupportedMode
 }
@@ -11,6 +12,7 @@ struct ProductionDaemonDependencies {
     let recordUnexpectedExit: @Sendable (Date) throws -> Void
     let recordCleanExit: @Sendable () throws -> Void
     let loadConfiguration: @Sendable () throws -> ProductionConfiguration
+    let verifyInstalledSet: @Sendable (ProductionMode) throws -> ProductionInstalledSetIdentity
     let enumerator: HIDDeviceEnumerating
     let registry: LidHardwareProfileRegistry
     let streamFactory: @Sendable (HIDDeviceDescriptor) throws -> HIDReportStreaming
@@ -100,6 +102,16 @@ final class ProductionDaemonApplication {
             dependencies.eventSink.emit(.healthChanged(.disabled))
             try? dependencies.recordCleanExit()
             return .disabled
+        }
+        if configuration.mode == .enabled {
+            do {
+                _ = try dependencies.verifyInstalledSet(configuration.mode)
+            } catch {
+                dependencies.eventSink.emit(.degraded(code: "installed-set-invalid"))
+                dependencies.eventSink.emit(.healthChanged(.degradedFailOpen))
+                try? dependencies.recordCleanExit()
+                throw ProductionDaemonError.installedSetInvalid
+            }
         }
 
         let descriptors: [HIDDeviceDescriptor]
@@ -226,6 +238,7 @@ public enum LidMonitorProductionDaemonEntryPoint {
                 try budget.recordCleanExit()
             },
             loadConfiguration: { try ProductionConfigurationLoader().load() },
+            verifyInstalledSet: { try ProductionInstalledSetVerifier().verify(mode: $0) },
             enumerator: IOHIDDeviceEnumerator(),
             registry: .production,
             streamFactory: { try IOHIDReportStream(descriptor: $0) },
@@ -288,6 +301,8 @@ public enum LidMonitorProductionDaemonEntryPoint {
             return ExitCode.usage.rawValue
         } catch ProductionDaemonError.incompatibleHardware {
             return ExitCode.unavailable.rawValue
+        } catch ProductionDaemonError.installedSetInvalid {
+            return ExitCode.success.rawValue
         } catch ProductionDaemonError.sleepAuthorityUnavailable {
             return ExitCode.success.rawValue
         } catch is HIDReportStreamError {

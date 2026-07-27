@@ -10,6 +10,19 @@ usage() {
     exit 64
 }
 
+normalized_config_sha256() {
+    /usr/bin/swift -e '
+import CryptoKit
+import Foundation
+let path = CommandLine.arguments[1]
+let data = try Data(contentsOf: URL(fileURLWithPath: path))
+guard var object = try PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any] else { exit(65) }
+object["Mode"] = "disabled"
+let canonical = try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])
+print(SHA256.hash(data: canonical).map { String(format: "%02x", $0) }.joined())
+' "$1"
+}
+
 install_package() {
     require_root_for_system
     verify_package
@@ -973,7 +986,7 @@ prepare_package() {
     source_commit="$(git -C "$REPO_ROOT" rev-parse HEAD)"
     checksum="$(sha256_file "$STAGING_DIR/macbook-lid-monitor-daemon")"
     plist_checksum="$(sha256_file "$STAGING_DIR/com.crazydennies.macbook-lid-monitor.plist")"
-    config_checksum="$(sha256_file "$STAGING_DIR/config.plist")"
+    config_checksum="$(normalized_config_sha256 "$STAGING_DIR/config.plist")"
     /usr/libexec/PlistBuddy -c "Set :Version $version" "$STAGING_DIR/manifest.plist"
     /usr/libexec/PlistBuddy -c "Set :SourceCommit $source_commit" "$STAGING_DIR/manifest.plist"
     /usr/libexec/PlistBuddy -c "Set :BinarySHA256 $checksum" "$STAGING_DIR/manifest.plist"
@@ -1004,7 +1017,7 @@ verify_package() {
     expected_plist="$(/usr/libexec/PlistBuddy -c 'Print :PlistSHA256' "$manifest")"
     actual_plist="$(sha256_file "$plist")"
     expected_config="$(/usr/libexec/PlistBuddy -c 'Print :DisabledConfigSHA256' "$manifest")"
-    actual_config="$(sha256_file "$config")"
+    actual_config="$(normalized_config_sha256 "$config")"
     test "$expected" = "$actual"
     test "$version" = "$(package_version)"
     test "$source_commit" = "$(git -C "$REPO_ROOT" rev-parse HEAD)"

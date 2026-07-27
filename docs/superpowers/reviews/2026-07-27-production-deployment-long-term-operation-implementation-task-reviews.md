@@ -216,3 +216,50 @@ git diff --check: passed
 ### Decision
 
 **Task 4 approved.** No Critical/P0/P1 finding remains. Task 5 may begin.
+
+## Task 5 — Runtime installed-set verification
+
+### Implemented
+
+- Added native and injectable installed-set readers, SHA-256 hashing, fixed managed paths, identity,
+  and verifier contracts.
+- Verifier checks owner/group/mode/type/link-count for binary, plist, config, and manifest.
+- Manifest paths, schema, binary/plist hashes, hardware profile, and prohibited environment entries
+  are validated.
+- Config identity uses sorted-key canonical JSON after normalizing only `Mode=disabled`, allowing
+  mode transitions while rejecting every other policy drift.
+- Enabled daemon startup verifies the installed set before HID enumeration, sleep authority, or
+  requester construction and fails open with stable evidence.
+- Package preparation/verification now produces the identical canonical config hash.
+
+### TDD and review findings
+
+- RED proved all verifier types and behavior were absent.
+- Binary-plist normalization was nondeterministic because dictionary serialization order is
+  unspecified. Replaced with sorted-key canonical JSON.
+- The first fixture generated expected identity from already-mutated config. Expected template and
+  current config were separated, proving non-Mode drift rejection.
+- Shell package hashing initially remained raw bytes. It now uses the same canonical semantic hash.
+
+### Re-review
+
+- Valid set and mode-only change: pass.
+- Binary/plist/config/path/metadata/hard-link/environment mismatch: fail-open pass.
+- Invalid installed set precedes authority/requester construction: pass.
+- Package/runtime canonical hash equality: pass.
+- No system mutation occurred: pass.
+
+### Verification
+
+```text
+focused verifier/composition: 16 tests, 0 failures
+focused package/verifier: 52 tests, 0 failures
+full XCTest: 221 tests, 0 failures
+package prepare/verify: passed
+release daemon build: passed
+git diff --check: passed
+```
+
+### Decision
+
+**Task 5 approved.** No Critical/P0/P1 finding remains. Stage A review may begin.

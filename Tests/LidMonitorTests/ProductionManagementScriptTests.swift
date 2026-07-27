@@ -29,6 +29,7 @@ final class ProductionManagementScriptTests: XCTestCase {
         XCTAssertTrue(text.contains("Set :SourceCommit"))
         XCTAssertTrue(text.contains("Set :PlistSHA256"))
         XCTAssertTrue(text.contains("Set :DisabledConfigSHA256"))
+        XCTAssertTrue(text.contains("normalized_config_sha256"))
         XCTAssertTrue(text.contains("test \"$expected\" = \"$actual\""))
         XCTAssertTrue(text.contains("test \"$version\" = \"$(package_version)\""))
     }
@@ -698,9 +699,7 @@ final class ProductionManagementScriptTests: XCTestCase {
         manifest["PlistSHA256"] = try commandOutput(
             "/usr/bin/shasum", ["-a", "256", stagedPlist.path]
         ).split(separator: " ").first.map(String.init)
-        manifest["DisabledConfigSHA256"] = try commandOutput(
-            "/usr/bin/shasum", ["-a", "256", stagedConfig.path]
-        ).split(separator: " ").first.map(String.init)
+        manifest["DisabledConfigSHA256"] = try normalizedConfigChecksum(stagedConfig)
         let data = try PropertyListSerialization.data(fromPropertyList: manifest, format: .xml, options: 0)
         try data.write(to: manifestURL)
         try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: binary.path)
@@ -751,6 +750,16 @@ final class ProductionManagementScriptTests: XCTestCase {
             throw NSError(domain: "ProductionManagementScriptTests", code: Int(process.terminationStatus))
         }
         return output
+    }
+
+    private func normalizedConfigChecksum(_ url: URL) throws -> String {
+        let data = try Data(contentsOf: url)
+        var object = try XCTUnwrap(
+            PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any]
+        )
+        object["Mode"] = "disabled"
+        let canonical = try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])
+        return ProductionSHA256Hasher().hash(canonical)
     }
 
     private func runScript(_ command: String, environment: [String: String] = [:]) throws {

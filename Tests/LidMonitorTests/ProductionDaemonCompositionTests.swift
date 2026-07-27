@@ -3,6 +3,20 @@ import XCTest
 @testable import LidMonitorCore
 
 final class ProductionDaemonCompositionTests: XCTestCase {
+    func testInvalidInstalledSetFailsOpenBeforeRequesterConstruction() throws {
+        let fixture = Fixture(
+            mode: .enabled,
+            descriptors: [Fixture.exactDescriptor],
+            installedSetError: CompositionFailure.failed
+        )
+
+        XCTAssertThrowsError(try fixture.application.start()) { error in
+            XCTAssertEqual(error as? ProductionDaemonError, .installedSetInvalid)
+        }
+        XCTAssertTrue(fixture.requesterFactory.requestedModes.isEmpty)
+        XCTAssertTrue(fixture.events.events.contains(.degraded(code: "installed-set-invalid")))
+        XCTAssertEqual(fixture.cleanExitCount, 1)
+    }
     func testDeployableProductionSourceContainsNoSleepOperationEnvironmentOverride() throws {
         let root = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
         let source = try String(
@@ -160,6 +174,14 @@ private final class Fixture {
             recordUnexpectedExit: { [unexpectedExitCounter] _ in unexpectedExitCounter.increment() },
             recordCleanExit: { [cleanExitCounter] in cleanExitCounter.increment() },
             loadConfiguration: { [configuration] in configuration },
+            verifyInstalledSet: { [installedSetError, configuration] mode in
+                if let installedSetError { throw installedSetError }
+                return ProductionInstalledSetIdentity(
+                    sourceCommit: "commit", manifestSHA256: "manifest", binarySHA256: "binary",
+                    plistSHA256: "plist", normalizedConfigSHA256: "normalized",
+                    currentConfigSHA256: "current", hardwareProfileID: configuration.hardwareProfileID
+                )
+            },
             enumerator: enumerator,
             registry: .production,
             streamFactory: { [stream] _ in stream },
@@ -177,13 +199,15 @@ private final class Fixture {
 
     private let allowsStart: Bool
     private let authorityError: Error?
+    private let installedSetError: Error?
 
     init(
         mode: ProductionMode,
         descriptors: [HIDDeviceDescriptor],
         allowsStart: Bool = true,
         streamStartError: Error? = nil,
-        authorityError: Error? = nil
+        authorityError: Error? = nil,
+        installedSetError: Error? = nil
     ) {
         configuration = ProductionConfiguration(
             schemaVersion: 1,
@@ -195,6 +219,7 @@ private final class Fixture {
         enumerator = CompositionEnumerator(descriptors: descriptors)
         self.allowsStart = allowsStart
         self.authorityError = authorityError
+        self.installedSetError = installedSetError
         stream.startError = streamStartError
     }
 }

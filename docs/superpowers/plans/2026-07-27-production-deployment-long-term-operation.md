@@ -389,7 +389,7 @@ git add packaging/manifest/manifest.plist.example \
 git commit -m "feat: complete production package identity"
 ```
 
-### Task 5: Runtime installed-set verification
+### Task 5: Runtime installed-set verification — complete
 
 **Purpose:** Prevent enabled requester construction when installed binary/plist/config/manifest or
 metadata no longer matches the accepted package.
@@ -401,18 +401,18 @@ metadata no longer matches the accepted package.
 - Create: `Tests/LidMonitorTests/ProductionInstalledSetVerifierTests.swift`
 - Modify: `Tests/LidMonitorTests/ProductionDaemonCompositionTests.swift`
 
-- [ ] **Step 1: Add failing verifier tests**
+- [x] **Step 1: Add failing verifier tests**
 
 Test valid set plus binary/plist/config mismatch, non-mode config drift, mode-only normalization,
 manifest schema/path mismatch, unsafe metadata, hard links, and prohibited environment entries.
 
-- [ ] **Step 2: Prove RED**
+- [x] **Step 2: Prove RED**
 
 ```bash
 swift test --filter 'ProductionInstalledSetVerifierTests|ProductionDaemonCompositionTests'
 ```
 
-- [ ] **Step 3: Implement verifier API**
+- [x] **Step 3: Implement verifier API**
 
 ```swift
 protocol ProductionInstalledSetVerifying: Sendable {
@@ -434,7 +434,7 @@ Use injected readers/hashers in tests. Enabled startup verifies before acquiring
 constructing `MacOSSleepRequester`. Failure emits stable `installed-set-invalid-*` evidence and
 exits fail-open without restart storm semantics changing.
 
-- [ ] **Step 4: Verify, review, and commit**
+- [x] **Step 4: Verify, review, and commit**
 
 ```bash
 swift test --filter 'ProductionInstalledSetVerifierTests|ProductionDaemonCompositionTests'
