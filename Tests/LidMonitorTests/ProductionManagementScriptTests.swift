@@ -86,6 +86,44 @@ final class ProductionManagementScriptTests: XCTestCase {
         XCTAssertFalse(text.contains("read -s"))
     }
 
+    func testAcceptTask10ExercisesInjectedRollbackUpgradeAndExplicitRollback() throws {
+        let sandbox = root.appendingPathComponent(".build/production-package-accept-task10-root")
+        try? FileManager.default.removeItem(at: sandbox)
+        defer { try? FileManager.default.removeItem(at: sandbox) }
+
+        try seedStaging()
+        try runScript("install", environment: ["MLM_TEST_ROOT": sandbox.path])
+        let manifestURL = sandbox.appendingPathComponent("Library/Application Support/MacBookLidMonitor/manifest.plist")
+        var originalManifest = try plistDictionary(at: manifestURL)
+        originalManifest["Version"] = "previous-version"
+        try PropertyListSerialization.data(
+            fromPropertyList: originalManifest,
+            format: .xml,
+            options: 0
+        ).write(to: manifestURL)
+        try synchronizeInstalledManifestChecksum(in: sandbox)
+
+        try seedStaging()
+        try runScript("accept-task10", environment: ["MLM_TEST_ROOT": sandbox.path])
+
+        let finalManifest = try plistDictionary(at: manifestURL)
+        XCTAssertEqual(finalManifest["Version"] as? String, "previous-version")
+        let configURL = sandbox.appendingPathComponent("Library/Application Support/MacBookLidMonitor/config.plist")
+        let config = try ProductionConfigurationDecoder().decode(Data(contentsOf: configURL))
+        XCTAssertEqual(config.mode, .disabled)
+    }
+
+    func testAcceptTask10IsExplicitAndDoesNotHandlePasswords() throws {
+        let text = try String(
+            contentsOf: root.appendingPathComponent("scripts/manage-production-daemon.sh"),
+            encoding: .utf8
+        )
+        XCTAssertTrue(text.contains("accept-task10)"))
+        XCTAssertTrue(text.contains("MLM_FAIL_UPGRADE_STAGE=after-activation"))
+        XCTAssertFalse(text.contains("sudo -S"))
+        XCTAssertFalse(text.contains("read -s"))
+    }
+
     func testInstallRejectsManagedPathSymlink() throws {
         let sandbox = root.appendingPathComponent(".build/production-package-symlink-root")
         try? FileManager.default.removeItem(at: sandbox)
@@ -281,6 +319,15 @@ final class ProductionManagementScriptTests: XCTestCase {
             format: .xml,
             options: 0
         ).write(to: manifestURL)
+    }
+
+    private func plistDictionary(at url: URL) throws -> [String: Any] {
+        try XCTUnwrap(
+            PropertyListSerialization.propertyList(
+                from: Data(contentsOf: url),
+                format: nil
+            ) as? [String: Any]
+        )
     }
 
     private func commandOutput(_ executable: String, _ arguments: [String]) throws -> String {

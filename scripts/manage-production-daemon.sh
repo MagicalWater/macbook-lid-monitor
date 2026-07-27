@@ -6,7 +6,7 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 source "$SCRIPT_DIR/lib/production-package-common.sh"
 
 usage() {
-    printf '%s\n' 'usage: manage-production-daemon.sh prepare|verify|install|bootstrap|status|stop|bootout|disable|upgrade|rollback|accept-task9' >&2
+    printf '%s\n' 'usage: manage-production-daemon.sh prepare|verify|install|bootstrap|status|stop|bootout|disable|upgrade|rollback|accept-task9|accept-task10' >&2
     exit 64
 }
 
@@ -230,6 +230,53 @@ accept_task9() {
     printf 'accepted task=9 mode=disabled label=%s\n' "$LAUNCHD_LABEL"
 }
 
+managed_version() {
+    assert_regular_source "$MANAGED_MANIFEST"
+    /usr/libexec/PlistBuddy -c 'Print :Version' "$MANAGED_MANIFEST"
+}
+
+managed_checksum() {
+    verify_managed_set
+    sha256_file "$MANAGED_BINARY"
+}
+
+accept_task10() {
+    require_root_for_system
+    print_residual_state pre-task10
+    verify_managed_set
+    local original_version original_checksum candidate_version candidate_checksum
+    original_version="$(managed_version)"
+    original_checksum="$(managed_checksum)"
+
+    prepare_as_invoking_user
+    verify_package
+    candidate_version="$(/usr/libexec/PlistBuddy -c 'Print :Version' "$STAGING_DIR/manifest.plist")"
+    candidate_checksum="$(/usr/libexec/PlistBuddy -c 'Print :BinarySHA256' "$STAGING_DIR/manifest.plist")"
+
+    if MLM_FAIL_UPGRADE_STAGE=after-activation upgrade_package; then
+        printf 'error: injected upgrade unexpectedly succeeded\n' >&2
+        return 70
+    fi
+    [[ "$(managed_version)" == "$original_version" ]]
+    [[ "$(managed_checksum)" == "$original_checksum" ]]
+    printf 'injected-failure-rollback=verified version=%s checksum=%s\n' "$original_version" "$original_checksum"
+
+    upgrade_package
+    [[ "$(managed_version)" == "$candidate_version" ]]
+    [[ "$(managed_checksum)" == "$candidate_checksum" ]]
+    printf 'upgrade=verified version=%s checksum=%s\n' "$candidate_version" "$candidate_checksum"
+
+    rollback_upgrade
+    [[ "$(managed_version)" == "$original_version" ]]
+    [[ "$(managed_checksum)" == "$original_checksum" ]]
+    disable_job
+    bootout_job
+    bootstrap_job
+    status_job
+    print_residual_state post-task10
+    printf 'accepted task=10 final-version=%s mode=disabled label=%s\n' "$original_version" "$LAUNCHD_LABEL"
+}
+
 prepare_package() {
     assert_regular_source "$SOURCE_PLIST"
     assert_regular_source "$SOURCE_CONFIG"
@@ -290,5 +337,6 @@ case "$1" in
     upgrade) upgrade_package ;;
     rollback) rollback_upgrade ;;
     accept-task9) accept_task9 ;;
+    accept-task10) accept_task10 ;;
     *) usage ;;
 esac

@@ -553,6 +553,54 @@ paths rather than only preflight rejection.
 **Task 10 implementation approved.** Controlled mutation of the installed Task 9 version remains
 blocked pending the explicit installed-version approval gate.
 
+## Task 10 — Controlled acceptance command
+
+### Implementation
+
+- Added one explicit `accept-task10` root command.
+- Records pre/post managed state and installed version/checksum.
+- Prepares the candidate as the invoking non-root user.
+- Injects a post-activation failure and proves automatic restoration of the original version.
+- Performs a successful upgrade and verifies candidate version/checksum.
+- Performs an explicit rollback and verifies the original version/checksum.
+- Reasserts `disabled`, reboots the launchd job into the disabled clean-exit state, and prints final
+  residual state.
+
+### TDD evidence
+
+- RED: acceptance tests failed before the command existed.
+- GREEN: complete sandbox acceptance and password-handling contract tests pass.
+
+### Immediate review
+
+- Final state intentionally returns to the original Task 9 installed version, proving rollback
+  without leaving an unreviewed candidate active.
+- The command never reads or pipes passwords and reuses the approved non-root prepare boundary.
+- Injected failure must return failure; unexpected success aborts acceptance.
+
+### Re-review
+
+- Original version/checksum captured before mutation: pass.
+- Injected failure automatically restores and verifies original set: pass.
+- Successful upgrade verifies candidate manifest and binary checksum: pass.
+- Explicit rollback verifies original manifest and checksum: pass.
+- Final config is disabled and launchd authority is loaded without sleep authority: pass.
+- Sandbox test root remains constrained under repository `.build`: pass.
+
+### Fresh verification
+
+- Focused management tests: 18 tests, 0 failures.
+- Full suite: 162 tests, 0 failures.
+- `bash -n`: passed.
+- `shellcheck`: passed.
+- Release production daemon: passed.
+- `git diff --check`: passed.
+
+### Disposition
+
+**Task 10 controlled acceptance command approved.** Real execution is authorized by the user's
+installed-version mutation approval and requires one visible sudo invocation.
+
 ## Task 9 — Install and control lifecycle (pre-acceptance review)
 
 ### Implementation
