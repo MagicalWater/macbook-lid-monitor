@@ -213,6 +213,48 @@ final class ProductionManagementScriptTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: binary.path))
     }
 
+    func testAcceptTask11RotatesDiagnosesUninstallsAndLeavesNoManagedResidual() throws {
+        let sandbox = root.appendingPathComponent(".build/production-package-accept-task11-root")
+        try? FileManager.default.removeItem(at: sandbox)
+        defer { try? FileManager.default.removeItem(at: sandbox) }
+
+        try seedStaging()
+        try runScript("install", environment: ["MLM_TEST_ROOT": sandbox.path])
+        let logDirectory = sandbox.appendingPathComponent("Library/Logs/MacBookLidMonitor")
+        try FileManager.default.createDirectory(at: logDirectory, withIntermediateDirectories: true)
+        try Data(repeating: 0x41, count: 1_048_577)
+            .write(to: logDirectory.appendingPathComponent("production.log"))
+        try Data(repeating: 0x42, count: 1_048_577)
+            .write(to: logDirectory.appendingPathComponent("production-error.log"))
+
+        try runScript("accept-task11", environment: ["MLM_TEST_ROOT": sandbox.path])
+
+        let managedPaths = [
+            sandbox.appendingPathComponent("Library/PrivilegedHelperTools/macbook-lid-monitor-daemon"),
+            sandbox.appendingPathComponent("Library/LaunchDaemons/com.crazydennies.macbook-lid-monitor.plist"),
+            sandbox.appendingPathComponent("Library/Application Support/MacBookLidMonitor/config.plist"),
+            sandbox.appendingPathComponent("Library/Application Support/MacBookLidMonitor/manifest.plist"),
+            logDirectory.appendingPathComponent("production.log"),
+            logDirectory.appendingPathComponent("production.log.1"),
+            logDirectory.appendingPathComponent("production-error.log"),
+            logDirectory.appendingPathComponent("production-error.log.1"),
+        ]
+        for path in managedPaths {
+            XCTAssertFalse(FileManager.default.fileExists(atPath: path.path), path.path)
+        }
+    }
+
+    func testAcceptTask11IsExplicitAndDoesNotHandlePasswords() throws {
+        let text = try String(
+            contentsOf: root.appendingPathComponent("scripts/manage-production-daemon.sh"),
+            encoding: .utf8
+        )
+        XCTAssertTrue(text.contains("accept-task11)"))
+        XCTAssertTrue(text.contains("verify_uninstalled_state"))
+        XCTAssertFalse(text.contains("sudo -S"))
+        XCTAssertFalse(text.contains("read -s"))
+    }
+
     func testInstallRejectsManagedPathSymlink() throws {
         let sandbox = root.appendingPathComponent(".build/production-package-symlink-root")
         try? FileManager.default.removeItem(at: sandbox)

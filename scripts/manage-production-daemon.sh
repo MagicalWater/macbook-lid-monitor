@@ -6,7 +6,7 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 source "$SCRIPT_DIR/lib/production-package-common.sh"
 
 usage() {
-    printf '%s\n' 'usage: manage-production-daemon.sh prepare|verify|install|bootstrap|status|stop|bootout|disable|upgrade|rollback|rotate-logs|diagnostics|uninstall|accept-task9|accept-task10' >&2
+    printf '%s\n' 'usage: manage-production-daemon.sh prepare|verify|install|bootstrap|status|stop|bootout|disable|upgrade|rollback|rotate-logs|diagnostics|uninstall|accept-task9|accept-task10|accept-task11' >&2
     exit 64
 }
 
@@ -161,6 +161,50 @@ uninstall_package() {
     rmdir "$MANAGED_SUPPORT" 2>/dev/null || true
     rmdir "$MANAGED_LOG_DIR" 2>/dev/null || true
     printf 'uninstalled label=%s\n' "$LAUNCHD_LABEL"
+}
+
+verify_uninstalled_state() {
+    local found=0
+    for path in "$MANAGED_BINARY" "$MANAGED_PLIST" "$MANAGED_CONFIG" "$MANAGED_MANIFEST" \
+        "$MANAGED_SUPPORT/crash-budget.json" "$MANAGED_ROLLBACK" \
+        "$MANAGED_STDOUT_LOG" "$MANAGED_STDERR_LOG"; do
+        if [[ -e "$path" || -L "$path" ]]; then
+            printf 'error: managed residual remains: %s\n' "$path" >&2
+            found=1
+        fi
+    done
+    for path in "$MANAGED_STDOUT_LOG" "$MANAGED_STDERR_LOG"; do
+        for generation in 1 2 3; do
+            if [[ -e "$path.$generation" || -L "$path.$generation" ]]; then
+                printf 'error: managed residual remains: %s\n' "$path.$generation" >&2
+                found=1
+            fi
+        done
+    done
+    if [[ -z "$SYSTEM_ROOT" ]]; then
+        if launchctl print "system/$LAUNCHD_LABEL" >/dev/null 2>&1; then
+            printf 'error: system job remains loaded\n' >&2
+            found=1
+        fi
+        if pgrep -f '^/Library/PrivilegedHelperTools/macbook-lid-monitor-daemon$' >/dev/null 2>&1; then
+            printf 'error: daemon process remains active\n' >&2
+            found=1
+        fi
+    fi
+    [[ "$found" -eq 0 ]]
+    printf 'verified uninstall residual-state=clean label=%s\n' "$LAUNCHD_LABEL"
+}
+
+accept_task11() {
+    require_root_for_system
+    printf '%s\n' '--- pre-task11 diagnostics ---'
+    diagnostics
+    rotate_logs
+    printf '%s\n' '--- post-rotation diagnostics ---'
+    diagnostics
+    uninstall_package
+    verify_uninstalled_state
+    printf 'accepted task=11 state=uninstalled label=%s\n' "$LAUNCHD_LABEL"
 }
 
 backup_current_set() {
@@ -419,5 +463,6 @@ case "$1" in
     uninstall) uninstall_package ;;
     accept-task9) accept_task9 ;;
     accept-task10) accept_task10 ;;
+    accept-task11) accept_task11 ;;
     *) usage ;;
 esac

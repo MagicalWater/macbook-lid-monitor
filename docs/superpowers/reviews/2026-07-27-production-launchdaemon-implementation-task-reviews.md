@@ -640,6 +640,53 @@ logs before size handling.
 **Task 11 implementation approved.** Real diagnostics/rotation are non-destructive, but controlled
 uninstall and zero-residual validation remain blocked pending explicit installed-state approval.
 
+## Task 11 — Controlled acceptance command
+
+### Implementation
+
+- Added `accept-task11` as the single approved root entry point.
+- The command emits redacted diagnostics before mutation, enforces bounded log rotation and
+  permissions, emits post-rotation diagnostics, performs scoped uninstall, and verifies zero
+  managed residual state.
+- Residual verification covers the system job, daemon process, binary, plist, config, manifest,
+  crash state, rollback slot, active logs, and all three rotated generations.
+
+### TDD evidence
+
+- RED: no single Task 11 acceptance entry point or post-uninstall verifier existed.
+- GREEN: the sandbox acceptance test installs a managed set, creates oversized logs, runs the
+  complete command, and proves every managed path is absent.
+
+### Immediate review
+
+No new P0/P1 issue was found after the Task 11 implementation review fixes. The acceptance wrapper
+uses the already-reviewed diagnostics, rotation, uninstall, and symlink protections rather than
+duplicating mutation logic.
+
+### Re-review
+
+- Root is required for real-system execution: pass.
+- Diagnostics never print log contents or raw reports: pass.
+- Rotation precedes uninstall and retains bounded permissions: pass.
+- Uninstall is scoped to managed paths: pass.
+- Post-uninstall verification checks job/process and every managed artifact: pass.
+- No password reading, `sudo -S`, or embedded credential handling: pass.
+- Sandbox execution does not touch real `/Library` or launchd state: pass.
+
+### Fresh verification
+
+- Focused management tests: 25 tests, 0 failures.
+- Full suite: 169 tests, 0 failures.
+- `bash -n`: passed.
+- `shellcheck`: passed.
+- Release production daemon: passed.
+- `git diff --check`: passed.
+
+### Disposition
+
+**Task 11 controlled acceptance command approved.** The user approved the installed-state mutation;
+real execution remains pending the one explicit sudo command.
+
 ## Task 10 — Controlled acceptance command
 
 ### Implementation
