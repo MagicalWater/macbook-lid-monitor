@@ -930,3 +930,40 @@ non-root user before returning to root-only installation operations.
 ### Disposition
 
 **Stage C approved and complete.** Stage D acceptance remains gated.
+
+
+## Task 12 — Loginwindow dry-run acceptance commands
+
+### Implementation
+
+- Added explicit `accept-task12-loginwindow-start` and `accept-task12-loginwindow-finish` commands.
+- Start requires the installed daemon to be disabled, switches to dry-run, verifies one system-domain process, launches a detached root-only observer, and performs a controlled GUI-domain bootout for the invoking user.
+- The observer records console owner, system job state, and daemon process count while no user GUI session is active.
+- Finish validates that evidence, restores disabled mode, bootouts/rebootstraps the system job, emits diagnostics, and deletes the temporary evidence.
+
+### Immediate review
+
+A single foreground shell cannot safely span logout because its Terminal session is destroyed. The implementation therefore uses an explicit two-phase boundary and a short-lived detached observer rather than pretending one shell can survive logout.
+
+### Re-review
+
+- Real start requires root and a non-root `SUDO_USER`: pass.
+- System job remains the only production authority: pass.
+- Observer writes only bounded state metadata, not sensor data or log contents: pass.
+- Observer script is root-owned mode `0700` and self-removes: pass.
+- Finish refuses missing or invalid loginwindow evidence: pass.
+- Final state returns to installed/loaded/disabled with no resident process: pass in sandbox.
+- No password reading, `sudo -S`, or embedded credentials: pass.
+
+### Fresh verification
+
+- Focused management tests: 29 tests, 0 failures.
+- Full suite: 173 tests, 0 failures.
+- `bash -n`: passed.
+- `shellcheck`: passed.
+- Release production daemon: passed.
+- `git diff --check`: passed.
+
+### Disposition
+
+**Loginwindow acceptance commands approved for the separately authorized logout test.** Real system evidence remains pending start/logout/login/finish execution.

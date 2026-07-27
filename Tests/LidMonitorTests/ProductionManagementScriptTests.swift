@@ -282,6 +282,32 @@ final class ProductionManagementScriptTests: XCTestCase {
         XCTAssertFalse(text.contains("read -s"))
     }
 
+    func testTask12LoginwindowTwoPhaseAcceptanceUsesEvidenceAndReturnsDisabled() throws {
+        let sandbox = root.appendingPathComponent(".build/production-package-task12-loginwindow-root")
+        try? FileManager.default.removeItem(at: sandbox)
+        defer { try? FileManager.default.removeItem(at: sandbox) }
+
+        try seedStaging()
+        try runScript("install", environment: ["MLM_TEST_ROOT": sandbox.path])
+        try runScript("bootstrap", environment: ["MLM_TEST_ROOT": sandbox.path])
+        try runScript("accept-task12-loginwindow-start", environment: ["MLM_TEST_ROOT": sandbox.path, "SUDO_USER": "water"])
+        try runScript("accept-task12-loginwindow-finish", environment: ["MLM_TEST_ROOT": sandbox.path, "SUDO_USER": "water"])
+
+        let configURL = sandbox.appendingPathComponent("Library/Application Support/MacBookLidMonitor/config.plist")
+        let config = try ProductionConfigurationDecoder().decode(Data(contentsOf: configURL))
+        XCTAssertEqual(config.mode, .disabled)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: sandbox.appendingPathComponent("Library/Application Support/MacBookLidMonitor/task12-loginwindow-evidence.txt").path))
+    }
+
+    func testTask12LoginwindowCommandsAreExplicitAndDoNotHandlePasswords() throws {
+        let text = try String(contentsOf: root.appendingPathComponent("scripts/manage-production-daemon.sh"), encoding: .utf8)
+        XCTAssertTrue(text.contains("accept-task12-loginwindow-start)"))
+        XCTAssertTrue(text.contains("accept-task12-loginwindow-finish)"))
+        XCTAssertTrue(text.contains("launchctl bootout \"gui/$invoking_uid\""))
+        XCTAssertFalse(text.contains("sudo -S"))
+        XCTAssertFalse(text.contains("read -s"))
+    }
+
     func testInstallRejectsManagedPathSymlink() throws {
         let sandbox = root.appendingPathComponent(".build/production-package-symlink-root")
         try? FileManager.default.removeItem(at: sandbox)

@@ -6,7 +6,7 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 source "$SCRIPT_DIR/lib/production-package-common.sh"
 
 usage() {
-    printf '%s\n' 'usage: manage-production-daemon.sh prepare|verify|install|bootstrap|status|stop|bootout|disable|dry-run|upgrade|rollback|rotate-logs|diagnostics|uninstall|accept-task9|accept-task10|accept-task11|accept-task12-logged-in' >&2
+    printf '%s\n' 'usage: manage-production-daemon.sh prepare|verify|install|bootstrap|status|stop|bootout|disable|dry-run|upgrade|rollback|rotate-logs|diagnostics|uninstall|accept-task9|accept-task10|accept-task11|accept-task12-logged-in|accept-task12-loginwindow-start|accept-task12-loginwindow-finish' >&2
     exit 64
 }
 
@@ -150,6 +150,76 @@ accept_task12_logged_in() {
     diagnostics
     trap - EXIT
     printf 'accepted task=12 scope=logged-in final-mode=disabled label=%s\n' "$LAUNCHD_LABEL"
+}
+
+loginwindow_evidence_path() {
+    printf '%s\n' "$MANAGED_SUPPORT/task12-loginwindow-evidence.txt"
+}
+
+accept_task12_loginwindow_start() {
+    require_root_for_system
+    local mode invoking_user invoking_uid evidence helper
+    mode="$(/usr/libexec/PlistBuddy -c 'Print :Mode' "$MANAGED_CONFIG")"
+    [[ "$mode" == "disabled" ]] || { printf 'error: expected disabled starting mode\n' >&2; return 65; }
+    invoking_user=${SUDO_USER:-}
+    [[ -n "$invoking_user" && "$invoking_user" != root ]] || { printf 'error: SUDO_USER is required\n' >&2; return 77; }
+    invoking_uid="$(id -u "$invoking_user")"
+    evidence="$(loginwindow_evidence_path)"
+    rm -f -- "$evidence"
+    set_dry_run_mode
+    verify_logged_in_dry_run
+    if [[ -n "$SYSTEM_ROOT" ]]; then
+        printf 'console-user=loginwindow\nprocess-count=1\nsystem-job=loaded\n' > "$evidence"
+        printf 'started task=12 scope=loginwindow test-root=%s\n' "$SYSTEM_ROOT"
+        return 0
+    fi
+    helper="/var/tmp/macbook-lid-monitor-task12-loginwindow-$$.sh"
+    cat > "$helper" <<EOF
+#!/usr/bin/env bash
+set -euo pipefail
+for _ in {1..180}; do
+  owner="\$(stat -f %Su /dev/console 2>/dev/null || true)"
+  if [[ "\$owner" != "$invoking_user" && -n "\$owner" ]]; then
+    count="\$({ pgrep -f '^/Library/PrivilegedHelperTools/macbook-lid-monitor-daemon$' || true; } | wc -l | tr -d ' ')"
+    job=absent
+    launchctl print system/$LAUNCHD_LABEL >/dev/null 2>&1 && job=loaded
+    printf 'console-user=%s\nprocess-count=%s\nsystem-job=%s\n' "\$owner" "\$count" "\$job" > "$evidence.tmp"
+    chmod 0600 "$evidence.tmp"
+    chown root:wheel "$evidence.tmp"
+    mv -f "$evidence.tmp" "$evidence"
+    rm -f -- "$helper"
+    exit 0
+  fi
+  sleep 1
+done
+rm -f -- "$helper"
+exit 70
+EOF
+    chmod 0700 "$helper"
+    chown root:wheel "$helper"
+    nohup "$helper" >/dev/null 2>&1 &
+    printf 'logout-imminent task=12 scope=loginwindow user=%s\n' "$invoking_user"
+    launchctl bootout "gui/$invoking_uid"
+}
+
+accept_task12_loginwindow_finish() {
+    require_root_for_system
+    local evidence owner count job
+    evidence="$(loginwindow_evidence_path)"
+    [[ -f "$evidence" && ! -L "$evidence" ]] || { printf 'error: loginwindow evidence missing\n' >&2; return 70; }
+    owner="$(awk -F= '$1=="console-user" {print $2}' "$evidence")"
+    count="$(awk -F= '$1=="process-count" {print $2}' "$evidence")"
+    job="$(awk -F= '$1=="system-job" {print $2}' "$evidence")"
+    [[ "$owner" != "${SUDO_USER:-root}" && "$count" == 1 && "$job" == loaded ]] || {
+        printf 'error: invalid loginwindow evidence owner=%s process-count=%s job=%s\n' "$owner" "$count" "$job" >&2
+        return 70
+    }
+    disable_job
+    bootout_job
+    bootstrap_job
+    diagnostics
+    rm -f -- "$evidence"
+    printf 'accepted task=12 scope=loginwindow final-mode=disabled observed-console-user=%s label=%s\n' "$owner" "$LAUNCHD_LABEL"
 }
 
 rotate_one_log() {
@@ -533,5 +603,7 @@ case "$1" in
     accept-task10) accept_task10 ;;
     accept-task11) accept_task11 ;;
     accept-task12-logged-in) accept_task12_logged_in ;;
+    accept-task12-loginwindow-start) accept_task12_loginwindow_start ;;
+    accept-task12-loginwindow-finish) accept_task12_loginwindow_finish ;;
     *) usage ;;
 esac
