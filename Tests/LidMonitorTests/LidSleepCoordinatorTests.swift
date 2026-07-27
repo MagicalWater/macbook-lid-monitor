@@ -153,7 +153,7 @@ final class LidSleepCoordinatorTests: XCTestCase {
         XCTAssertEqual(fixture.requester.requestCount, 1)
         XCTAssertEqual(
             fixture.operationalEvents,
-            [.sleepRequestFailed("test-sleep-failure")]
+            [.sleepRequestAttempted, .sleepRequestFailed("test-sleep-failure")]
         )
         XCTAssertEqual(fixture.transitions.suffix(2), [.triggered, .disarmed])
 
@@ -174,7 +174,7 @@ final class LidSleepCoordinatorTests: XCTestCase {
         XCTAssertEqual(fixture.requester.requestCount, 1)
         XCTAssertEqual(
             fixture.operationalEvents,
-            [.sleepRequestFailed("test-sleep-failure")]
+            [.sleepRequestAttempted, .sleepRequestFailed("test-sleep-failure")]
         )
         XCTAssertEqual(
             fixture.transitions.suffix(2),

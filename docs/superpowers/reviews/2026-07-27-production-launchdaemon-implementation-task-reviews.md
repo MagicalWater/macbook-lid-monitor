@@ -1209,3 +1209,48 @@ retry.
 
 **First enabled sensor-driven sleep command approved for the separately authorized real cycle.**
 Recovery resleep and injected failure acceptance remain pending.
+
+## Task 13 — Diagnostic transition instrumentation and dry-run path
+
+### Reason
+
+The first enabled real-system attempt reached enabled mode but produced no `sleep-requested`
+evidence. The operator had already held the lid below the configured threshold without fully
+closing it, so normal-lid-close assumptions were rejected. The failure must be localized before
+another enabled retry.
+
+### Implementation
+
+- Added privacy-safe transition events for monitoring armed, candidate start/cancel, debounce
+  completion, sleep-request attempt, dry-run would-sleep, startup cooldown, and recovery resleep.
+- The sleep-request attempt event is emitted immediately before invoking the requester, so it does
+  not depend on the return timing of `IOPMSleepSystem`.
+- Added `accept-task13-dry-run-path`, which upgrades to the current checkout, runs only in dry-run,
+  and requires the complete candidate → debounce → attempt → would-sleep chain.
+- The command never grants real sleep authority and always restores disabled state.
+
+### Immediate review findings
+
+- The first composition test attempted the close path while startup cooldown was still active.
+  The test was corrected to model the real sequence: cooldown expiry, open-angle arming, low-angle
+  candidate, then debounce.
+- Requester callbacks bypass the coordinator operational callback in production composition. The
+  production requester factory now emits `would-sleep` and `sleep-requested` evidence directly,
+  while the coordinator owns the pre-call `sleep-request-attempted` event.
+- Existing integration and coordinator expectations were updated to include the new attempted
+  event before success or failure.
+
+### Fresh verification
+
+- Production composition focused tests: 7 tests, 0 failures.
+- Production management focused tests: 36 tests, 0 failures.
+- Full suite: 182 tests, 0 failures.
+- `bash -n`: passed.
+- `shellcheck -x`: passed.
+- Release production daemon: passed.
+- `git diff --check`: passed.
+
+### Disposition
+
+**Task 13 diagnostic dry-run path approved for real-system execution.** It cannot request real
+sleep. The enabled retry remains blocked until this diagnostic path is accepted.

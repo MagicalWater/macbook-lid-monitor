@@ -21,6 +21,10 @@ final class ProductionEventTests: XCTestCase {
             formatter.line(for: .sleepRequested, at: Date()),
             "timestamp=2026-07-27T00:00:00Z event=sleep-requested pid=42"
         )
+        XCTAssertEqual(
+            formatter.line(for: .transition(name: "candidate-started"), at: Date()),
+            "timestamp=2026-07-27T00:00:00Z event=transition pid=42 name=candidate-started"
+        )
     }
 
     func testSensorValueAppearsOnlyOnAllowedTransitionEvent() {

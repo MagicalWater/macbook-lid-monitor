@@ -32,7 +32,7 @@ final class AutoSleepIntegrationTests: XCTestCase {
         stream.emit(angle: policy.sleepThreshold, at: base.addingTimeInterval(7))
         scheduler.fire(at: base.addingTimeInterval(9))
         stream.emit(angle: policy.sleepThreshold - 1, at: base.addingTimeInterval(10))
-        XCTAssertEqual(recorder.events, [.wouldSleep])
+        XCTAssertEqual(recorder.events, [.sleepRequestAttempted, .wouldSleep])
 
         stream.emit(angle: policy.reopenThreshold, at: base.addingTimeInterval(11))
         XCTAssertEqual(
@@ -41,7 +41,10 @@ final class AutoSleepIntegrationTests: XCTestCase {
         )
         stream.emit(angle: policy.sleepThreshold, at: base.addingTimeInterval(12))
         scheduler.fire(at: base.addingTimeInterval(14))
-        XCTAssertEqual(recorder.events, [.wouldSleep, .wouldSleep])
+        XCTAssertEqual(
+            recorder.events,
+            [.sleepRequestAttempted, .wouldSleep, .sleepRequestAttempted, .wouldSleep]
+        )
 
         coordinator.stop()
     }
@@ -139,7 +142,10 @@ final class AutoSleepIntegrationTests: XCTestCase {
         stream.emit(angle: policy.sleepThreshold, at: base.addingTimeInterval(21))
         scheduler.fire(at: base.addingTimeInterval(35))
 
-        XCTAssertEqual(recorder.events, [.wouldSleep, .wouldSleep])
+        XCTAssertEqual(
+            recorder.events,
+            [.sleepRequestAttempted, .wouldSleep, .sleepRequestAttempted, .wouldSleep]
+        )
         XCTAssertEqual(
             recorder.transitions.suffix(2),
             [.wakeRecovery, .recoveryResleep]
@@ -177,7 +183,7 @@ final class AutoSleepIntegrationTests: XCTestCase {
         stream.emit(angle: policy.reopenThreshold, at: base.addingTimeInterval(21))
         scheduler.fire(at: base.addingTimeInterval(35))
 
-        XCTAssertEqual(recorder.events, [.wouldSleep])
+        XCTAssertEqual(recorder.events, [.sleepRequestAttempted, .wouldSleep])
         XCTAssertEqual(recorder.transitions.suffix(2), [.wakeRecovery, .rearmed])
         coordinator.stop()
     }
@@ -215,7 +221,7 @@ final class AutoSleepIntegrationTests: XCTestCase {
         XCTAssertEqual(operation.requestCount, 1)
         XCTAssertEqual(
             recorder.events,
-            [.sleepRequestFailed("integration-sleep-failure")]
+            [.sleepRequestAttempted, .sleepRequestFailed("integration-sleep-failure")]
         )
         XCTAssertEqual(recorder.transitions.suffix(2), [.triggered, .disarmed])
         coordinator.stop()

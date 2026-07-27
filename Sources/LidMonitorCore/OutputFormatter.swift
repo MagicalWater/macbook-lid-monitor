@@ -33,6 +33,8 @@ struct OutputFormatter: Sendable {
 
     func autoSleepLine(_ event: AutoSleepOperationalEvent) -> String {
         switch event {
+        case .sleepRequestAttempted:
+            return "auto-sleep: sleep-request-attempted"
         case .wouldSleep:
             return "auto-sleep: would-sleep"
         case .sleepRequested:

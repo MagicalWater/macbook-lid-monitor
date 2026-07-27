@@ -155,6 +155,7 @@ final class LidSleepCoordinator: @unchecked Sendable {
                 wakeRecoveryTask = nil
 
             case .requestSleep:
+                onOperationalEvent(.sleepRequestAttempted)
                 do {
                     try sleepRequester.requestSleep()
                 } catch {

@@ -11,6 +11,7 @@ protocol SystemSleepOperating: Sendable {
 }
 
 enum AutoSleepOperationalEvent: Equatable, Sendable {
+    case sleepRequestAttempted
     case wouldSleep
     case sleepRequested
     case sleepRequestFailed(String)

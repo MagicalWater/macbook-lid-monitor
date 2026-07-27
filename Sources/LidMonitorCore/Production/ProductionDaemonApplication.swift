@@ -125,17 +125,26 @@ final class ProductionDaemonApplication {
             now: dependencies.now,
             onOperationalEvent: { event in
                 switch event {
+                case .sleepRequestAttempted: sink.emit(.transition(name: "sleep-request-attempted"))
                 case let .sleepRequestFailed(code): sink.emit(.degraded(code: code))
-                case .wouldSleep: sink.emit(.healthChanged(.dryRun))
+                case .wouldSleep:
+                    sink.emit(.transition(name: "would-sleep"))
+                    sink.emit(.healthChanged(.dryRun))
                 case .sleepRequested: sink.emit(.sleepRequested)
                 }
             },
             onTransitionEvent: { event in
                 switch event {
-                case .rearmed: sink.emit(.stateChanged(.monitoringArmed, sensorValue: nil))
+                case .rearmed:
+                    sink.emit(.transition(name: "monitoring-armed"))
+                    sink.emit(.stateChanged(.monitoringArmed, sensorValue: nil))
                 case .disarmed, .recoverySensorUnavailable, .wakeRecovery:
                     sink.emit(.stateChanged(.monitoringDisarmed, sensorValue: nil))
-                default: break
+                case .candidateStarted: sink.emit(.transition(name: "candidate-started"))
+                case .candidateCancelled: sink.emit(.transition(name: "candidate-cancelled"))
+                case .triggered: sink.emit(.transition(name: "debounce-elapsed"))
+                case .recoveryResleep: sink.emit(.transition(name: "recovery-resleep"))
+                case .startupCooldown: sink.emit(.transition(name: "startup-cooldown"))
                 }
             }
         )
@@ -196,12 +205,19 @@ public enum LidMonitorProductionDaemonEntryPoint {
             requesterFactory: { mode, sink in
                 switch mode {
                 case .dryRun:
-                    return DryRunSleepRequester { _ in sink.emit(.healthChanged(.dryRun)) }
+                    return DryRunSleepRequester { event in
+                        if case .wouldSleep = event {
+                            sink.emit(.transition(name: "would-sleep"))
+                            sink.emit(.healthChanged(.dryRun))
+                        }
+                    }
                 case .enabled:
                     return MacOSSleepRequester(
                         operation: IOKitSystemSleepOperation(),
                         onEvent: { event in
-                            if case let .sleepRequestFailed(code) = event {
+                            if case .sleepRequested = event {
+                                sink.emit(.sleepRequested)
+                            } else if case let .sleepRequestFailed(code) = event {
                                 sink.emit(.degraded(code: code))
                             }
                         }

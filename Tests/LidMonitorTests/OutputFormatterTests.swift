@@ -7,6 +7,10 @@ final class OutputFormatterTests: XCTestCase {
         let formatter = OutputFormatter()
 
         XCTAssertEqual(
+            formatter.autoSleepLine(.sleepRequestAttempted),
+            "auto-sleep: sleep-request-attempted"
+        )
+        XCTAssertEqual(
             formatter.autoSleepLine(.wouldSleep),
             "auto-sleep: would-sleep"
         )

@@ -17,6 +17,7 @@ enum ProductionEvent: Equatable, Sendable {
     case healthChanged(DaemonHealthState)
     case stateChanged(DaemonHealthState, sensorValue: Int?)
     case degraded(code: String)
+    case transition(name: String)
     case sleepRequested
     case stopping(reason: String)
 }
@@ -45,6 +46,8 @@ struct ProductionEventFormatter: Sendable {
             return "\(prefix) event=state-changed pid=\(pid) state=\(state.rawValue)\(sensor)"
         case let .degraded(code):
             return "\(prefix) event=degraded pid=\(pid) code=\(code)"
+        case let .transition(name):
+            return "\(prefix) event=transition pid=\(pid) name=\(name)"
         case .sleepRequested:
             return "\(prefix) event=sleep-requested pid=\(pid)"
         case let .stopping(reason):

@@ -6,7 +6,7 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 source "$SCRIPT_DIR/lib/production-package-common.sh"
 
 usage() {
-    printf '%s\n' 'usage: manage-production-daemon.sh prepare|verify|install|bootstrap|status|stop|bootout|disable|dry-run|upgrade|rollback|rotate-logs|diagnostics|uninstall|accept-task9|accept-task10|accept-task11|accept-task12-logged-in|accept-task12-loginwindow-start|accept-task12-loginwindow-finish|accept-task12-sleep-wake|accept-task13-enabled-once' >&2
+    printf '%s\n' 'usage: manage-production-daemon.sh prepare|verify|install|bootstrap|status|stop|bootout|disable|dry-run|upgrade|rollback|rotate-logs|diagnostics|uninstall|accept-task9|accept-task10|accept-task11|accept-task12-logged-in|accept-task12-loginwindow-start|accept-task12-loginwindow-finish|accept-task12-sleep-wake|accept-task13-dry-run-path|accept-task13-enabled-once' >&2
     exit 64
 }
 
@@ -404,6 +404,62 @@ accept_task13_enabled_once() {
     printf 'accepted task=13 scope=enabled-once final-mode=disabled label=%s\n' "$LAUNCHD_LABEL"
 }
 
+accept_task13_dry_run_path() {
+    require_root_for_system
+    local mode log_offset candidate_count debounce_count attempt_count would_sleep_count process_count
+    mode="$(/usr/libexec/PlistBuddy -c 'Print :Mode' "$MANAGED_CONFIG")"
+    [[ "$mode" == "disabled" ]] || { printf 'error: expected disabled starting mode\n' >&2; return 65; }
+    cleanup_task13_dry_run_path_to_disabled() {
+        if [[ -f "$MANAGED_CONFIG" && ! -L "$MANAGED_CONFIG" ]]; then
+            disable_job >/dev/null 2>&1 || true
+            bootout_job >/dev/null 2>&1 || true
+            bootstrap_job >/dev/null 2>&1 || true
+        fi
+    }
+    trap cleanup_task13_dry_run_path_to_disabled EXIT
+    prepare_as_invoking_user
+    verify_package
+    upgrade_package
+    set_dry_run_mode
+    verify_logged_in_dry_run
+    if [[ -n "$SYSTEM_ROOT" ]]; then
+        {
+            printf 'timestamp=test event=transition pid=1 name=candidate-started\n'
+            printf 'timestamp=test event=transition pid=1 name=debounce-elapsed\n'
+            printf 'timestamp=test event=transition pid=1 name=sleep-request-attempted\n'
+            printf 'timestamp=test event=transition pid=1 name=would-sleep\n'
+        } >> "$MANAGED_STDOUT_LOG"
+        log_offset=0
+    else
+        log_offset="$(stat -f '%z' "$MANAGED_STDOUT_LOG")"
+        printf 'armed task=13 scope=dry-run-path action=move-lid-below-68-degrees-and-hold-2-seconds-within-180-seconds\n'
+        for _ in {1..180}; do
+            would_sleep_count="$(dd if="$MANAGED_STDOUT_LOG" bs=1 skip="$log_offset" 2>/dev/null | grep -c 'event=transition.*name=would-sleep' || true)"
+            [[ "$would_sleep_count" -ge 1 ]] && break
+            sleep 1
+        done
+    fi
+    candidate_count="$(dd if="$MANAGED_STDOUT_LOG" bs=1 skip="$log_offset" 2>/dev/null | grep -c 'event=transition.*name=candidate-started' || true)"
+    debounce_count="$(dd if="$MANAGED_STDOUT_LOG" bs=1 skip="$log_offset" 2>/dev/null | grep -c 'event=transition.*name=debounce-elapsed' || true)"
+    attempt_count="$(dd if="$MANAGED_STDOUT_LOG" bs=1 skip="$log_offset" 2>/dev/null | grep -c 'event=transition.*name=sleep-request-attempted' || true)"
+    would_sleep_count="$(dd if="$MANAGED_STDOUT_LOG" bs=1 skip="$log_offset" 2>/dev/null | grep -c 'event=transition.*name=would-sleep' || true)"
+    [[ "$candidate_count" -ge 1 ]] || { printf 'error: candidate-started evidence missing\n' >&2; return 70; }
+    [[ "$debounce_count" -ge 1 ]] || { printf 'error: debounce-elapsed evidence missing\n' >&2; return 70; }
+    [[ "$attempt_count" == 1 ]] || { printf 'error: expected exactly one sleep-request-attempted event, got %s\n' "$attempt_count" >&2; return 70; }
+    [[ "$would_sleep_count" == 1 ]] || { printf 'error: expected exactly one would-sleep event, got %s\n' "$would_sleep_count" >&2; return 70; }
+    if [[ -z "$SYSTEM_ROOT" ]]; then
+        process_count="$({ pgrep -f '^/Library/PrivilegedHelperTools/macbook-lid-monitor-daemon$' || true; } | wc -l | tr -d ' ')"
+        [[ "$process_count" == 1 ]] || { printf 'error: expected one dry-run daemon, got %s\n' "$process_count" >&2; return 70; }
+    fi
+    printf 'verified task=13 scope=dry-run-path candidate=true debounce=true attempt-count=1 would-sleep-count=1\n'
+    disable_job
+    bootout_job
+    bootstrap_job
+    diagnostics
+    trap - EXIT
+    printf 'accepted task=13 scope=dry-run-path final-mode=disabled label=%s\n' "$LAUNCHD_LABEL"
+}
+
 rotate_one_log() {
     local path=$1 max_bytes=1048576 generations=3 size=0 index
     [[ -e "$path" ]] || return 0
@@ -788,6 +844,7 @@ case "$1" in
     accept-task12-loginwindow-start) accept_task12_loginwindow_start ;;
     accept-task12-loginwindow-finish) accept_task12_loginwindow_finish ;;
     accept-task12-sleep-wake) accept_task12_sleep_wake ;;
+    accept-task13-dry-run-path) accept_task13_dry_run_path ;;
     accept-task13-enabled-once) accept_task13_enabled_once ;;
     *) usage ;;
 esac

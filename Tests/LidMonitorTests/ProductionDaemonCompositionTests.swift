@@ -44,6 +44,26 @@ final class ProductionDaemonCompositionTests: XCTestCase {
         session.stop(reason: "test")
     }
 
+    func testDryRunClosePathEmitsDiagnosticTransitions() throws {
+        let fixture = Fixture(mode: .dryRun, descriptors: [Fixture.exactDescriptor])
+
+        let result = try fixture.application.start()
+        guard case let .running(session) = result else {
+            return XCTFail("expected running session")
+        }
+
+        fixture.scheduler.runAll()
+        fixture.stream.emit(report: [1, 90, 0], at: Date(timeIntervalSince1970: 1_010))
+        fixture.stream.emit(report: [1, 60, 0], at: Date(timeIntervalSince1970: 1_011))
+        fixture.scheduler.runAll()
+
+        XCTAssertTrue(fixture.events.events.contains(.transition(name: "candidate-started")))
+        XCTAssertTrue(fixture.events.events.contains(.transition(name: "debounce-elapsed")))
+        XCTAssertTrue(fixture.events.events.contains(.transition(name: "sleep-request-attempted")))
+        XCTAssertTrue(fixture.events.events.contains(.transition(name: "would-sleep")))
+        session.stop(reason: "test")
+    }
+
     func testEnabledUnknownHardwareFailsBeforeRealRequesterConstruction() {
         let fixture = Fixture(mode: .enabled, descriptors: [])
 
@@ -150,11 +170,16 @@ private final class CompositionStream: HIDReportStreaming, @unchecked Sendable {
     var startError: Error?
     private(set) var startCount = 0
     private(set) var stopCount = 0
+    private var onReport: (@Sendable (HIDReport) -> Void)?
     func start(onReport: @escaping @Sendable (HIDReport) -> Void) throws {
         startCount += 1
         if let startError { throw startError }
+        self.onReport = onReport
     }
-    func stop() { stopCount += 1 }
+    func stop() { stopCount += 1; onReport = nil }
+    func emit(report: [UInt8], at date: Date) {
+        onReport?(HIDReport(reportID: 1, bytes: report, timestamp: date))
+    }
 }
 
 private final class CompositionWakeObserver: SystemWakeObserving, @unchecked Sendable {
@@ -165,8 +190,15 @@ private final class CompositionWakeObserver: SystemWakeObserving, @unchecked Sen
 }
 
 private final class CompositionScheduler: OneShotScheduling, @unchecked Sendable {
+    private var actions: [@Sendable () -> Void] = []
     func schedule(at deadline: Date, _ action: @escaping @Sendable () -> Void) -> CancellableTask {
-        CompositionTask()
+        actions.append(action)
+        return CompositionTask()
+    }
+    func runAll() {
+        let pending = actions
+        actions.removeAll()
+        pending.forEach { $0() }
     }
 }
 
@@ -177,7 +209,16 @@ private final class CompositionRequesterFactory: @unchecked Sendable {
     private(set) var requestedModes: [ProductionMode] = []
     func make(_ mode: ProductionMode, _ sink: ProductionEventSinking) -> SleepRequesting {
         requestedModes.append(mode)
-        return CompositionRequester()
+        switch mode {
+        case .dryRun:
+            return DryRunSleepRequester { event in
+                if case .wouldSleep = event {
+                    sink.emit(.transition(name: "would-sleep"))
+                }
+            }
+        case .enabled, .disabled:
+            return CompositionRequester()
+        }
     }
 }
 
