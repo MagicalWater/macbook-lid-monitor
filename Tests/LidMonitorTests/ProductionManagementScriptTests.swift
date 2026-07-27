@@ -152,6 +152,61 @@ final class ProductionManagementScriptTests: XCTestCase {
         XCTAssertEqual((directoryAttributes[.posixPermissions] as? NSNumber)?.intValue, 0o700)
     }
 
+    func testRotateLogsPreservesActiveWriterInodeAndPrimaryPath() throws {
+        let sandbox = root.appendingPathComponent(".build/production-log-running-writer-root")
+        try? FileManager.default.removeItem(at: sandbox)
+        defer { try? FileManager.default.removeItem(at: sandbox) }
+        let logDir = sandbox.appendingPathComponent("Library/Logs/MacBookLidMonitor")
+        try FileManager.default.createDirectory(at: logDir, withIntermediateDirectories: true)
+        let log = logDir.appendingPathComponent("production.log")
+        try Data(repeating: 65, count: 1_048_577).write(to: log)
+        let handle = try FileHandle(forWritingTo: log)
+        defer { try? handle.close() }
+        try handle.seekToEnd()
+        let originalInode = try XCTUnwrap(
+            (FileManager.default.attributesOfItem(atPath: log.path)[.systemFileNumber] as? NSNumber)?.uint64Value
+        )
+
+        try runScript("rotate-logs", environment: ["MLM_TEST_ROOT": sandbox.path])
+        try handle.write(contentsOf: Data("post-rotation-event\n".utf8))
+        try handle.synchronize()
+
+        let currentInode = try XCTUnwrap(
+            (FileManager.default.attributesOfItem(atPath: log.path)[.systemFileNumber] as? NSNumber)?.uint64Value
+        )
+        XCTAssertEqual(currentInode, originalInode)
+        let current = String(decoding: try Data(contentsOf: log), as: UTF8.self)
+        XCTAssertTrue(current.contains("post-rotation-event"), current)
+        XCTAssertEqual(try Data(contentsOf: logDir.appendingPathComponent("production.log.1")).count, 1_048_577)
+    }
+
+    func testObservabilityDefinesOnlineSafeRotationInterface() throws {
+        let observability = try String(
+            contentsOf: root.appendingPathComponent("scripts/lib/production-observability.sh"),
+            encoding: .utf8
+        )
+        XCTAssertTrue(observability.contains("rotate_one_log_preserving_inode()"))
+        XCTAssertTrue(observability.contains("rotate_logs()"))
+    }
+
+    func testRotateLogsRejectsGenerationSymlinkBeforeMutation() throws {
+        let sandbox = root.appendingPathComponent(".build/production-log-generation-symlink-root")
+        try? FileManager.default.removeItem(at: sandbox)
+        defer { try? FileManager.default.removeItem(at: sandbox) }
+        let logDir = sandbox.appendingPathComponent("Library/Logs/MacBookLidMonitor")
+        try FileManager.default.createDirectory(at: logDir, withIntermediateDirectories: true)
+        let log = logDir.appendingPathComponent("production.log")
+        let outside = sandbox.appendingPathComponent("outside.txt")
+        try Data("outside".utf8).write(to: outside)
+        try Data(repeating: 65, count: 1_048_577).write(to: log)
+        try FileManager.default.createSymbolicLink(at: logDir.appendingPathComponent("production.log.1"), withDestinationURL: outside)
+
+        let failure = try runScriptFailure("rotate-logs", environment: ["MLM_TEST_ROOT": sandbox.path])
+        XCTAssertTrue(failure.output.contains("error=log-rotation-unsafe"), failure.output)
+        XCTAssertEqual(String(decoding: try Data(contentsOf: outside), as: UTF8.self), "outside")
+        XCTAssertEqual(try Data(contentsOf: log).count, 1_048_577)
+    }
+
     func testDiagnosticsIsRedactedAndDoesNotPrintLogContents() throws {
         let manager = try String(
             contentsOf: root.appendingPathComponent("scripts/manage-production-daemon.sh"),

@@ -631,39 +631,6 @@ activate_deployment() {
     printf 'activated deployment mode=enabled label=%s\n' "$LAUNCHD_LABEL"
 }
 
-rotate_one_log() {
-    local path=$1 max_bytes=1048576 generations=3 size=0 index
-    [[ -e "$path" ]] || return 0
-    assert_regular_source "$path"
-    size="$(stat -f '%z' "$path")"
-    [[ "$size" -gt "$max_bytes" ]] || return 0
-    rm -f -- "$path.$generations"
-    for ((index=generations-1; index>=1; index--)); do
-        [[ -f "$path.$index" && ! -L "$path.$index" ]] && mv -f -- "$path.$index" "$path.$((index+1))"
-    done
-    mv -f -- "$path" "$path.1"
-    : > "$path"
-    chmod 0600 "$path"
-    if [[ -z "$SYSTEM_ROOT" ]]; then chown root:wheel "$path"; fi
-}
-
-rotate_logs() {
-    require_root_for_system
-    assert_managed_path_safe "$MANAGED_LOG_DIR"
-    mkdir -p -- "$MANAGED_LOG_DIR"
-    chmod 0700 "$MANAGED_LOG_DIR"
-    if [[ -z "$SYSTEM_ROOT" ]]; then chown root:wheel "$MANAGED_LOG_DIR"; fi
-    for path in "$MANAGED_STDOUT_LOG" "$MANAGED_STDERR_LOG"; do
-        if [[ -f "$path" && ! -L "$path" ]]; then
-            chmod 0600 "$path"
-            if [[ -z "$SYSTEM_ROOT" ]]; then chown root:wheel "$path"; fi
-        fi
-    done
-    rotate_one_log "$MANAGED_STDOUT_LOG"
-    rotate_one_log "$MANAGED_STDERR_LOG"
-    printf 'rotated logs max-bytes=1048576 generations=3\n'
-}
-
 uninstall_package_unlocked() {
     require_root_for_system
     verify_installed_set

@@ -624,20 +624,20 @@ Diagnostics must not `cat` or `tail` logs.
 - Modify: `scripts/manage-production-daemon.sh`
 - Modify: `Tests/LidMonitorTests/ProductionManagementScriptTests.swift`
 
-- [ ] Create a running-writer regression fixture that records primary inode, rotates, writes again,
+- [x] Create a running-writer regression fixture that records primary inode, rotates, writes again,
   and proves the new event appears in the primary path.
-- [ ] Prove RED against the current move-based implementation.
-- [ ] Implement generation shift by copy, copy active log to `.1`, then truncate the active file in
+- [x] Prove RED against the current move-based implementation.
+- [x] Implement generation shift by copy, copy active log to `.1`, then truncate the active file in
   place while preserving owner/mode and active inode.
-- [ ] Keep the public interface exact:
+- [x] Keep the public interface exact:
 
 ```bash
 rotate_one_log_preserving_inode PATH 1048576 3
 rotate_logs
 ```
 
-- [ ] Retain at most three generations and rotate only above 1 MiB.
-- [ ] Run focused/full/static checks, review, and commit `fix: preserve active production log inode`.
+- [x] Retain at most three generations and rotate only above 1 MiB.
+- [x] Run focused/full/static checks, review, and commit `fix: preserve active production log inode`.
 
 ### Task 12: Disabled upgrade, rollback, and complete uninstall semantics
 

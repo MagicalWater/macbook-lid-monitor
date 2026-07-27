@@ -654,3 +654,62 @@ git diff --check: passed
 
 **Task 10 approved.** No Critical/P0/P1 finding remains. Task 11 may begin after the independent
 Task 10 commit.
+
+## Task 11 — Online-safe production log rotation
+
+### RED evidence
+
+The running-writer fixture failed because move-based rotation replaced the primary inode. A writer
+holding the original file descriptor appended its post-rotation event to `.1`, while the new
+primary path remained empty. The required observability interfaces were also absent.
+
+### Implemented
+
+- Added `rotate_one_log_preserving_inode PATH 1048576 3` and moved `rotate_logs` into the
+  observability library.
+- Shifted generations by copying through same-directory random temporary files and atomic rename.
+- Copied the active log to `.1`, then truncated the active file in place so launchd/daemon file
+  descriptors continue to target the primary inode.
+- Retained the existing threshold of greater than 1 MiB and at most three generations.
+- Preserved active log owner and mode while keeping the log directory mode `0700`.
+
+### Immediate review findings
+
+#### T11-P1 — Generation destinations could follow symlinks
+
+The first GREEN implementation copied directly to generation paths and used a predictable `.tmp`
+name, allowing an existing generation symlink to redirect writes.
+
+**Resolution:** preflight every generation path before mutation, reject symlinks/non-regular
+destinations, and copy through random same-directory temporary files before rename. A regression
+proves the outside target and active log remain unchanged on rejection.
+
+### Re-review
+
+- Primary inode is identical before and after rotation: pass.
+- A writer opened before rotation writes its next event into the primary path: pass.
+- `.1` contains the pre-rotation snapshot: pass.
+- Rotation occurs only above 1 MiB: pass.
+- At most three generations remain: pass.
+- Generation symlinks are rejected before mutation: pass.
+- Bash syntax and ShellCheck are clean: pass.
+- No `/Library`, production launchd, sleep, reboot, merge, push, or worktree cleanup occurred: pass.
+
+### Verification
+
+```text
+RED: running writer retained old inode and post-rotation event missed primary path
+focused Task 11: 4 tests, 0 failures
+management suite: 72 tests, 0 failures
+full XCTest: 257 tests, 0 failures
+bash -n: manager and sourced libraries passed
+shellcheck: passed with zero findings
+release daemon build: passed
+package prepare/verify: passed
+git diff --check: passed
+```
+
+### Decision
+
+**Task 11 approved.** No Critical/P0/P1 finding remains. Task 12 may begin after the independent
+Task 11 commit.

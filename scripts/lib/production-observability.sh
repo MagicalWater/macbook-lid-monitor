@@ -123,6 +123,58 @@ log_status_lines() {
     done
 }
 
+rotate_one_log_preserving_inode() {
+    local path=$1 max_bytes=$2 generations=$3 size index source destination temporary
+    [[ -e "$path" ]] || return 0
+    assert_regular_source "$path"
+    size="$(stat -f '%z' "$path")"
+    [[ "$size" -gt "$max_bytes" ]] || return 0
+    for ((index=1; index<=generations; index++)); do
+        destination="$path.$index"
+        [[ ! -L "$destination" ]] || {
+            printf 'error=log-rotation-unsafe reason=generation-symlink path=%s\n' "$destination" >&2
+            return 74
+        }
+        [[ ! -e "$destination" || -f "$destination" ]] || {
+            printf 'error=log-rotation-unsafe reason=generation-type path=%s\n' "$destination" >&2
+            return 74
+        }
+    done
+    rm -f -- "$path.$generations"
+    for ((index=generations-1; index>=1; index--)); do
+        source="$path.$index"
+        destination="$path.$((index+1))"
+        if [[ -f "$source" ]]; then
+            temporary="$(mktemp "$path.rotate.XXXXXX")"
+            cp -p -- "$source" "$temporary"
+            mv -f -- "$temporary" "$destination"
+        else
+            rm -f -- "$destination"
+        fi
+    done
+    temporary="$(mktemp "$path.rotate.XXXXXX")"
+    cp -p -- "$path" "$temporary"
+    mv -f -- "$temporary" "$path.1"
+    : > "$path"
+}
+
+rotate_logs() {
+    require_root_for_system
+    assert_managed_path_safe "$MANAGED_LOG_DIR"
+    mkdir -p -- "$MANAGED_LOG_DIR"
+    chmod 0700 "$MANAGED_LOG_DIR"
+    if [[ -z "$SYSTEM_ROOT" ]]; then chown root:wheel "$MANAGED_LOG_DIR"; fi
+    local path
+    for path in "$MANAGED_STDOUT_LOG" "$MANAGED_STDERR_LOG"; do
+        if [[ -f "$path" && ! -L "$path" ]]; then
+            chmod 0600 "$path"
+            if [[ -z "$SYSTEM_ROOT" ]]; then chown root:wheel "$path"; fi
+        fi
+        rotate_one_log_preserving_inode "$path" 1048576 3
+    done
+    printf 'rotated logs max-bytes=1048576 generations=3\n'
+}
+
 status_job() {
     local installed=false version=unavailable source_commit=unavailable mode=unavailable integrity=invalid
     local job process_count health hardware_model hardware_chip crash acceptance lease
