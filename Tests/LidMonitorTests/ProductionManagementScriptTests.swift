@@ -1311,6 +1311,7 @@ final class ProductionManagementScriptTests: XCTestCase {
         )
         XCTAssertTrue(manager.contains("error=test-hook-production-disabled reason=boot-epoch"))
         XCTAssertTrue(manager.contains("error=test-hook-production-disabled reason=state-mtime"))
+        XCTAssertTrue(manager.contains("error=test-hook-production-disabled reason=activation-bootstrap"))
         XCTAssertTrue(deployment.contains("test-hook-production-disabled target-model"))
         XCTAssertTrue(deployment.contains("test-hook-production-disabled target-chip"))
         XCTAssertTrue(deployment.contains("test-hook-production-disabled boot-epoch"))
@@ -1515,6 +1516,32 @@ final class ProductionManagementScriptTests: XCTestCase {
 
         let configURL = sandbox.appendingPathComponent("Library/Application Support/MacBookLidMonitor/config.plist")
         XCTAssertEqual(try ProductionConfigurationDecoder().decode(Data(contentsOf: configURL)).mode, .enabled)
+    }
+
+    func testActivationBootstrapFailureRestoresDisabled() throws {
+        let sandbox = root.appendingPathComponent(".build/production-activation-bootstrap-failure-root")
+        try? FileManager.default.removeItem(at: sandbox)
+        defer { try? FileManager.default.removeItem(at: sandbox) }
+        try seedStaging()
+        try runScript("install", environment: ["MLM_TEST_ROOT": sandbox.path])
+        for stage in ["deployment-dry-run", "deployment-enabled-once", "deployment-recovery-resleep"] {
+            _ = try runDeploymentLibrary("record_deployment_acceptance \(stage) pass", sandbox: sandbox)
+        }
+
+        let failure = try runScriptFailure(
+            "activate",
+            environment: [
+                "MLM_TEST_ROOT": sandbox.path,
+                "MLM_TEST_ACTIVATION_BOOTSTRAP_FAIL": "1",
+            ]
+        )
+
+        XCTAssertTrue(failure.output.contains("activation bootstrap failed"), failure.output)
+        let configURL = sandbox.appendingPathComponent("Library/Application Support/MacBookLidMonitor/config.plist")
+        XCTAssertEqual(
+            try ProductionConfigurationDecoder().decode(Data(contentsOf: configURL)).mode,
+            .disabled
+        )
     }
 
     func testBoundedDeploymentInjectedFailureAndSignalRestoreDisabled() throws {

@@ -845,3 +845,66 @@ git diff --check: passed
 
 **Task 13 approved.** No Critical/P0/P1 finding remains. Stage B implementation review may begin
 after the independent Task 13 commit.
+
+## Stage B — Deployment lifecycle and operations implementation review
+
+### Independent review scope
+
+- Traced every root-mutating and launchd-mutating dispatcher path independently from Task 6–13
+  reviews.
+- Verified install, mode changes, bounded acceptance, persistent activation, crash reset, log
+  rotation, upgrade, rollback, and uninstall against installed-set verification, acceptance state,
+  authority boundaries, cleanup ordering, and final mode.
+- Re-ran the complete automated, release, static, package, and independent clean-snapshot gates.
+
+### Finding
+
+#### SB-P1 — Persistent activation could retain enabled config after bootstrap failure
+
+`activate_deployment` changed the managed config to `enabled` before bootout/bootstrap. If bootstrap
+failed, the command returned with no resident daemon but left enabled authority on disk. A later
+manual bootstrap could therefore start real sleep authority without re-running the evidence-bound
+activation gate.
+
+**Resolution:** activation now treats bootout/bootstrap as one fail-safe transaction. Any bootstrap
+failure atomically restores `disabled`, performs bootout, emits
+`error: activation failed; restored disabled`, and returns failure. The deterministic failure hook is
+sandbox-only and a regression proves both the final mode and failure result.
+
+### Re-review
+
+- Install starts disabled and rejects loaded/duplicate authority: pass.
+- All mode edits verify the installed set and use atomic config replacement: pass.
+- Bounded deployment stages return disabled and identity-bound acceptance is ordered: pass.
+- Persistent activation is the only path that intentionally leaves enabled: pass.
+- Activation bootstrap failure restores disabled and booted-out state: pass.
+- Crash reset requires disabled/nonresident state: pass.
+- Upgrade and rollback preflight before mutation and finish disabled: pass.
+- Rollback failure remains booted out: pass.
+- Uninstall preflights all managed paths and removes all managed state only: pass.
+- Online log rotation preserves the active writer inode: pass.
+- Test hooks cannot be enabled outside `MLM_TEST_ROOT`: pass.
+- No real `/Library`, production launchd, sleep, reboot, merge, push, or worktree cleanup occurred:
+  pass.
+
+### Verification
+
+```text
+Stage B finding RED: activation bootstrap-failure regression failed and left mode=enabled
+focused fix: 1 test, 0 failures
+main working tree full XCTest: 264 tests, 0 failures
+four release products: passed
+bash -n: manager and all sourced libraries passed
+shellcheck -x: passed with zero findings
+plist lint: three production templates passed
+package prepare/verify: passed
+git diff --check: passed
+independent clean snapshot: 264 tests, 0 failures
+independent clean snapshot: four release products passed
+independent clean snapshot: bash/shellcheck/plist/package/diff/status passed
+```
+
+### Decision
+
+**Stage B approved.** No Critical/P0/P1 finding remains. Task 14 may begin after the independent
+Stage B closure commit.

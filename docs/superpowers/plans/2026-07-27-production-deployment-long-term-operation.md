@@ -694,11 +694,11 @@ uninstall_package
 
 ### Stage B implementation review
 
-- [ ] Review all root mutation and state-transition code independently from Task reviews.
-- [ ] Trace every management command through installed verifier, authority state, acceptance
+- [x] Review all root mutation and state-transition code independently from Task reviews.
+- [x] Trace every management command through installed verifier, authority state, acceptance
   invalidation, safe cleanup, and final mode.
-- [ ] Run full test/build/static/package/clean-snapshot validation.
-- [ ] Fix/re-review and commit Stage B closure.
+- [x] Run full test/build/static/package/clean-snapshot validation.
+- [x] Fix/re-review and commit Stage B closure.
 
 ## Stage C — Release and real deployment
 

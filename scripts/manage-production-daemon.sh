@@ -624,10 +624,20 @@ deployment_recovery_resleep() {
 
 activate_deployment() {
     require_root_for_system
+    if [[ -n "${MLM_TEST_ACTIVATION_BOOTSTRAP_FAIL:-}" && -z "$SYSTEM_ROOT" ]]; then
+        printf 'error=test-hook-production-disabled reason=activation-bootstrap\n' >&2
+        return 65
+    fi
     verify_deployment_acceptance deployment-dry-run deployment-enabled-once deployment-recovery-resleep
     set_managed_mode enabled
     bootout_job
-    bootstrap_job
+    if [[ -n "${MLM_TEST_ACTIVATION_BOOTSTRAP_FAIL:-}" ]] || ! bootstrap_job; then
+        set_managed_mode disabled
+        bootout_job
+        bootstrap_job >/dev/null 2>&1 || true
+        printf 'error: activation bootstrap failed; restored disabled mode\n' >&2
+        return 70
+    fi
     printf 'activated deployment mode=enabled label=%s\n' "$LAUNCHD_LABEL"
 }
 

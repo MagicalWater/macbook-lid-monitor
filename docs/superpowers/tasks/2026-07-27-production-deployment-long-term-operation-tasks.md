@@ -1,6 +1,6 @@
 # Milestone 16 Production Deployment and Long-term Operation Task Register
 
-Status: Tasks 1–13 and Stage A review complete. Stage B review is next. Tasks 15–21 remain approval-gated.
+Status: Tasks 1–13 and Stage A/B reviews complete. Task 14 is next. Tasks 15–21 remain approval-gated.
 
 ## Mandatory per-Task workflow
 
@@ -38,7 +38,7 @@ all Task reviews. Historical Milestone 1–15 evidence is context, not Milestone
 | 11 | Online-safe log rotation — complete | observability lib, manager/tests | 72 focused tests; 257 full tests; writer inode/symlink/static/package checks | none | revert commit; test-root only |
 | 12 | Disabled upgrade/rollback and complete uninstall — complete | manager, installed/deployment libs/tests | 12 focused tests; 77 management tests; 262 full tests; static/package/release checks | none | revert commit; test-root only |
 | 13 | Long-term operator runbook and docs synchronization — complete | runbook, README, command/static tests | 1 focused test; 78 management tests; 263 full tests; diff check | none | revert commit; no system state |
-| B | Stage B implementation review | review/evidence only | root mutation trace, full/static/package/clean snapshot | none | no system state |
+| B | Stage B implementation review — complete | review/evidence only | 264 full tests; four release products; static/package/clean-snapshot gate | none | no system state |
 | 14 | Full automated clean-checkout release gate | implementation review and automated validation evidence | complete suite/build/static/package/clean snapshot/residual proof | none | no system state; production remains uninstalled |
 | 15 | Formal-main integration and package provenance | Git and package evidence | formal main/origin equality, clean checkouts, exact release package | explicit merge/push approval | no install; abort before integration or revert approved merge |
 | 16 | Disabled production installation | manager and install evidence | exact artifacts, root metadata, loaded/disabled/zero PID, no acceptance | explicit `/Library` and bootstrap approval | disable/bootout/uninstall if install acceptance fails |
