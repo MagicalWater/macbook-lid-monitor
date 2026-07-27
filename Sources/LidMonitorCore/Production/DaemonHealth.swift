@@ -6,6 +6,7 @@ struct DaemonHealthSnapshot: Equatable, Sendable {
     let profileID: String
     let state: DaemonHealthState
     let lastTransitionTime: Date?
+    let lastValidSampleTime: Date?
     let lastValidSampleAge: TimeInterval?
     let lastErrorCode: String?
 }
@@ -45,6 +46,7 @@ struct DaemonHealth: Sendable {
             profileID: profileID,
             state: state,
             lastTransitionTime: lastTransitionTime,
+            lastValidSampleTime: lastValidSampleTime,
             lastValidSampleAge: lastValidSampleTime.map { max(0, now.timeIntervalSince($0)) },
             lastErrorCode: lastErrorCode
         )

@@ -1,6 +1,6 @@
 import Foundation
 
-enum ProductionMode: String, Equatable, Sendable {
+enum ProductionMode: String, Codable, Equatable, Sendable {
     case disabled
     case dryRun = "dry-run"
     case enabled

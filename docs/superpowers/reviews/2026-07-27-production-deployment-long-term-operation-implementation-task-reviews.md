@@ -500,3 +500,90 @@ git diff --check: passed
 
 **Task 8 approved.** No Critical/P0/P1 finding remains. Task 9 may begin after the independent Task 8
 commit.
+
+## Task 9 — Bounded runtime health persistence
+
+### RED evidence
+
+The focused test target failed to compile because `ProductionHealthStore`,
+`ProductionHealthRecord`, the health reader result, and the persisting event sink did not exist.
+
+### Implemented
+
+- Added a root-owned production health snapshot at the manifest-bound `health.plist` path using
+  JSON content with schema, installed version, mode, profile, state, PID, transition time,
+  last-valid-sample time, last stable error code, and update time.
+- Reused `DaemonHealth` as the single in-memory state model rather than introducing a second state
+  machine.
+- Added same-directory random temporary writes, mode `0600`, and POSIX atomic rename replacement.
+- Added bounded valid-sample heartbeat persistence while retaining every valid sample time only in
+  memory between writes.
+- Added missing/corrupt/stale/current read classification with one ISO-8601 serialization contract.
+- Wrapped the production event sink so state/error transitions persist while every original log
+  event is still forwarded.
+- Added a coordinator callback that records only successfully decoded finite integer samples.
+- Store failures are swallowed at the observability boundary and cannot construct or acquire sleep
+  authority.
+
+### Immediate review findings
+
+#### T9-P1 — Writer and reader used different date encodings
+
+The first writer encoded ISO-8601 dates while the reader used the default decoder strategy, which
+would classify a valid production snapshot as corrupt.
+
+**Resolution:** use ISO-8601 for both encoding and decoding and add current/stale fixtures using the
+same contract.
+
+#### T9-P1 — Replacement briefly removed the health snapshot
+
+The first GREEN implementation removed the existing destination before moving the temporary file,
+creating a missing-file observation window.
+
+**Resolution:** replace with one same-filesystem POSIX `rename`, retain deferred temporary cleanup,
+and prove no temporary health file remains.
+
+#### T9-P1 — No valid-sample heartbeat source existed
+
+The existing event stream exposed state transitions but not every valid decoded sample. Persisting
+only transition events could make a healthy steady-state daemon appear stale.
+
+**Resolution:** add a defaulted coordinator `onValidSample` callback. Every valid sample updates the
+store's in-memory timestamp, but disk writes occur only when the bounded heartbeat is due. Malformed
+reports do not refresh health.
+
+#### T9-P2 — Runtime path and state ownership diverged from existing contracts
+
+The initial store used `health.json`, while the manifest defines `health.plist`, and initially kept
+state fields independently from `DaemonHealth`.
+
+**Resolution:** use the manifest-bound path and extend `DaemonHealthSnapshot` with the absolute last
+sample time so persistence derives from the existing health model.
+
+### Re-review
+
+- Snapshot contains only bounded operational health fields: pass.
+- Snapshot and temporary file metadata are mode `0600`: pass.
+- Replacement is atomic and leaves no temporary file: pass.
+- State and new error transitions write immediately: pass.
+- Duplicate state/error events do not write repeatedly: pass.
+- Valid sample heartbeats are bounded and malformed reports do not refresh them: pass.
+- Missing, corrupt, stale, and current snapshots are distinguishable: pass.
+- Installed version reads only the manifest version field: pass.
+- Persistence failure forwards events and cannot affect authority/startup: pass.
+- No `/Library`, launchd, sleep, reboot, merge, push, or worktree cleanup occurred: pass.
+
+### Verification
+
+```text
+RED: focused compile failed because health persistence interfaces were absent
+focused: 29 tests, 0 failures
+full XCTest: 249 tests, 0 failures
+release daemon build: passed
+git diff --check: passed
+```
+
+### Decision
+
+**Task 9 approved.** No Critical/P0/P1 finding remains. Task 10 may begin after the independent Task 9
+commit.

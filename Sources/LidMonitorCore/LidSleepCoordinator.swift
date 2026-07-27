@@ -11,6 +11,7 @@ final class LidSleepCoordinator: @unchecked Sendable {
     private let now: @Sendable () -> Date
     private let onOperationalEvent: @Sendable (AutoSleepOperationalEvent) -> Void
     private let onTransitionEvent: @Sendable (AutoSleepTransitionEvent) -> Void
+    private let onValidSample: @Sendable (Date) -> Void
     private let queue = DispatchQueue(label: "macbook-lid-monitor.coordinator")
 
     private var machine: LidSleepStateMachine
@@ -30,7 +31,8 @@ final class LidSleepCoordinator: @unchecked Sendable {
         maximumSampleAge: TimeInterval = .infinity,
         now: @escaping @Sendable () -> Date = Date.init,
         onOperationalEvent: @escaping @Sendable (AutoSleepOperationalEvent) -> Void = { _ in },
-        onTransitionEvent: @escaping @Sendable (AutoSleepTransitionEvent) -> Void = { _ in }
+        onTransitionEvent: @escaping @Sendable (AutoSleepTransitionEvent) -> Void = { _ in },
+        onValidSample: @escaping @Sendable (Date) -> Void = { _ in }
     ) {
         self.stream = stream
         self.decoder = decoder
@@ -41,6 +43,7 @@ final class LidSleepCoordinator: @unchecked Sendable {
         self.now = now
         self.onOperationalEvent = onOperationalEvent
         self.onTransitionEvent = onTransitionEvent
+        self.onValidSample = onValidSample
         machine = LidSleepStateMachine(
             policy: policy,
             maximumSampleAge: maximumSampleAge > 0 ? maximumSampleAge : 0
@@ -97,6 +100,7 @@ final class LidSleepCoordinator: @unchecked Sendable {
                 apply(machine.handle(.dataInvalid(at: report.timestamp)))
                 return
             }
+            onValidSample(report.timestamp)
             apply(machine.handle(.angleChanged(angle, at: report.timestamp)))
 
         case .unsupported, .malformed, .outOfRange:

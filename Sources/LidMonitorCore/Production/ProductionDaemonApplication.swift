@@ -20,6 +20,7 @@ struct ProductionDaemonDependencies {
     let wakeObserver: SystemWakeObserving
     let requesterFactory: @Sendable (ProductionMode, ProductionEventSinking) -> SleepRequesting
     let acquireSleepAuthority: @Sendable () throws -> SleepAuthorityHolding
+    let recordValidSample: @Sendable (Date) -> Void
     let eventSink: ProductionEventSinking
     let now: @Sendable () -> Date
 }
@@ -186,7 +187,8 @@ final class ProductionDaemonApplication {
                 case .recoveryResleep: sink.emit(.transition(name: "recovery-resleep"))
                 case .startupCooldown: sink.emit(.transition(name: "startup-cooldown"))
                 }
-            }
+            },
+            onValidSample: dependencies.recordValidSample
         )
         do {
             try coordinator.start()
@@ -211,7 +213,13 @@ final class ProductionDaemonApplication {
 public enum LidMonitorProductionDaemonEntryPoint {
     public static func run(arguments: [String]) -> Int32 {
         guard arguments.isEmpty else { return ExitCode.usage.rawValue }
-        let sink = ProductionEventSink()
+        let logSink = ProductionEventSink()
+        let healthStore = ProductionHealthStore()
+        let sink = ProductionHealthPersistingEventSink(
+            downstream: logSink,
+            store: healthStore,
+            version: ProductionHealthStore.installedVersion()
+        )
         let dependencies = ProductionDaemonDependencies(
             beginRun: { date in
                 var budget = CrashBudget(
@@ -275,6 +283,7 @@ public enum LidMonitorProductionDaemonEntryPoint {
                 )
                 return try lease.acquire()
             },
+            recordValidSample: { date in try? healthStore.recordSample(at: date) },
             eventSink: sink,
             now: Date.init
         )

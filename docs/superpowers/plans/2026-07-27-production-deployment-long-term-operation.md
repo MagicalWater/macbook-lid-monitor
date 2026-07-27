@@ -574,13 +574,13 @@ and diagnostics.
 - Create: `Tests/LidMonitorTests/ProductionHealthStoreTests.swift`
 - Modify: `Tests/LidMonitorTests/ProductionDaemonCompositionTests.swift`
 
-- [ ] Add failing atomicity, metadata, state-transition, throttling, stale/corrupt, and redaction
+- [x] Add failing atomicity, metadata, state-transition, throttling, stale/corrupt, and redaction
   tests.
-- [ ] Implement a plist/JSON snapshot containing version, mode, profile, state, PID, transition
+- [x] Implement a plist/JSON snapshot containing version, mode, profile, state, PID, transition
   timestamp, last-valid-sample timestamp, and last stable error code.
-- [ ] Write only on state/error transitions and a bounded sample heartbeat, never every HID report.
-- [ ] Ensure health-store failure degrades observability but cannot create sleep authority.
-- [ ] Focused/full/release verification, review, and commit `feat: persist bounded daemon health`.
+- [x] Write only on state/error transitions and a bounded sample heartbeat, never every HID report.
+- [x] Ensure health-store failure degrades observability but cannot create sleep authority.
+- [x] Focused/full/release verification, review, and commit `feat: persist bounded daemon health`.
 
 ### Task 10: Stable status, diagnostics, and operational baseline
 

@@ -90,6 +90,20 @@ final class ProductionDaemonCompositionTests: XCTestCase {
         session.stop(reason: "test")
     }
 
+    func testOnlyValidDecodedReportsRecordHealthSamples() throws {
+        let fixture = Fixture(mode: .dryRun, descriptors: [Fixture.exactDescriptor])
+        let result = try fixture.application.start()
+        guard case let .running(session) = result else {
+            return XCTFail("expected running session")
+        }
+
+        fixture.stream.emit(report: [], at: Date(timeIntervalSince1970: 1_009))
+        fixture.stream.emit(report: [1, 90, 0], at: Date(timeIntervalSince1970: 1_010))
+
+        XCTAssertEqual(fixture.validSampleCount, 1)
+        session.stop(reason: "test")
+    }
+
     func testEnabledUnknownHardwareFailsBeforeRealRequesterConstruction() {
         let fixture = Fixture(mode: .enabled, descriptors: [])
 
@@ -162,9 +176,11 @@ private final class Fixture {
     private let unexpectedExitCounter = CompositionCounter()
     private let cleanExitCounter = CompositionCounter()
     private let beginRunCounter = CompositionCounter()
+    private let validSampleCounter = CompositionCounter()
     var unexpectedExitCount: Int { unexpectedExitCounter.value }
     var cleanExitCount: Int { cleanExitCounter.value }
     var beginRunCount: Int { beginRunCounter.value }
+    var validSampleCount: Int { validSampleCounter.value }
     lazy var application = ProductionDaemonApplication(
         dependencies: ProductionDaemonDependencies(
             beginRun: { [allowsStart, beginRunCounter] _ in
@@ -192,6 +208,7 @@ private final class Fixture {
                 if let authorityError { throw authorityError }
                 return CompositionAuthorityHolding()
             },
+            recordValidSample: { [validSampleCounter] _ in validSampleCounter.increment() },
             eventSink: events,
             now: { Date(timeIntervalSince1970: 1_000) }
         )

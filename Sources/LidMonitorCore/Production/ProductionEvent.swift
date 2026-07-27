@@ -1,7 +1,7 @@
 import Darwin
 import Foundation
 
-enum DaemonHealthState: String, Equatable, Sendable {
+enum DaemonHealthState: String, Codable, Equatable, Sendable {
     case starting
     case disabled
     case monitoringDisarmed = "monitoring-disarmed"
