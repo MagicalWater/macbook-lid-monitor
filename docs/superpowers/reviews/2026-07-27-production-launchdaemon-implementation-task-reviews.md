@@ -813,3 +813,27 @@ non-root user before returning to root-only installation operations.
 
 **Implementation approved.** Task 9 remains open until the separately approved root
 `accept-task9` command completes and its real system evidence is reviewed.
+
+## Task 11 — Controlled system acceptance
+
+### Evidence
+
+- Pre-diagnostics reported loaded, disabled version `25693f158874`, matching checksum, and zero resident processes.
+- Existing production logs were `0644`; rotation enforcement changed both active logs to `0600` and the directory to `0700`.
+- No rotation was needed because active logs were below the 1 MiB threshold.
+- Disable and bootout completed before file removal.
+- Scoped uninstall removed the system job, process authority, binary, plist, config, manifest, crash state, rollback slot, active logs, and all retained generations.
+- Independent post-command review found no managed residual path and no remaining production log directory.
+
+### Re-review
+
+- System launchd job: absent.
+- Resident daemon process: absent.
+- Managed binary/plist/config/manifest: absent.
+- Crash budget and rollback slot: absent.
+- Active and rotated production logs: absent.
+- Unrelated residual content: none observed; empty production log directory removed.
+
+### Disposition
+
+**Task 11 approved and complete.** The real system is now uninstalled with zero production managed residual state.
