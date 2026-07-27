@@ -124,6 +124,7 @@
 - [x] Test rolling-window accounting, clean-exit exclusion, circuit open, explicit reset, corrupt state fail-open, and atomic persistence.
 - [x] Implement with injectable storage/time.
 - [x] Verify circuit-open mode never starts sensor-driven sleep.
+- [x] Verify a real unclean process lifetime is counted on the next start, circuit-open exits cleanly to stop launchd restart, and an explicit disabled/nonresident reset command exists.
 - [x] Run tests, review, document, and commit.
 
 ### Stage B review
@@ -249,6 +250,10 @@ Perform separately approved reboot auto-start in dry-run, production upgrade/rol
 - Create final task reviews, validation evidence, and holistic review.
 
 **Completion:** All spec criteria have fresh evidence; documentation matches actual state; final disposition explicitly states installed/disabled/uninstalled state and supported hardware profile.
+
+Post-closure merge-gate review additionally verified and corrected crash-lifetime accounting,
+circuit-open launchd exit semantics, operator crash-budget reset, and foreground/daemon
+sleep-authority exclusion.
 
 ### Task 15 closure
 

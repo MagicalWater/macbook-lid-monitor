@@ -148,10 +148,14 @@ One production management script provides explicit subcommands:
 
 ```text
 prepare verify install upgrade rollback enable-dry-run enable disable
-bootstrap status health logs diagnostics stop bootout uninstall
+bootstrap status health logs diagnostics stop bootout reset-crash-budget uninstall
 ```
 
 Mutating commands require root and must reject symlinked managed paths. `prepare` and repository validation remain non-root and never write `/Library`.
+
+`enabled` production and foreground `--execute-sleep` must acquire the same non-blocking
+cross-process sleep-authority lease. Lease conflict or an unsafe lease path fails open before a
+real requester is constructed. Dry-run and diagnostic modes do not acquire the lease.
 
 Upgrade is transactional: stage, validate, bootout, atomically activate, bootstrap, verify health, commit manifest. Failure automatically restores the previous binary/plist/config and verifies rollback health.
 

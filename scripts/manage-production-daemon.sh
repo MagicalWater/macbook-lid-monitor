@@ -6,7 +6,7 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 source "$SCRIPT_DIR/lib/production-package-common.sh"
 
 usage() {
-    printf '%s\n' 'usage: manage-production-daemon.sh prepare|verify|install|bootstrap|status|stop|bootout|disable|dry-run|upgrade|rollback|rotate-logs|diagnostics|uninstall|accept-task9|accept-task10|accept-task11|accept-task12-logged-in|accept-task12-loginwindow-start|accept-task12-loginwindow-finish|accept-task12-sleep-wake|accept-task13-dry-run-path|accept-task13-enabled-once|accept-task13-recovery-resleep|accept-task13-injected-failure|accept-task14-reboot-start|accept-task14-reboot-finish' >&2
+    printf '%s\n' 'usage: manage-production-daemon.sh prepare|verify|install|bootstrap|status|stop|bootout|disable|dry-run|upgrade|rollback|reset-crash-budget|rotate-logs|diagnostics|uninstall|accept-task9|accept-task10|accept-task11|accept-task12-logged-in|accept-task12-loginwindow-start|accept-task12-loginwindow-finish|accept-task12-sleep-wake|accept-task13-dry-run-path|accept-task13-enabled-once|accept-task13-recovery-resleep|accept-task13-injected-failure|accept-task14-reboot-start|accept-task14-reboot-finish' >&2
     exit 64
 }
 
@@ -83,6 +83,31 @@ disable_job() {
     if [[ -z "$SYSTEM_ROOT" ]]; then chown root:wheel "$MANAGED_CONFIG"; fi
     stop_job
     printf 'disabled label=%s\n' "$LAUNCHD_LABEL"
+}
+
+reset_crash_budget() {
+    require_root_for_system
+    assert_regular_source "$MANAGED_CONFIG"
+    assert_managed_path_safe "$MANAGED_SUPPORT/crash-budget.json"
+    [[ ! -L "$MANAGED_SUPPORT/crash-budget.json" ]] || {
+        printf 'error: refusing symlink crash budget path\n' >&2
+        return 74
+    }
+    local mode process_count
+    mode="$(/usr/libexec/PlistBuddy -c 'Print :Mode' "$MANAGED_CONFIG")"
+    [[ "$mode" == disabled ]] || {
+        printf 'error: crash budget reset requires disabled mode\n' >&2
+        return 70
+    }
+    if [[ -z "$SYSTEM_ROOT" ]]; then
+        process_count="$({ pgrep -f '^/Library/PrivilegedHelperTools/macbook-lid-monitor-daemon$' || true; } | wc -l | tr -d ' ')"
+        [[ "$process_count" == 0 ]] || {
+            printf 'error: crash budget reset requires no resident daemon\n' >&2
+            return 70
+        }
+    fi
+    rm -f -- "$MANAGED_SUPPORT/crash-budget.json"
+    printf 'reset crash-budget label=%s mode=disabled\n' "$LAUNCHD_LABEL"
 }
 
 
@@ -1053,6 +1078,7 @@ case "$1" in
     dry-run) set_dry_run_mode ;;
     upgrade) upgrade_package ;;
     rollback) rollback_upgrade ;;
+    reset-crash-budget) reset_crash_budget ;;
     rotate-logs) rotate_logs ;;
     diagnostics) diagnostics ;;
     uninstall) uninstall_package ;;

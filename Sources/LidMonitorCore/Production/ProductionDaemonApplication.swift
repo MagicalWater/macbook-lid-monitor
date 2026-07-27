@@ -2,11 +2,12 @@ import Foundation
 
 enum ProductionDaemonError: Error, Equatable, Sendable {
     case incompatibleHardware
+    case sleepAuthorityUnavailable
     case unsupportedMode
 }
 
 struct ProductionDaemonDependencies {
-    let allowsStart: @Sendable (Date) throws -> Bool
+    let beginRun: @Sendable (Date) throws -> Bool
     let recordUnexpectedExit: @Sendable (Date) throws -> Void
     let recordCleanExit: @Sendable () throws -> Void
     let loadConfiguration: @Sendable () throws -> ProductionConfiguration
@@ -16,6 +17,7 @@ struct ProductionDaemonDependencies {
     let scheduler: OneShotScheduling
     let wakeObserver: SystemWakeObserving
     let requesterFactory: @Sendable (ProductionMode, ProductionEventSinking) -> SleepRequesting
+    let acquireSleepAuthority: @Sendable () throws -> SleepAuthorityHolding
     let eventSink: ProductionEventSinking
     let now: @Sendable () -> Date
 }
@@ -24,16 +26,19 @@ final class ProductionDaemonSession: @unchecked Sendable {
     private let coordinator: LidSleepCoordinator
     private let sink: ProductionEventSinking
     private let recordCleanExit: @Sendable () throws -> Void
+    private let sleepAuthority: SleepAuthorityHolding?
     private let lock = NSLock()
     private var stopped = false
 
     init(
         coordinator: LidSleepCoordinator,
         sink: ProductionEventSinking,
+        sleepAuthority: SleepAuthorityHolding?,
         recordCleanExit: @escaping @Sendable () throws -> Void
     ) {
         self.coordinator = coordinator
         self.sink = sink
+        self.sleepAuthority = sleepAuthority
         self.recordCleanExit = recordCleanExit
     }
 
@@ -65,6 +70,15 @@ enum ProductionDaemonStartResult: Equatable {
     }
 }
 
+func productionDaemonImmediateExitCode(for result: ProductionDaemonStartResult) -> Int32? {
+    switch result {
+    case .disabled, .circuitOpen:
+        return ExitCode.success.rawValue
+    case .running:
+        return nil
+    }
+}
+
 final class ProductionDaemonApplication {
     private let dependencies: ProductionDaemonDependencies
 
@@ -73,7 +87,7 @@ final class ProductionDaemonApplication {
     }
 
     func start() throws -> ProductionDaemonStartResult {
-        guard try dependencies.allowsStart(dependencies.now()) else {
+        guard try dependencies.beginRun(dependencies.now()) else {
             dependencies.eventSink.emit(.degraded(code: "crash-circuit-open"))
             dependencies.eventSink.emit(.healthChanged(.degradedFailOpen))
             return .circuitOpen
@@ -84,6 +98,7 @@ final class ProductionDaemonApplication {
         )
         guard configuration.mode != .disabled else {
             dependencies.eventSink.emit(.healthChanged(.disabled))
+            try? dependencies.recordCleanExit()
             return .disabled
         }
 
@@ -105,6 +120,19 @@ final class ProductionDaemonApplication {
             throw ProductionDaemonError.incompatibleHardware
         }
 
+        let sleepAuthority: SleepAuthorityHolding?
+        if configuration.mode == .enabled {
+            do {
+                sleepAuthority = try dependencies.acquireSleepAuthority()
+            } catch {
+                dependencies.eventSink.emit(.degraded(code: "sleep-authority-unavailable"))
+                dependencies.eventSink.emit(.healthChanged(.degradedFailOpen))
+                try? dependencies.recordCleanExit()
+                throw ProductionDaemonError.sleepAuthorityUnavailable
+            }
+        } else {
+            sleepAuthority = nil
+        }
         let requester = dependencies.requesterFactory(configuration.mode, dependencies.eventSink)
         let sink = dependencies.eventSink
         let stream: HIDReportStreaming
@@ -161,6 +189,7 @@ final class ProductionDaemonApplication {
             ProductionDaemonSession(
                 coordinator: coordinator,
                 sink: dependencies.eventSink,
+                sleepAuthority: sleepAuthority,
                 recordCleanExit: dependencies.recordCleanExit
             )
         )
@@ -172,13 +201,13 @@ public enum LidMonitorProductionDaemonEntryPoint {
         guard arguments.isEmpty else { return ExitCode.usage.rawValue }
         let sink = ProductionEventSink()
         let dependencies = ProductionDaemonDependencies(
-            allowsStart: { date in
+            beginRun: { date in
                 var budget = CrashBudget(
                     storage: FileCrashBudgetStorage(),
                     maximumUnexpectedExits: 3,
                     window: 300
                 )
-                return try budget.allowsStart(at: date)
+                return try budget.beginRun(at: date)
             },
             recordUnexpectedExit: { date in
                 var budget = CrashBudget(
@@ -232,15 +261,18 @@ public enum LidMonitorProductionDaemonEntryPoint {
                     return DryRunSleepRequester { _ in }
                 }
             },
+            acquireSleepAuthority: { try POSIXSleepAuthorityLease().acquire() },
             eventSink: sink,
             now: Date.init
         )
         do {
-            switch try ProductionDaemonApplication(dependencies: dependencies).start() {
-            case .disabled:
-                return ExitCode.success.rawValue
-            case .circuitOpen:
-                return ExitCode.unavailable.rawValue
+            let result = try ProductionDaemonApplication(dependencies: dependencies).start()
+            if let exitCode = productionDaemonImmediateExitCode(for: result) {
+                return exitCode
+            }
+            switch result {
+            case .disabled, .circuitOpen:
+                preconditionFailure("immediate result must have an exit code")
             case let .running(session):
                 let finished = DispatchSemaphore(value: 0)
                 let signals = ProcessSignalController()
@@ -256,6 +288,8 @@ public enum LidMonitorProductionDaemonEntryPoint {
             return ExitCode.usage.rawValue
         } catch ProductionDaemonError.incompatibleHardware {
             return ExitCode.unavailable.rawValue
+        } catch ProductionDaemonError.sleepAuthorityUnavailable {
+            return ExitCode.success.rawValue
         } catch is HIDReportStreamError {
             return ExitCode.ioFailure.rawValue
         } catch {

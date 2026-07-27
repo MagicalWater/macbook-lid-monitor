@@ -275,6 +275,20 @@ docs/superpowers/reviews/2026-07-27-production-launchdaemon-final-review.md
 sudo ./scripts/manage-production-daemon.sh uninstall
 ```
 
+若 persistent crash budget 因連續未乾淨退出而開啟 circuit，daemon 會以成功碼停在
+fail-open 狀態，避免 `KeepAlive.SuccessfulExit=false` 再形成 restart storm。確認 package
+已切回 `disabled`、且沒有 resident daemon 後，操作者可明確重置：
+
+```bash
+sudo ./scripts/manage-production-daemon.sh reset-crash-budget
+```
+
+重置只移除 crash-budget state，不會自動啟用或 bootstrap daemon。
+
+production `enabled` 與前景 `--execute-sleep` 共用一個非阻塞 sleep-authority lease。
+任一方已持有時，另一方會 fail-open，不能建立第二個真實睡眠 authority。diagnostic 與
+dry-run 不取得這個 lease。
+
 解除安裝會停止並 bootout system job，移除 binary、plist、config、manifest、rollback slot、crash-budget state、production logs 與 Task acceptance state。可用 acceptance／review 中的 residual-state check 驗證零殘留。
 
 ## 前景工具移除方式

@@ -23,10 +23,11 @@ Holistic review of the production LaunchDaemon implementation, packaging, govern
 4. **Fail-open input handling:** unknown hardware/report/configuration, stale data, and invalid recovery data do not request sleep.
 5. **Bounded requests:** normal close is exactly once per request epoch; recovery resleep is bounded to one request per wake epoch.
 6. **Failure behavior:** sleep-request failure is observable, disarms, and does not retry.
-7. **Restart protection:** crash budget prevents restart storms and fails open on corrupt state.
+7. **Restart protection:** an atomic active-run marker detects real unclean lifetimes; circuit-open exits cleanly to stop launchd restart, fails open on corrupt state, and requires an explicit disabled/nonresident reset.
 8. **Lifecycle safety:** install begins disabled; upgrade has one verified rollback slot; stop, disable, bootout, rollback, diagnostics, and uninstall are explicit operations.
 9. **Filesystem safety:** fixed paths, root ownership/modes, symlink refusal, checksum manifest, and unrelated-file preservation are tested.
 10. **Privacy and observability:** logs are root-only, bounded, structured, and exclude raw HID reports from production events.
+11. **Cross-process authority:** foreground `--execute-sleep` and production `enabled` require the same non-blocking lease; conflict fails open before a second requester exists.
 
 ## Real-system acceptance
 
@@ -61,7 +62,7 @@ repository checkout: detached HEAD pending explicit merge/push authorization
 
 The current checkout and an independent clean snapshot both passed:
 
-- 188 XCTest tests with zero failures;
+- 198 XCTest tests with zero failures after merge-gate corrections;
 - release builds for all four package products;
 - `bash -n` and `shellcheck -x` for all scripts;
 - plist/config/manifest lint;
@@ -70,6 +71,10 @@ The current checkout and an independent clean snapshot both passed:
 
 The clean snapshot was copied without `.git` and `.build`, initialized as a new repository, and
 validated from a fresh build graph. Its tracked working tree remained clean after verification.
+
+The post-Task-15 merge-gate review additionally passed the same full and clean-snapshot gate after
+correcting crash lifecycle accounting, circuit-open exit semantics, operator reset, and
+cross-process sleep-authority exclusion.
 
 ## Decision
 

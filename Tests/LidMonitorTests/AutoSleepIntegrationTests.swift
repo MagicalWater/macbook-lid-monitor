@@ -3,6 +3,24 @@ import XCTest
 @testable import LidMonitorCore
 
 final class AutoSleepIntegrationTests: XCTestCase {
+    func testDryRunDoesNotAcquireRealSleepAuthority() throws {
+        let leasing = AutoSleepAuthorityLeasing()
+
+        let holding = try AutoSleepComposition.acquireSleepAuthority(for: .dryRun, leasing: leasing)
+
+        XCTAssertNil(holding)
+        XCTAssertEqual(leasing.acquireCount, 0)
+    }
+
+    func testExecuteSleepRequiresRealSleepAuthority() throws {
+        let leasing = AutoSleepAuthorityLeasing()
+
+        let holding = try AutoSleepComposition.acquireSleepAuthority(for: .executeSleep, leasing: leasing)
+
+        XCTAssertNotNil(holding)
+        XCTAssertEqual(leasing.acquireCount, 1)
+    }
+
     func testDryRunCompositionProcessesCalibratedCloseCycleEndToEnd() throws {
         let base = Date(timeIntervalSince1970: 3_000)
         let policy = LidSleepPolicy.calibratedDefault
@@ -227,6 +245,16 @@ final class AutoSleepIntegrationTests: XCTestCase {
         coordinator.stop()
     }
 }
+
+private final class AutoSleepAuthorityLeasing: SleepAuthorityLeasing, @unchecked Sendable {
+    private(set) var acquireCount = 0
+    func acquire() throws -> SleepAuthorityHolding {
+        acquireCount += 1
+        return AutoSleepAuthorityHolding()
+    }
+}
+
+private final class AutoSleepAuthorityHolding: SleepAuthorityHolding, @unchecked Sendable {}
 
 private final class IntegrationReportStream: HIDReportStreaming, @unchecked Sendable {
     private var callback: (@Sendable (HIDReport) -> Void)?

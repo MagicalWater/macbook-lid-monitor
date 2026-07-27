@@ -1,3 +1,7 @@
+> Historical-status note: this document is chronological. Statements such as “pending” or
+> “ready for acceptance” describe the state at that review point and are superseded by later
+> closure sections and the final merge-gate review.
+
 ## Task 12 — Logged-in dry-run system acceptance
 
 ### Evidence
@@ -1621,3 +1625,47 @@ Clean snapshot created without the existing `.git` or `.build`, initialized as a
 **Task 15 approved and complete.** The Production LaunchDaemon phase is holistically closed. The
 implementation is validated for the exact M1 Pro profile, and the intentional final system state is
 uninstalled. Integration of the detached HEAD remains a separate explicit decision.
+
+## Post-Task-15 merge-gate findings and corrections
+
+### Finding 1 — Real unclean exits did not consume crash budget
+
+The original budget counted only handled startup errors. A crash, `SIGKILL`, or other exit that
+could not execute cleanup left no evidence for the next launch. Added an atomic `runActive`
+lifecycle marker: begin marks active, clean stop clears it, and the next begin counts a still-active
+previous run as unexpected. Legacy JSON without `runActive` decodes as inactive.
+
+### Finding 2 — Circuit-open still caused launchd restart
+
+Circuit-open originally mapped to exit `69`, while the plist restarts unsuccessful exits. Changed
+the immediate circuit-open disposition to exit `0` after degraded evidence, so launchd stops
+restarting and the daemon remains fail-open.
+
+### Finding 3 — No operator crash-budget recovery command
+
+Added `reset-crash-budget`. It requires root, an installed regular config, disabled mode, no
+resident daemon, and a non-symlink state path. It removes only the budget state and never enables
+or bootstraps the daemon.
+
+### Finding 4 — Foreground and daemon real-sleep authority could overlap
+
+Added a shared non-blocking POSIX file lease. Production `enabled` and foreground
+`--execute-sleep` both require it; dry-run does not. Conflict and unsafe paths fail open before
+constructing a second real requester.
+
+### Hardware re-acceptance disposition
+
+No new real sleep acceptance is required for these corrections. They operate before real requester
+construction or around process lifecycle. Once a lease is acquired and the runtime starts, the
+already accepted HID, debounce, request, recovery, and IOKit paths are unchanged.
+
+### Fresh merge-gate verification
+
+- Current checkout XCTest: 198 tests, 0 failures.
+- Independent clean snapshot XCTest: 198 tests, 0 failures.
+- All four release products: passed in both environments.
+- Bash syntax, shellcheck, plist/config/manifest lint: passed.
+- Production package `prepare` and `verify`: passed in both environments.
+- Plan unchecked items: zero.
+- System job, PID, binary, plist, support, and log paths: absent.
+- `git diff --check`: passed.

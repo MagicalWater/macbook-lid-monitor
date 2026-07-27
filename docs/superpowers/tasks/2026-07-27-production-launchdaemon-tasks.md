@@ -21,7 +21,7 @@ Status: Complete; Tasks 1–15, all stage reviews, hardware acceptance, reboot/r
 | 12 | Production dry-run acceptance — complete | validation evidence | logged-in, loginwindow, and real sleep/wake dry-run acceptance complete | completed; separate reboot approval remains for Task 14 | automatic disable/bootout/bootstrap cleanup |
 | 13 | Enabled bounded acceptance — complete | validation evidence | dry-run path, first enabled sleep, bounded recovery-resleep, and non-sleeping injected failure all accepted on the real system | completed; no further Task 13 approval remains | automatic removal of injection plus disable/bootout/bootstrap cleanup |
 | 14 | Reboot/rollback/uninstall acceptance — complete | validation evidence | real reboot proof, disabled startup, rollback to `20c369b823d1`, uninstall, independently verified zero residual | completed | rollback and uninstall completed; no managed system state remains |
-| 15 | Docs, tooling disposition, final review — complete | README, governance closures, final review | fresh full/clean/static/release validation + holistic review | no additional system mutation; Task 14 already left zero residual | revert Task 15 documentation commit |
+| 15 | Docs, tooling disposition, final review — complete | README, governance closures, final and merge-gate reviews | fresh full/clean/static/release validation + holistic merge-gate review | no additional system mutation; Task 14 already left zero residual | revert Task 15 and merge-gate documentation commits |
 
 ## Per-task mandatory workflow
 

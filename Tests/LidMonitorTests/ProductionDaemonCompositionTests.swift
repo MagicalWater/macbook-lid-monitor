@@ -11,6 +11,8 @@ final class ProductionDaemonCompositionTests: XCTestCase {
         XCTAssertEqual(result, .disabled)
         XCTAssertEqual(fixture.enumerator.callCount, 0)
         XCTAssertTrue(fixture.requesterFactory.requestedModes.isEmpty)
+        XCTAssertEqual(fixture.beginRunCount, 1)
+        XCTAssertEqual(fixture.cleanExitCount, 1)
         XCTAssertEqual(fixture.events.events, [
             .started(mode: .disabled, profileID: fixture.configuration.hardwareProfileID),
             .healthChanged(.disabled),
@@ -74,6 +76,21 @@ final class ProductionDaemonCompositionTests: XCTestCase {
         XCTAssertTrue(fixture.events.events.contains(.healthChanged(.incompatibleHardware)))
     }
 
+    func testEnabledAuthorityConflictFailsOpenBeforeRequesterConstruction() {
+        let fixture = Fixture(
+            mode: .enabled,
+            descriptors: [Fixture.exactDescriptor],
+            authorityError: SleepAuthorityLeaseError.alreadyHeld
+        )
+
+        XCTAssertThrowsError(try fixture.application.start()) { error in
+            XCTAssertEqual(error as? ProductionDaemonError, .sleepAuthorityUnavailable)
+        }
+        XCTAssertTrue(fixture.requesterFactory.requestedModes.isEmpty)
+        XCTAssertTrue(fixture.events.events.contains(.degraded(code: "sleep-authority-unavailable")))
+        XCTAssertEqual(fixture.cleanExitCount, 1)
+    }
+
     func testOpenCrashCircuitPreventsEnumerationAndRequesterConstruction() throws {
         let fixture = Fixture(mode: .enabled, descriptors: [Fixture.exactDescriptor], allowsStart: false)
 
@@ -83,6 +100,7 @@ final class ProductionDaemonCompositionTests: XCTestCase {
         XCTAssertEqual(fixture.enumerator.callCount, 0)
         XCTAssertTrue(fixture.requesterFactory.requestedModes.isEmpty)
         XCTAssertTrue(fixture.events.events.contains(.healthChanged(.degradedFailOpen)))
+        XCTAssertEqual(productionDaemonImmediateExitCode(for: result), ExitCode.success.rawValue)
     }
 
     func testUnexpectedStreamStartupFailureConsumesCrashBudget() {
@@ -119,11 +137,16 @@ private final class Fixture {
     let events = CompositionEventSink()
     private let unexpectedExitCounter = CompositionCounter()
     private let cleanExitCounter = CompositionCounter()
+    private let beginRunCounter = CompositionCounter()
     var unexpectedExitCount: Int { unexpectedExitCounter.value }
     var cleanExitCount: Int { cleanExitCounter.value }
+    var beginRunCount: Int { beginRunCounter.value }
     lazy var application = ProductionDaemonApplication(
         dependencies: ProductionDaemonDependencies(
-            allowsStart: { [allowsStart] _ in allowsStart },
+            beginRun: { [allowsStart, beginRunCounter] _ in
+                beginRunCounter.increment()
+                return allowsStart
+            },
             recordUnexpectedExit: { [unexpectedExitCounter] _ in unexpectedExitCounter.increment() },
             recordCleanExit: { [cleanExitCounter] in cleanExitCounter.increment() },
             loadConfiguration: { [configuration] in configuration },
@@ -133,18 +156,24 @@ private final class Fixture {
             scheduler: scheduler,
             wakeObserver: wakeObserver,
             requesterFactory: requesterFactory.make,
+            acquireSleepAuthority: { [authorityError] in
+                if let authorityError { throw authorityError }
+                return CompositionAuthorityHolding()
+            },
             eventSink: events,
             now: { Date(timeIntervalSince1970: 1_000) }
         )
     )
 
     private let allowsStart: Bool
+    private let authorityError: Error?
 
     init(
         mode: ProductionMode,
         descriptors: [HIDDeviceDescriptor],
         allowsStart: Bool = true,
-        streamStartError: Error? = nil
+        streamStartError: Error? = nil,
+        authorityError: Error? = nil
     ) {
         configuration = ProductionConfiguration(
             schemaVersion: 1,
@@ -155,6 +184,7 @@ private final class Fixture {
         )
         enumerator = CompositionEnumerator(descriptors: descriptors)
         self.allowsStart = allowsStart
+        self.authorityError = authorityError
         stream.startError = streamStartError
     }
 }
@@ -228,6 +258,7 @@ private final class CompositionEventSink: ProductionEventSinking, @unchecked Sen
 }
 
 private enum CompositionFailure: Error { case failed }
+private final class CompositionAuthorityHolding: SleepAuthorityHolding, @unchecked Sendable {}
 
 private final class CompositionCounter: @unchecked Sendable {
     private let lock = NSLock()

@@ -14,6 +14,26 @@ struct CrashBudgetSnapshot: Equatable, Sendable {
 private struct CrashBudgetState: Codable, Equatable, Sendable {
     var unexpectedExitTimes: [TimeInterval]
     var circuitOpen: Bool
+    var runActive: Bool
+
+    init(unexpectedExitTimes: [TimeInterval], circuitOpen: Bool, runActive: Bool = false) {
+        self.unexpectedExitTimes = unexpectedExitTimes
+        self.circuitOpen = circuitOpen
+        self.runActive = runActive
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case unexpectedExitTimes
+        case circuitOpen
+        case runActive
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        unexpectedExitTimes = try container.decode([TimeInterval].self, forKey: .unexpectedExitTimes)
+        circuitOpen = try container.decode(Bool.self, forKey: .circuitOpen)
+        runActive = try container.decodeIfPresent(Bool.self, forKey: .runActive) ?? false
+    }
 }
 
 struct CrashBudget: Sendable {
@@ -31,10 +51,25 @@ struct CrashBudget: Sendable {
         self.window = max(1, window)
     }
 
-    mutating func allowsStart(at date: Date) throws -> Bool {
+    mutating func beginRun(at date: Date) throws -> Bool {
         do {
-            guard let state = try loadState() else { return true }
-            return !state.circuitOpen
+            var state = try loadState() ?? CrashBudgetState(unexpectedExitTimes: [], circuitOpen: false)
+            let cutoff = date.timeIntervalSince1970 - window
+            state.unexpectedExitTimes = state.unexpectedExitTimes.filter { $0 >= cutoff }
+            if state.runActive {
+                state.unexpectedExitTimes.append(date.timeIntervalSince1970)
+                if state.unexpectedExitTimes.count >= maximumUnexpectedExits {
+                    state.circuitOpen = true
+                }
+            }
+            guard !state.circuitOpen else {
+                state.runActive = false
+                try storage.storeAtomically(try JSONEncoder().encode(state))
+                return false
+            }
+            state.runActive = true
+            try storage.storeAtomically(try JSONEncoder().encode(state))
+            return true
         } catch is DecodingError {
             return false
         }
@@ -50,6 +85,7 @@ struct CrashBudget: Sendable {
         let cutoff = date.timeIntervalSince1970 - window
         state.unexpectedExitTimes = state.unexpectedExitTimes.filter { $0 >= cutoff }
         state.unexpectedExitTimes.append(date.timeIntervalSince1970)
+        state.runActive = false
         if state.unexpectedExitTimes.count >= maximumUnexpectedExits {
             state.circuitOpen = true
         }
@@ -61,7 +97,16 @@ struct CrashBudget: Sendable {
     }
 
     mutating func recordCleanExit() throws {
-        _ = try storage.load()
+        guard var state = try loadState() else { return }
+        state.runActive = false
+        try storage.storeAtomically(try JSONEncoder().encode(state))
+    }
+
+    mutating func snapshot(at date: Date) throws -> CrashBudgetSnapshot {
+        let state = try loadState() ?? CrashBudgetState(unexpectedExitTimes: [], circuitOpen: false)
+        let cutoff = date.timeIntervalSince1970 - window
+        let count = state.unexpectedExitTimes.filter { $0 >= cutoff }.count
+        return CrashBudgetSnapshot(unexpectedExitCount: count, isCircuitOpen: state.circuitOpen)
     }
 
     mutating func reset() throws {

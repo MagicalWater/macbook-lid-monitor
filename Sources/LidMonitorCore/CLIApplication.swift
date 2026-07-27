@@ -13,6 +13,18 @@ private func autoSleepSignalHandler(_ signalNumber: Int32) {
 }
 
 enum AutoSleepComposition {
+    static func acquireSleepAuthority(
+        for executionMode: AutoSleepExecutionMode,
+        leasing: SleepAuthorityLeasing = POSIXSleepAuthorityLease()
+    ) throws -> SleepAuthorityHolding? {
+        switch executionMode {
+        case .dryRun:
+            return nil
+        case .executeSleep:
+            return try leasing.acquire()
+        }
+    }
+
     static func makeCoordinator(
         stream: HIDReportStreaming,
         decoder: LidAngleDecoding,
@@ -275,6 +287,7 @@ private struct DiagnosticApplication {
                 policy: policy
             )
         )
+        let sleepAuthority = try AutoSleepComposition.acquireSleepAuthority(for: executionMode)
         let stream = try IOHIDReportStream(descriptor: descriptor)
         let activeFormatter = formatter
         let coordinator = AutoSleepComposition.makeCoordinator(
@@ -304,6 +317,7 @@ private struct DiagnosticApplication {
         }
 
         controller.finish()
+        _ = sleepAuthority
         return .success
     }
 }

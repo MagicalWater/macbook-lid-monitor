@@ -487,6 +487,30 @@ final class ProductionManagementScriptTests: XCTestCase {
         XCTAssertFalse(text.contains("reboot" + " now"))
     }
 
+    func testCrashBudgetResetRequiresDisabledInstalledNonresidentState() throws {
+        let sandbox = root.appendingPathComponent(".build/production-package-crash-reset-root")
+        try? FileManager.default.removeItem(at: sandbox)
+        defer { try? FileManager.default.removeItem(at: sandbox) }
+
+        try seedStaging()
+        try runScript("install", environment: ["MLM_TEST_ROOT": sandbox.path])
+        let budget = sandbox.appendingPathComponent("Library/Application Support/MacBookLidMonitor/crash-budget.json")
+        try Data("{}".utf8).write(to: budget)
+
+        try runScript("reset-crash-budget", environment: ["MLM_TEST_ROOT": sandbox.path])
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: budget.path))
+    }
+
+    func testCrashBudgetResetCommandIsExplicitAndFailSafe() throws {
+        let text = try String(contentsOf: root.appendingPathComponent("scripts/manage-production-daemon.sh"), encoding: .utf8)
+        XCTAssertTrue(text.contains("reset-crash-budget) reset_crash_budget"))
+        XCTAssertTrue(text.contains("crash budget reset requires disabled mode"))
+        XCTAssertTrue(text.contains("crash budget reset requires no resident daemon"))
+        XCTAssertTrue(text.contains("refusing symlink crash budget path"))
+        XCTAssertFalse(text.contains("reset-crash-budget) set_enabled_mode"))
+    }
+
     func testTask13DryRunPathAcceptanceReturnsDisabledInSandbox() throws {
         let sandbox = root.appendingPathComponent(".build/production-package-task13-dry-run-path-root")
         try? FileManager.default.removeItem(at: sandbox)
