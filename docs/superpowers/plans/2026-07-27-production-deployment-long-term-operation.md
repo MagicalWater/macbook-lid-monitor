@@ -712,12 +712,12 @@ uninstall_package
 - Create: `docs/validation/2026-07-27-production-deployment-automated-gate.md`
 - Update: Milestone Task review/status documents
 
-- [ ] Run all  Swift tests with exact count and zero failures.
-- [ ] Build all four release products.
-- [ ] Run `bash -n`, `shellcheck -x`, plist lint, package prepare/verify, and `git diff --check`.
-- [ ] Validate an independent clean snapshot excluding `.git` and `.build`.
-- [ ] Verify no `/Library`/launchd/sleep/reboot mutation occurred and production remains uninstalled.
-- [ ] Perform holistic implementation review, fix/re-review all findings, and commit the release
+- [x] Run all Swift tests with exact count and zero failures.
+- [x] Build all four release products.
+- [x] Run `bash -n`, `shellcheck -x`, plist lint, package prepare/verify, and `git diff --check`.
+- [x] Validate an independent clean snapshot excluding `.git` and `.build`.
+- [x] Verify no `/Library`/launchd/sleep/reboot mutation occurred and production remains uninstalled.
+- [x] Perform holistic implementation review, fix/re-review all findings, and commit the release
   candidate closure.
 
 ### Task 15: Formal-main integration and package provenance gate
