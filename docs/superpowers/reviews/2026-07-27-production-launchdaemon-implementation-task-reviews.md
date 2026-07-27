@@ -553,6 +553,22 @@ paths rather than only preflight rejection.
 **Task 10 implementation approved.** Controlled mutation of the installed Task 9 version remains
 blocked pending the explicit installed-version approval gate.
 
+## Task 10 — Controlled system acceptance
+
+### Evidence
+
+- Prepared candidate version `ffdec68d54e5`.
+- Injected post-activation failure restored version `25693f158874` and matching checksum.
+- Normal upgrade activated and verified candidate version/checksum.
+- Explicit rollback restored the original version/checksum.
+- Final mode is `disabled`; system job is loaded but not running.
+- No resident PID, GUI-domain duplicate, error log entry, or crash-budget state exists.
+- One rollback slot remains and matches the final installed version.
+
+### Disposition
+
+**Task 10 approved and complete.**
+
 ## Task 10 — Controlled acceptance command
 
 ### Implementation

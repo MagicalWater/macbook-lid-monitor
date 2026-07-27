@@ -1,6 +1,6 @@
 # Production LaunchDaemon Task Register
 
-Status: Implementation in progress; Tasks 1–9 complete; Task 10 acceptance command verified and approved, awaiting controlled root execution.
+Status: Implementation in progress; Tasks 1–10 complete; Task 11 implementation pending.
 
 | Task | Purpose | Primary files | Verification | Approval gate | Rollback/safe stop |
 | ---: | --- | --- | --- | --- | --- |
@@ -15,7 +15,7 @@ Status: Implementation in progress; Tasks 1–9 complete; Task 10 acceptance com
 | 7 | plist/config/manifest templates — complete | packaging files/tests | XCTest + plutil | none | revert commit |
 | 8 | prepare/verify scripts — complete | management script/lib/tests | XCTest/bash/shellcheck | none; must not write `/Library` | delete build artifacts |
 | 9 | install/control lifecycle — complete | script/docs/harness | controlled disabled acceptance | approved and completed | disable, stop, bootout, uninstall staged artifacts |
-| 10 | upgrade/rollback — acceptance ready | script/fixtures/evidence | injected failure + rollback acceptance | approved; root execution pending | automatic restore previous set |
+| 10 | upgrade/rollback — complete | script/fixtures/evidence | injected failure + rollback acceptance | approved and completed | automatic restore previous set |
 | 11 | logs/diagnostics/uninstall | script/docs/tests | rotation/privacy/residual-state | **required before installed-state mutation** | bootout and scoped removal |
 | C | Packaging stage review | reviews/evidence | clean checkout + residual state | approval for any cleanup mutation | explicit uninstall |
 | 12 | Production dry-run acceptance | validation evidence | loginwindow/power/HID/single authority | logout/sleep/reboot approvals as applicable | disable/bootout |
