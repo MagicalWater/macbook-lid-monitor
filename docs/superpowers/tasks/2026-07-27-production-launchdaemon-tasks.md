@@ -1,6 +1,6 @@
 # Production LaunchDaemon Task Register
 
-Status: Implementation in progress; Tasks 1–11 and Stage C complete; Task 12 logged-in dry-run acceptance command verified and awaiting controlled root execution.
+Status: Implementation in progress; Tasks 1–11 and Stage C complete; Task 12 logged-in dry-run acceptance complete. Loginwindow/logout, real sleep/wake, and reboot remain behind separate approval gates.
 
 | Task | Purpose | Primary files | Verification | Approval gate | Rollback/safe stop |
 | ---: | --- | --- | --- | --- | --- |
@@ -18,7 +18,7 @@ Status: Implementation in progress; Tasks 1–11 and Stage C complete; Task 12 l
 | 10 | upgrade/rollback — complete | script/fixtures/evidence | injected failure + rollback acceptance | approved and completed | automatic restore previous set |
 | 11 | logs/diagnostics/uninstall — complete | script/docs/tests | rotation/privacy/residual-state | approved and completed | bootout and scoped removal |
 | C | Packaging stage review — complete | reviews/evidence | clean checkout + residual state | completed with zero installed residual | explicit uninstall |
-| 12 | Production dry-run acceptance — logged-in command ready | validation evidence | logged-in process/log/single authority, then gated loginwindow and sleep/wake | approved for logged-in scope; separate logout/sleep approvals remain | automatic disable/bootout/bootstrap cleanup |
+| 12 | Production dry-run acceptance — logged-in scope complete | validation evidence | logged-in HID/process/log/single authority complete; loginwindow and sleep/wake pending | logged-in scope completed; separate logout/sleep/reboot approvals remain | automatic disable/bootout/bootstrap cleanup |
 | 13 | Enabled bounded acceptance | validation evidence | one sleep, one recovery, injected failure | **separate approval per real sleep cycle** | disable/bootout/uninstall |
 | 14 | Reboot/rollback/uninstall acceptance | validation evidence | boot, rollback, zero residual | **separate reboot and uninstall approvals** | rollback then uninstall |
 | 15 | Docs, tooling disposition, final review | README/docs/tool moves | full clean validation + holistic review | approval if cleanup touches installed state | restore archived tooling from git |

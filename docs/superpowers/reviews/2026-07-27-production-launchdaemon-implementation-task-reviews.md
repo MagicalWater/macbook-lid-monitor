@@ -1,3 +1,21 @@
+## Task 12 — Logged-in dry-run system acceptance
+
+### Evidence
+
+- Pre-install production residual state was clean.
+- Release version `7d056a175fe5` was prepared and verified.
+- Dry-run started under the system LaunchDaemon with exactly one resident process.
+- Redacted diagnostics reported matching installed and manifest checksums.
+- Production error log remained empty.
+- Root-only log permissions were enforced before shutdown.
+- Emergency disable returned the package to `disabled`, process count zero, and launchd last exit code zero.
+- Independent re-review found no GUI-domain duplicate authority.
+
+### Disposition
+
+**Task 12 logged-in scope approved and complete.** Loginwindow/logout, real sleep/wake, and reboot
+remain blocked behind their separate approval gates.
+
 ## Task 12 — Logged-in dry-run acceptance command
 
 ### Implementation
