@@ -156,6 +156,7 @@ final class ProductionManagementScriptTests: XCTestCase {
         XCTAssertTrue(text.contains("diagnostics label="))
         XCTAssertFalse(text.contains("tail -"))
         XCTAssertFalse(text.contains("cat \"$MANAGED_STDOUT_LOG\""))
+        XCTAssertTrue(text.contains("pgrep -f '^/Library/PrivilegedHelperTools/macbook-lid-monitor-daemon$' || true"))
     }
 
     func testUninstallRemovesOnlyManagedArtifactsAndPreservesUnrelatedFiles() throws {

@@ -687,6 +687,28 @@ duplicating mutation logic.
 **Task 11 controlled acceptance command approved.** The user approved the installed-state mutation;
 real execution remains pending the one explicit sudo command.
 
+### Real acceptance retry finding
+
+The first real `accept-task11` execution stopped immediately after the pre-diagnostics heading.
+No rotation or uninstall mutation had occurred. Root cause was `pgrep` returning status 1 when the
+disabled daemon correctly had zero resident processes; with `set -euo pipefail`, that normal absent
+state terminated diagnostics.
+
+**Resolution:** The process-count pipeline now explicitly treats `pgrep` no-match as an empty result
+and still counts it as zero. Added a regression contract for the no-process handling.
+
+### Retry verification
+
+- Focused management tests: 25 tests, 0 failures.
+- Full suite: 169 tests, 0 failures.
+- `bash -n`: passed.
+- `shellcheck`: passed.
+- Release production daemon: passed.
+- `git diff --check`: passed.
+
+The failed attempt left the production package installed, loaded, and disabled; Task 11 uninstall
+acceptance remains pending a retry of the same approved command.
+
 ## Task 10 — Controlled acceptance command
 
 ### Implementation

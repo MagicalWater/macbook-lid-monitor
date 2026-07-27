@@ -128,7 +128,7 @@ diagnostics() {
         process_count=0
     else
         if launchctl print "system/$LAUNCHD_LABEL" >/dev/null 2>&1; then job_state=loaded; else job_state=absent; fi
-        process_count="$(pgrep -f '^/Library/PrivilegedHelperTools/macbook-lid-monitor-daemon$' | wc -l | tr -d ' ')"
+        process_count="$({ pgrep -f '^/Library/PrivilegedHelperTools/macbook-lid-monitor-daemon$' || true; } | wc -l | tr -d ' ')"
     fi
     printf 'diagnostics label=%s job=%s mode=%s version=%s checksum=%s process-count=%s\n' \
         "$LAUNCHD_LABEL" "$job_state" "$mode" "$version" "$checksum" "$process_count"
