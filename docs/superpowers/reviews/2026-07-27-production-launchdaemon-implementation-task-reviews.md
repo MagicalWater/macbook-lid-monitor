@@ -1254,3 +1254,41 @@ another enabled retry.
 
 **Task 13 diagnostic dry-run path approved for real-system execution.** It cannot request real
 sleep. The enabled retry remains blocked until this diagnostic path is accepted.
+
+## Task 13 — Real-system dry-run path closure
+
+### Evidence
+
+- The operator moved the lid from an open position to below the configured 68-degree threshold and held it for at least two seconds.
+- The production command verified `candidate=true`, `debounce=true`, `attempt-count=1`, and `would-sleep-count=1`.
+- The command accepted the scope and returned the installed daemon to disabled mode.
+- Production stderr remained empty.
+
+### Independent re-review
+
+- Installed version: `8a3f2799044d`.
+- Production mode: disabled.
+- System job: loaded and not running.
+- Last exit code: zero.
+- Resident production PID: absent.
+
+The immediate command diagnostics showed `process-count=1` during the disabled bootstrap exit window. A later independent check confirmed zero resident PID, matching the previously documented launchd transient.
+
+### Diagnostic conclusion
+
+The real hardware and production stack successfully traverse:
+
+```text
+HID angle input
+→ armed
+→ candidate
+→ debounce elapsed
+→ request attempted
+→ dry-run would-sleep
+```
+
+The failed enabled acceptance is therefore not an angle-sensor, arming, threshold, or debounce failure. Remaining diagnosis is limited to the real IOKit request return timing and system sleep/wake boundary.
+
+### Disposition
+
+**Task 13 dry-run path approved and complete.** Do not repeat the old enabled acceptance contract unchanged; the next enabled command must judge pre-call attempt evidence separately from post-call return evidence.
