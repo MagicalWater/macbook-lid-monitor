@@ -1483,3 +1483,44 @@ The failed enabled acceptance is therefore not an angle-sensor, arming, threshol
 ### Disposition
 
 **Task 13 recovery-resleep scope approved and complete.** Remaining Task 13 work is limited to the non-sleeping injected sleep-request failure acceptance.
+
+## Task 14 — Reboot, rollback, and uninstall acceptance command
+
+### Design
+
+- Added a two-phase acceptance instead of invoking reboot from the management script.
+- `accept-task14-reboot-start` upgrades to the current checkout, creates a distinct rollback slot,
+  restores loaded/disabled state, and writes a root-owned `0600` state file containing the current
+  boot epoch and expected current/rollback versions.
+- The operator performs the actual reboot manually.
+- `accept-task14-reboot-finish` refuses to proceed unless the boot epoch is greater than the value
+  recorded by the start phase.
+- After reboot proof, finish requires the job to be loaded, mode disabled, no resident daemon, and
+  the expected current version.
+- Finish then performs rollback, verifies the expected previous version and disabled mode, runs
+  uninstall, and verifies zero managed residual state.
+- The Task 14 state file is included in uninstall and residual-state checks.
+
+### Immediate review findings
+
+- The first sandbox scenario installed and upgraded the same HEAD, so the distinct-version safety
+  check correctly rejected it. The test baseline was corrected to represent a genuinely older
+  installed version before preparing the current checkout.
+- No `reboot`, `shutdown -r`, or equivalent system restart command exists in the script.
+- Failure to prove a changed boot session leaves the installed disabled package intact for
+  diagnosis and does not begin rollback or uninstall.
+
+### Verification
+
+- Production management focused tests: 42 tests, 0 failures.
+- Full suite: 188 tests, 0 failures.
+- `bash -n`: passed.
+- `shellcheck -x`: passed.
+- Release production daemon build: passed.
+- `git diff --check`: passed.
+
+### Disposition
+
+**Task 14 two-phase command approved for the separately authorized real reboot, rollback, and
+uninstall acceptance.** Run the start phase before reboot and the finish phase only after the new
+boot has completed.

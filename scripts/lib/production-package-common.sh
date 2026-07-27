@@ -25,6 +25,7 @@ export MANAGED_LOG_DIR="$SYSTEM_ROOT/Library/Logs/MacBookLidMonitor"
 export MANAGED_STDOUT_LOG="$MANAGED_LOG_DIR/production.log"
 export MANAGED_STDERR_LOG="$MANAGED_LOG_DIR/production-error.log"
 export MANAGED_ROLLBACK="$MANAGED_SUPPORT/rollback"
+export MANAGED_TASK14_STATE="$MANAGED_SUPPORT/task14-reboot-state"
 export LAUNCHD_LABEL="com.crazydennies.macbook-lid-monitor"
 
 assert_regular_source() {

@@ -6,7 +6,7 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 source "$SCRIPT_DIR/lib/production-package-common.sh"
 
 usage() {
-    printf '%s\n' 'usage: manage-production-daemon.sh prepare|verify|install|bootstrap|status|stop|bootout|disable|dry-run|upgrade|rollback|rotate-logs|diagnostics|uninstall|accept-task9|accept-task10|accept-task11|accept-task12-logged-in|accept-task12-loginwindow-start|accept-task12-loginwindow-finish|accept-task12-sleep-wake|accept-task13-dry-run-path|accept-task13-enabled-once|accept-task13-recovery-resleep|accept-task13-injected-failure' >&2
+    printf '%s\n' 'usage: manage-production-daemon.sh prepare|verify|install|bootstrap|status|stop|bootout|disable|dry-run|upgrade|rollback|rotate-logs|diagnostics|uninstall|accept-task9|accept-task10|accept-task11|accept-task12-logged-in|accept-task12-loginwindow-start|accept-task12-loginwindow-finish|accept-task12-sleep-wake|accept-task13-dry-run-path|accept-task13-enabled-once|accept-task13-recovery-resleep|accept-task13-injected-failure|accept-task14-reboot-start|accept-task14-reboot-finish' >&2
     exit 64
 }
 
@@ -658,14 +658,14 @@ diagnostics() {
 uninstall_package() {
     require_root_for_system
     for path in "$MANAGED_BINARY" "$MANAGED_PLIST" "$MANAGED_CONFIG" "$MANAGED_MANIFEST" \
-        "$MANAGED_SUPPORT/crash-budget.json" "$MANAGED_STDOUT_LOG" "$MANAGED_STDERR_LOG" "$MANAGED_ROLLBACK"; do
+        "$MANAGED_SUPPORT/crash-budget.json" "$MANAGED_TASK14_STATE" "$MANAGED_STDOUT_LOG" "$MANAGED_STDERR_LOG" "$MANAGED_ROLLBACK"; do
         assert_managed_path_safe "$path"
         [[ -L "$path" ]] && { printf 'error: refusing symlink uninstall path: %s\n' "$path" >&2; return 74; }
     done
     disable_job 2>/dev/null || true
     bootout_job
     for path in "$MANAGED_BINARY" "$MANAGED_PLIST" "$MANAGED_CONFIG" "$MANAGED_MANIFEST" \
-        "$MANAGED_SUPPORT/crash-budget.json" "$MANAGED_STDOUT_LOG" "$MANAGED_STDERR_LOG"; do
+        "$MANAGED_SUPPORT/crash-budget.json" "$MANAGED_TASK14_STATE" "$MANAGED_STDOUT_LOG" "$MANAGED_STDERR_LOG"; do
         rm -f -- "$path"
     done
     for path in "$MANAGED_STDOUT_LOG" "$MANAGED_STDERR_LOG"; do
@@ -680,7 +680,7 @@ uninstall_package() {
 verify_uninstalled_state() {
     local found=0
     for path in "$MANAGED_BINARY" "$MANAGED_PLIST" "$MANAGED_CONFIG" "$MANAGED_MANIFEST" \
-        "$MANAGED_SUPPORT/crash-budget.json" "$MANAGED_ROLLBACK" \
+        "$MANAGED_SUPPORT/crash-budget.json" "$MANAGED_TASK14_STATE" "$MANAGED_ROLLBACK" \
         "$MANAGED_STDOUT_LOG" "$MANAGED_STDERR_LOG"; do
         if [[ -e "$path" || -L "$path" ]]; then
             printf 'error: managed residual remains: %s\n' "$path" >&2
@@ -707,6 +707,77 @@ verify_uninstalled_state() {
     fi
     [[ "$found" -eq 0 ]]
     printf 'verified uninstall residual-state=clean label=%s\n' "$LAUNCHD_LABEL"
+}
+
+current_boot_epoch() {
+    if [[ -n "${MLM_TEST_BOOT_EPOCH:-}" ]]; then
+        printf '%s\n' "$MLM_TEST_BOOT_EPOCH"
+        return
+    fi
+    sysctl -n kern.boottime | sed -E 's/.*sec = ([0-9]+).*/\1/'
+}
+
+accept_task14_reboot_start() {
+    require_root_for_system
+    local mode current_version rollback_version boot_epoch
+    mode="$(/usr/libexec/PlistBuddy -c 'Print :Mode' "$MANAGED_CONFIG")"
+    [[ "$mode" == "disabled" ]] || { printf 'error: expected disabled starting mode\n' >&2; return 65; }
+    prepare_as_invoking_user
+    verify_package
+    upgrade_package
+    disable_job
+    bootout_job
+    bootstrap_job
+    current_version="$(/usr/libexec/PlistBuddy -c 'Print :Version' "$MANAGED_MANIFEST")"
+    rollback_version="$(/usr/libexec/PlistBuddy -c 'Print :Version' "$MANAGED_ROLLBACK/manifest.plist")"
+    [[ "$current_version" != "$rollback_version" ]] || { printf 'error: task14 requires distinct current and rollback versions\n' >&2; return 70; }
+    boot_epoch="$(current_boot_epoch)"
+    {
+        printf 'schema=1\n'
+        printf 'boot_epoch=%s\n' "$boot_epoch"
+        printf 'current_version=%s\n' "$current_version"
+        printf 'rollback_version=%s\n' "$rollback_version"
+    } > "$MANAGED_TASK14_STATE"
+    chmod 0600 "$MANAGED_TASK14_STATE"
+    if [[ -z "$SYSTEM_ROOT" ]]; then chown root:wheel "$MANAGED_TASK14_STATE"; fi
+    diagnostics
+    printf 'armed task=14 scope=reboot current-version=%s rollback-version=%s boot-epoch=%s action=restart-mac-then-run-accept-task14-reboot-finish\n' \
+        "$current_version" "$rollback_version" "$boot_epoch"
+}
+
+accept_task14_reboot_finish() {
+    require_root_for_system
+    assert_regular_source "$MANAGED_TASK14_STATE"
+    local schema start_boot current_boot expected_current expected_rollback actual_current mode process_count actual_rollback
+    schema="$(awk -F= '$1 == "schema" {print $2}' "$MANAGED_TASK14_STATE")"
+    start_boot="$(awk -F= '$1 == "boot_epoch" {print $2}' "$MANAGED_TASK14_STATE")"
+    expected_current="$(awk -F= '$1 == "current_version" {print $2}' "$MANAGED_TASK14_STATE")"
+    expected_rollback="$(awk -F= '$1 == "rollback_version" {print $2}' "$MANAGED_TASK14_STATE")"
+    [[ "$schema" == 1 && -n "$start_boot" && -n "$expected_current" && -n "$expected_rollback" ]] || {
+        printf 'error: invalid task14 reboot state\n' >&2
+        return 65
+    }
+    current_boot="$(current_boot_epoch)"
+    [[ "$current_boot" -gt "$start_boot" ]] || { printf 'error: reboot not detected\n' >&2; return 70; }
+    actual_current="$(/usr/libexec/PlistBuddy -c 'Print :Version' "$MANAGED_MANIFEST")"
+    mode="$(/usr/libexec/PlistBuddy -c 'Print :Mode' "$MANAGED_CONFIG")"
+    [[ "$actual_current" == "$expected_current" ]] || { printf 'error: post-reboot version mismatch\n' >&2; return 70; }
+    [[ "$mode" == disabled ]] || { printf 'error: post-reboot mode is not disabled\n' >&2; return 70; }
+    if [[ -z "$SYSTEM_ROOT" ]]; then
+        launchctl print "system/$LAUNCHD_LABEL" >/dev/null || { printf 'error: system job missing after reboot\n' >&2; return 70; }
+        process_count="$({ pgrep -f '^/Library/PrivilegedHelperTools/macbook-lid-monitor-daemon$' || true; } | wc -l | tr -d ' ')"
+        [[ "$process_count" == 0 ]] || { printf 'error: disabled daemon unexpectedly running after reboot\n' >&2; return 70; }
+    fi
+    printf 'verified task=14 scope=reboot boot-changed=true job-loaded=true mode=disabled process-count=0 version=%s\n' "$actual_current"
+    rollback_upgrade
+    actual_rollback="$(/usr/libexec/PlistBuddy -c 'Print :Version' "$MANAGED_MANIFEST")"
+    [[ "$actual_rollback" == "$expected_rollback" ]] || { printf 'error: rollback version mismatch\n' >&2; return 70; }
+    mode="$(/usr/libexec/PlistBuddy -c 'Print :Mode' "$MANAGED_CONFIG")"
+    [[ "$mode" == disabled ]] || { printf 'error: rollback did not restore disabled mode\n' >&2; return 70; }
+    printf 'verified task=14 scope=rollback version=%s mode=disabled\n' "$actual_rollback"
+    uninstall_package
+    verify_uninstalled_state
+    printf 'accepted task=14 reboot=true rollback=true uninstall=true residual-state=clean label=%s\n' "$LAUNCHD_LABEL"
 }
 
 accept_task11() {
@@ -987,5 +1058,7 @@ case "$1" in
     accept-task13-enabled-once) accept_task13_enabled_once ;;
     accept-task13-recovery-resleep) accept_task13_recovery_resleep ;;
     accept-task13-injected-failure) accept_task13_injected_failure ;;
+    accept-task14-reboot-start) accept_task14_reboot_start ;;
+    accept-task14-reboot-finish) accept_task14_reboot_finish ;;
     *) usage ;;
 esac

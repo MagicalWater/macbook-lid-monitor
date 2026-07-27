@@ -447,6 +447,44 @@ final class ProductionManagementScriptTests: XCTestCase {
         XCTAssertFalse(text.contains("sudo -S"))
     }
 
+    func testTask14RebootRollbackAndUninstallAcceptanceInSandbox() throws {
+        let sandbox = root.appendingPathComponent(".build/production-package-task14-root")
+        try? FileManager.default.removeItem(at: sandbox)
+        defer { try? FileManager.default.removeItem(at: sandbox) }
+
+        try seedStaging()
+        try runScript("install", environment: ["MLM_TEST_ROOT": sandbox.path])
+        try runScript("bootstrap", environment: ["MLM_TEST_ROOT": sandbox.path])
+
+        let manifest = sandbox.appendingPathComponent("Library/Application Support/MacBookLidMonitor/manifest.plist")
+        _ = try commandOutput(
+            "/usr/libexec/PlistBuddy",
+            ["-c", "Set :Version task14-previous-version", manifest.path]
+        )
+        try runScript("accept-task14-reboot-start", environment: [
+            "MLM_TEST_ROOT": sandbox.path,
+            "MLM_TEST_BOOT_EPOCH": "100",
+        ])
+        XCTAssertTrue(FileManager.default.fileExists(atPath: manifest.path))
+
+        try runScript("accept-task14-reboot-finish", environment: [
+            "MLM_TEST_ROOT": sandbox.path,
+            "MLM_TEST_BOOT_EPOCH": "200",
+        ])
+        XCTAssertFalse(FileManager.default.fileExists(atPath: manifest.path))
+    }
+
+    func testTask14CommandsRequireRebootProofAndPerformRollbackThenUninstall() throws {
+        let text = try String(contentsOf: root.appendingPathComponent("scripts/manage-production-daemon.sh"), encoding: .utf8)
+        XCTAssertTrue(text.contains("accept-task14-reboot-start)"))
+        XCTAssertTrue(text.contains("accept-task14-reboot-finish)"))
+        XCTAssertTrue(text.contains("reboot not detected"))
+        XCTAssertTrue(text.contains("verified task=14 scope=rollback"))
+        XCTAssertTrue(text.contains("verify_uninstalled_state"))
+        XCTAssertFalse(text.contains("shutdown -r"))
+        XCTAssertFalse(text.contains("reboot" + " now"))
+    }
+
     func testTask13DryRunPathAcceptanceReturnsDisabledInSandbox() throws {
         let sandbox = root.appendingPathComponent(".build/production-package-task13-dry-run-path-root")
         try? FileManager.default.removeItem(at: sandbox)
