@@ -1038,6 +1038,48 @@ is printed to the terminal.
 **Controlled sleep/wake acceptance command approved.** Real execution remains pending the one
 explicit sudo command already authorized by the user.
 
+## Task 12 — Sleep/wake first real attempt incident
+
+### Finding
+
+The first real sleep/wake attempt entered and resumed from sleep successfully, but the command
+reported `wake-recovery production evidence missing`.
+
+### Root cause
+
+The management script and tests were from commit `66dbe99fd881`, while the installed production
+daemon and manifest were still version `7d056a175fe5`. The wake-recovery production event was added
+after that installed version, so the old binary could not emit the evidence expected by the new
+acceptance command. This was an acceptance orchestration defect, not evidence that the wake observer
+failed.
+
+### Safety review
+
+- EXIT cleanup restored `Mode=disabled`.
+- The system job was loaded but not running.
+- Last exit code was zero.
+- No production daemon PID remained.
+
+### Resolution
+
+`accept-task12-sleep-wake` now prepares the current checkout as the invoking non-root user, verifies
+the staged package, and performs the existing controlled upgrade before entering dry-run. The real
+sleep/wake cycle therefore always exercises the binary that defines the expected evidence contract.
+
+### Fresh verification
+
+- Focused management tests: 32 tests, 0 failures.
+- Full suite: 177 tests, 0 failures.
+- `bash -n`: passed.
+- `shellcheck -x`: passed.
+- Release production daemon: passed.
+- `git diff --check`: passed.
+
+### Disposition
+
+**First attempt rejected as a version-skew false negative.** A fresh real sleep/wake acceptance is
+required with the corrected self-upgrading command.
+
 ## Task 12 — Loginwindow real system acceptance closure
 
 ### Evidence

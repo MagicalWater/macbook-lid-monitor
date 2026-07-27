@@ -356,6 +356,8 @@ final class ProductionManagementScriptTests: XCTestCase {
     func testTask12SleepWakeCommandIsExplicitAndFailSafe() throws {
         let text = try String(contentsOf: root.appendingPathComponent("scripts/manage-production-daemon.sh"), encoding: .utf8)
         XCTAssertTrue(text.contains("accept-task12-sleep-wake)"))
+        XCTAssertTrue(text.contains("prepare_as_invoking_user"))
+        XCTAssertTrue(text.contains("upgrade_package"))
         XCTAssertTrue(text.contains("/usr/bin/pmset sleepnow"))
         XCTAssertTrue(text.contains("wake-recovery production evidence missing"))
         XCTAssertTrue(text.contains("trap cleanup_task12_sleep_wake_to_disabled EXIT"))

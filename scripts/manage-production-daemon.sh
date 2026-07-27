@@ -295,6 +295,9 @@ accept_task12_sleep_wake() {
         fi
     }
     trap cleanup_task12_sleep_wake_to_disabled EXIT
+    prepare_as_invoking_user
+    verify_package
+    upgrade_package
     set_dry_run_mode
     verify_logged_in_dry_run
     if [[ -n "$SYSTEM_ROOT" ]]; then
