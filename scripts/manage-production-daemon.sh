@@ -6,7 +6,7 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 source "$SCRIPT_DIR/lib/production-package-common.sh"
 
 usage() {
-    printf '%s\n' 'usage: manage-production-daemon.sh prepare|verify|install|bootstrap|status|stop|bootout|disable|upgrade|rollback|accept-task9|accept-task10' >&2
+    printf '%s\n' 'usage: manage-production-daemon.sh prepare|verify|install|bootstrap|status|stop|bootout|disable|upgrade|rollback|rotate-logs|diagnostics|uninstall|accept-task9|accept-task10' >&2
     exit 64
 }
 
@@ -83,6 +83,84 @@ disable_job() {
     if [[ -z "$SYSTEM_ROOT" ]]; then chown root:wheel "$MANAGED_CONFIG"; fi
     stop_job
     printf 'disabled label=%s\n' "$LAUNCHD_LABEL"
+}
+
+rotate_one_log() {
+    local path=$1 max_bytes=1048576 generations=3 size=0 index
+    [[ -e "$path" ]] || return 0
+    assert_regular_source "$path"
+    size="$(stat -f '%z' "$path")"
+    [[ "$size" -gt "$max_bytes" ]] || return 0
+    rm -f -- "$path.$generations"
+    for ((index=generations-1; index>=1; index--)); do
+        [[ -f "$path.$index" && ! -L "$path.$index" ]] && mv -f -- "$path.$index" "$path.$((index+1))"
+    done
+    mv -f -- "$path" "$path.1"
+    : > "$path"
+    chmod 0600 "$path"
+    if [[ -z "$SYSTEM_ROOT" ]]; then chown root:wheel "$path"; fi
+}
+
+rotate_logs() {
+    require_root_for_system
+    assert_managed_path_safe "$MANAGED_LOG_DIR"
+    mkdir -p -- "$MANAGED_LOG_DIR"
+    chmod 0700 "$MANAGED_LOG_DIR"
+    if [[ -z "$SYSTEM_ROOT" ]]; then chown root:wheel "$MANAGED_LOG_DIR"; fi
+    for path in "$MANAGED_STDOUT_LOG" "$MANAGED_STDERR_LOG"; do
+        if [[ -f "$path" && ! -L "$path" ]]; then
+            chmod 0600 "$path"
+            if [[ -z "$SYSTEM_ROOT" ]]; then chown root:wheel "$path"; fi
+        fi
+    done
+    rotate_one_log "$MANAGED_STDOUT_LOG"
+    rotate_one_log "$MANAGED_STDERR_LOG"
+    printf 'rotated logs max-bytes=1048576 generations=3\n'
+}
+
+diagnostics() {
+    local mode version checksum job_state process_count
+    mode="$(/usr/libexec/PlistBuddy -c 'Print :Mode' "$MANAGED_CONFIG" 2>/dev/null || printf unavailable)"
+    version="$(/usr/libexec/PlistBuddy -c 'Print :Version' "$MANAGED_MANIFEST" 2>/dev/null || printf unavailable)"
+    checksum="$(sha256_file "$MANAGED_BINARY" 2>/dev/null || printf unavailable)"
+    if [[ -n "$SYSTEM_ROOT" ]]; then
+        job_state=test-double
+        process_count=0
+    else
+        if launchctl print "system/$LAUNCHD_LABEL" >/dev/null 2>&1; then job_state=loaded; else job_state=absent; fi
+        process_count="$(pgrep -f '^/Library/PrivilegedHelperTools/macbook-lid-monitor-daemon$' | wc -l | tr -d ' ')"
+    fi
+    printf 'diagnostics label=%s job=%s mode=%s version=%s checksum=%s process-count=%s\n' \
+        "$LAUNCHD_LABEL" "$job_state" "$mode" "$version" "$checksum" "$process_count"
+    for path in "$MANAGED_STDOUT_LOG" "$MANAGED_STDERR_LOG"; do
+        if [[ -f "$path" && ! -L "$path" ]]; then
+            printf 'log path=%s bytes=%s mode=%s\n' "$path" "$(stat -f '%z' "$path")" "$(stat -f '%Lp' "$path")"
+        else
+            printf 'log path=%s absent\n' "$path"
+        fi
+    done
+}
+
+uninstall_package() {
+    require_root_for_system
+    for path in "$MANAGED_BINARY" "$MANAGED_PLIST" "$MANAGED_CONFIG" "$MANAGED_MANIFEST" \
+        "$MANAGED_SUPPORT/crash-budget.json" "$MANAGED_STDOUT_LOG" "$MANAGED_STDERR_LOG" "$MANAGED_ROLLBACK"; do
+        assert_managed_path_safe "$path"
+        [[ -L "$path" ]] && { printf 'error: refusing symlink uninstall path: %s\n' "$path" >&2; return 74; }
+    done
+    disable_job 2>/dev/null || true
+    bootout_job
+    for path in "$MANAGED_BINARY" "$MANAGED_PLIST" "$MANAGED_CONFIG" "$MANAGED_MANIFEST" \
+        "$MANAGED_SUPPORT/crash-budget.json" "$MANAGED_STDOUT_LOG" "$MANAGED_STDERR_LOG"; do
+        rm -f -- "$path"
+    done
+    for path in "$MANAGED_STDOUT_LOG" "$MANAGED_STDERR_LOG"; do
+        rm -f -- "$path.1" "$path.2" "$path.3"
+    done
+    rm -rf -- "$MANAGED_ROLLBACK"
+    rmdir "$MANAGED_SUPPORT" 2>/dev/null || true
+    rmdir "$MANAGED_LOG_DIR" 2>/dev/null || true
+    printf 'uninstalled label=%s\n' "$LAUNCHD_LABEL"
 }
 
 backup_current_set() {
@@ -336,6 +414,9 @@ case "$1" in
     disable) disable_job ;;
     upgrade) upgrade_package ;;
     rollback) rollback_upgrade ;;
+    rotate-logs) rotate_logs ;;
+    diagnostics) diagnostics ;;
+    uninstall) uninstall_package ;;
     accept-task9) accept_task9 ;;
     accept-task10) accept_task10 ;;
     *) usage ;;

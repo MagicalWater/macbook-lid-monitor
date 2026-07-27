@@ -124,6 +124,95 @@ final class ProductionManagementScriptTests: XCTestCase {
         XCTAssertFalse(text.contains("read -s"))
     }
 
+    func testRotateLogsBoundsSizeAndKeepsThreeGenerations() throws {
+        let sandbox = root.appendingPathComponent(".build/production-package-log-root")
+        try? FileManager.default.removeItem(at: sandbox)
+        defer { try? FileManager.default.removeItem(at: sandbox) }
+        let logDir = sandbox.appendingPathComponent("Library/Logs/MacBookLidMonitor")
+        try FileManager.default.createDirectory(at: logDir, withIntermediateDirectories: true)
+        let log = logDir.appendingPathComponent("production.log")
+        try Data(repeating: 65, count: 1_048_577).write(to: log)
+        for index in 1...3 {
+            try Data("old-\(index)".utf8).write(to: URL(fileURLWithPath: log.path + ".\(index)"))
+        }
+
+        try runScript("rotate-logs", environment: ["MLM_TEST_ROOT": sandbox.path])
+
+        XCTAssertEqual(try Data(contentsOf: log).count, 0)
+        XCTAssertEqual(try Data(contentsOf: URL(fileURLWithPath: log.path + ".1")).count, 1_048_577)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: log.path + ".3"))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: log.path + ".4"))
+        let attributes = try FileManager.default.attributesOfItem(atPath: log.path)
+        XCTAssertEqual((attributes[.posixPermissions] as? NSNumber)?.intValue, 0o600)
+        let directoryAttributes = try FileManager.default.attributesOfItem(atPath: logDir.path)
+        XCTAssertEqual((directoryAttributes[.posixPermissions] as? NSNumber)?.intValue, 0o700)
+    }
+
+    func testDiagnosticsIsRedactedAndDoesNotPrintLogContents() throws {
+        let text = try String(
+            contentsOf: root.appendingPathComponent("scripts/manage-production-daemon.sh"),
+            encoding: .utf8
+        )
+        XCTAssertTrue(text.contains("diagnostics label="))
+        XCTAssertFalse(text.contains("tail -"))
+        XCTAssertFalse(text.contains("cat \"$MANAGED_STDOUT_LOG\""))
+    }
+
+    func testUninstallRemovesOnlyManagedArtifactsAndPreservesUnrelatedFiles() throws {
+        let sandbox = root.appendingPathComponent(".build/production-package-uninstall-root")
+        try? FileManager.default.removeItem(at: sandbox)
+        defer { try? FileManager.default.removeItem(at: sandbox) }
+        try seedStaging()
+        try runScript("install", environment: ["MLM_TEST_ROOT": sandbox.path])
+        let unrelated = sandbox.appendingPathComponent("Library/Application Support/Unrelated/keep.txt")
+        try FileManager.default.createDirectory(at: unrelated.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data("keep".utf8).write(to: unrelated)
+        let logDir = sandbox.appendingPathComponent("Library/Logs/MacBookLidMonitor")
+        try FileManager.default.createDirectory(at: logDir, withIntermediateDirectories: true)
+        for name in ["production.log", "production.log.1", "production-error.log.3"] {
+            try Data("managed".utf8).write(to: logDir.appendingPathComponent(name))
+        }
+
+        try runScript("uninstall", environment: ["MLM_TEST_ROOT": sandbox.path])
+
+        XCTAssertEqual(try String(contentsOf: unrelated, encoding: .utf8), "keep")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: sandbox.appendingPathComponent("Library/PrivilegedHelperTools/macbook-lid-monitor-daemon").path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: sandbox.appendingPathComponent("Library/LaunchDaemons/com.crazydennies.macbook-lid-monitor.plist").path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: sandbox.appendingPathComponent("Library/Application Support/MacBookLidMonitor").path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: logDir.appendingPathComponent("production.log.1").path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: logDir.appendingPathComponent("production-error.log.3").path))
+    }
+
+    func testUninstallRejectsManagedSymlink() throws {
+        let sandbox = root.appendingPathComponent(".build/production-package-uninstall-symlink-root")
+        try? FileManager.default.removeItem(at: sandbox)
+        defer { try? FileManager.default.removeItem(at: sandbox) }
+        try seedStaging()
+        try runScript("install", environment: ["MLM_TEST_ROOT": sandbox.path])
+        let config = sandbox.appendingPathComponent("Library/Application Support/MacBookLidMonitor/config.plist")
+        try FileManager.default.removeItem(at: config)
+        try FileManager.default.createSymbolicLink(at: config, withDestinationURL: URL(fileURLWithPath: "/dev/null"))
+
+        XCTAssertThrowsError(try runScript("uninstall", environment: ["MLM_TEST_ROOT": sandbox.path]))
+    }
+
+    func testUninstallRejectsRollbackDirectorySymlinkBeforeMutation() throws {
+        let sandbox = root.appendingPathComponent(".build/production-package-uninstall-rollback-symlink-root")
+        try? FileManager.default.removeItem(at: sandbox)
+        defer { try? FileManager.default.removeItem(at: sandbox) }
+        try seedStaging()
+        try runScript("install", environment: ["MLM_TEST_ROOT": sandbox.path])
+        let support = sandbox.appendingPathComponent("Library/Application Support/MacBookLidMonitor")
+        let rollback = support.appendingPathComponent("rollback")
+        let target = sandbox.appendingPathComponent("outside-rollback")
+        try FileManager.default.createDirectory(at: target, withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(at: rollback, withDestinationURL: target)
+        let binary = sandbox.appendingPathComponent("Library/PrivilegedHelperTools/macbook-lid-monitor-daemon")
+
+        XCTAssertThrowsError(try runScript("uninstall", environment: ["MLM_TEST_ROOT": sandbox.path]))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: binary.path))
+    }
+
     func testInstallRejectsManagedPathSymlink() throws {
         let sandbox = root.appendingPathComponent(".build/production-package-symlink-root")
         try? FileManager.default.removeItem(at: sandbox)

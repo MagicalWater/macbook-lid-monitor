@@ -569,6 +569,77 @@ blocked pending the explicit installed-version approval gate.
 
 **Task 10 approved and complete.**
 
+## Task 11 — Logs, diagnostics, and uninstall implementation
+
+### Implementation
+
+- Added fixed 1 MiB log rotation with three retained generations.
+- Added root-only log directory/file modes (`0700`/`0600`).
+- Added redacted diagnostics that report state, version, checksum, process count, and log metadata
+  without printing raw log contents or sensor reports.
+- Added scoped uninstall for the production binary, plist, config, manifest, crash state, rollback
+  slot, and managed log generations.
+- Uninstall preserves unrelated files and refuses symlinked managed paths before any mutation.
+
+### TDD evidence
+
+- RED: lifecycle tests failed before rotation, diagnostics, and uninstall commands existed.
+- GREEN: bounded rotation, redacted diagnostics, scoped uninstall, unrelated-file preservation, and
+  symlink refusal tests pass in the repository sandbox.
+
+### Immediate review findings
+
+#### P0 — Uninstall checked symlinks after attempting disable
+
+That ordering could allow a symlinked config path to be touched before refusal.
+
+**Resolution:** All managed paths, including rollback, are now checked before disable/bootout or
+file deletion.
+
+#### P0 — Rollback directory was not covered by symlink refusal
+
+Recursive removal of a substituted rollback path was outside the intended trust boundary.
+
+**Resolution:** Added rollback-directory symlink preflight and a regression test proving no managed
+binary mutation occurs after refusal.
+
+#### P1 — Rotated log generations were not removed
+
+Uninstall originally removed only active log files, leaving `.1`–`.3` residual artifacts.
+
+**Resolution:** Scoped removal now covers all retained generations for both production logs.
+
+#### P1 — Existing logs were not forced root-only
+
+Rotation applied secure mode only to newly created active files.
+
+**Resolution:** Rotation now enforces `0700` on the log directory and `0600` on existing active
+logs before size handling.
+
+### Re-review
+
+- Rotation is bounded to 1 MiB and three generations: pass.
+- Log directory/file modes are root-only: pass.
+- Diagnostics do not print log contents or raw sensor values: pass.
+- Uninstall refuses symlinks before mutation: pass.
+- Rollback slot and all log generations are scoped for removal: pass.
+- Unrelated files remain untouched: pass.
+- No real installed-state mutation occurred during implementation verification: pass.
+
+### Verification
+
+- Focused management tests: 23 tests, 0 failures.
+- Full suite: 167 tests, 0 failures.
+- `bash -n`: passed.
+- `shellcheck`: passed.
+- Release production daemon: passed.
+- `git diff --check`: passed.
+
+### Disposition
+
+**Task 11 implementation approved.** Real diagnostics/rotation are non-destructive, but controlled
+uninstall and zero-residual validation remain blocked pending explicit installed-state approval.
+
 ## Task 10 — Controlled acceptance command
 
 ### Implementation
