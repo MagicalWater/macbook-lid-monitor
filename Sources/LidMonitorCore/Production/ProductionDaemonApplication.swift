@@ -127,7 +127,7 @@ final class ProductionDaemonApplication {
                 switch event {
                 case let .sleepRequestFailed(code): sink.emit(.degraded(code: code))
                 case .wouldSleep: sink.emit(.healthChanged(.dryRun))
-                case .sleepRequested: break
+                case .sleepRequested: sink.emit(.sleepRequested)
                 }
             },
             onTransitionEvent: { event in

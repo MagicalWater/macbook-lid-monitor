@@ -365,6 +365,32 @@ final class ProductionManagementScriptTests: XCTestCase {
         XCTAssertFalse(text.contains("read -s"))
     }
 
+    func testTask13EnabledOnceAcceptanceReturnsDisabledInSandbox() throws {
+        let sandbox = root.appendingPathComponent(".build/production-package-task13-enabled-once-root")
+        try? FileManager.default.removeItem(at: sandbox)
+        defer { try? FileManager.default.removeItem(at: sandbox) }
+
+        try seedStaging()
+        try runScript("install", environment: ["MLM_TEST_ROOT": sandbox.path])
+        try runScript("bootstrap", environment: ["MLM_TEST_ROOT": sandbox.path])
+        try runScript("accept-task13-enabled-once", environment: ["MLM_TEST_ROOT": sandbox.path])
+
+        let configURL = sandbox.appendingPathComponent("Library/Application Support/MacBookLidMonitor/config.plist")
+        let config = try ProductionConfigurationDecoder().decode(Data(contentsOf: configURL))
+        XCTAssertEqual(config.mode, .disabled)
+    }
+
+    func testTask13EnabledOnceCommandIsExplicitExactlyOnceAndFailSafe() throws {
+        let text = try String(contentsOf: root.appendingPathComponent("scripts/manage-production-daemon.sh"), encoding: .utf8)
+        XCTAssertTrue(text.contains("accept-task13-enabled-once)"))
+        XCTAssertTrue(text.contains("Set :Mode enabled"))
+        XCTAssertTrue(text.contains("expected exactly one sleep request"))
+        XCTAssertTrue(text.contains("trap cleanup_task13_enabled_once_to_disabled EXIT"))
+        XCTAssertTrue(text.contains("action=close-lid-within-180-seconds"))
+        XCTAssertFalse(text.contains("sudo -S"))
+        XCTAssertFalse(text.contains("read -s"))
+    }
+
     func testInstallRejectsManagedPathSymlink() throws {
         let sandbox = root.appendingPathComponent(".build/production-package-symlink-root")
         try? FileManager.default.removeItem(at: sandbox)

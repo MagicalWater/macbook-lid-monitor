@@ -6,7 +6,7 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 source "$SCRIPT_DIR/lib/production-package-common.sh"
 
 usage() {
-    printf '%s\n' 'usage: manage-production-daemon.sh prepare|verify|install|bootstrap|status|stop|bootout|disable|dry-run|upgrade|rollback|rotate-logs|diagnostics|uninstall|accept-task9|accept-task10|accept-task11|accept-task12-logged-in|accept-task12-loginwindow-start|accept-task12-loginwindow-finish|accept-task12-sleep-wake' >&2
+    printf '%s\n' 'usage: manage-production-daemon.sh prepare|verify|install|bootstrap|status|stop|bootout|disable|dry-run|upgrade|rollback|rotate-logs|diagnostics|uninstall|accept-task9|accept-task10|accept-task11|accept-task12-logged-in|accept-task12-loginwindow-start|accept-task12-loginwindow-finish|accept-task12-sleep-wake|accept-task13-enabled-once' >&2
     exit 64
 }
 
@@ -83,6 +83,18 @@ disable_job() {
     if [[ -z "$SYSTEM_ROOT" ]]; then chown root:wheel "$MANAGED_CONFIG"; fi
     stop_job
     printf 'disabled label=%s\n' "$LAUNCHD_LABEL"
+}
+
+
+set_enabled_mode() {
+    require_root_for_system
+    assert_regular_source "$MANAGED_CONFIG"
+    /usr/libexec/PlistBuddy -c 'Set :Mode enabled' "$MANAGED_CONFIG"
+    chmod 0644 "$MANAGED_CONFIG"
+    if [[ -z "$SYSTEM_ROOT" ]]; then chown root:wheel "$MANAGED_CONFIG"; fi
+    bootout_job
+    bootstrap_job
+    printf 'mode=enabled label=%s\n' "$LAUNCHD_LABEL"
 }
 
 set_dry_run_mode() {
@@ -333,6 +345,63 @@ accept_task12_sleep_wake() {
     diagnostics
     trap - EXIT
     printf 'accepted task=12 scope=sleep-wake final-mode=disabled label=%s\n' "$LAUNCHD_LABEL"
+}
+
+accept_task13_enabled_once() {
+    require_root_for_system
+    local mode before_pid process_count log_offset sleep_count=0 wake_found=0
+    mode="$(/usr/libexec/PlistBuddy -c 'Print :Mode' "$MANAGED_CONFIG")"
+    [[ "$mode" == "disabled" ]] || { printf 'error: expected disabled starting mode\n' >&2; return 65; }
+    cleanup_task13_enabled_once_to_disabled() {
+        if [[ -f "$MANAGED_CONFIG" && ! -L "$MANAGED_CONFIG" ]]; then
+            disable_job >/dev/null 2>&1 || true
+            bootout_job >/dev/null 2>&1 || true
+            bootstrap_job >/dev/null 2>&1 || true
+        fi
+    }
+    trap cleanup_task13_enabled_once_to_disabled EXIT
+    prepare_as_invoking_user
+    verify_package
+    upgrade_package
+    set_enabled_mode
+    if [[ -n "$SYSTEM_ROOT" ]]; then
+        printf 'timestamp=test event=sleep-requested pid=1\n' >> "$MANAGED_STDOUT_LOG"
+        printf 'timestamp=test event=state-changed pid=1 state=monitoring-disarmed\n' >> "$MANAGED_STDOUT_LOG"
+        before_pid=1
+        log_offset=0
+        sleep_count=1
+        wake_found=1
+    else
+        sleep 2
+        launchctl print "system/$LAUNCHD_LABEL" >/dev/null
+        process_count="$({ pgrep -f '^/Library/PrivilegedHelperTools/macbook-lid-monitor-daemon$' || true; } | wc -l | tr -d ' ')"
+        [[ "$process_count" == 1 ]] || { printf 'error: expected one enabled daemon before close, got %s\n' "$process_count" >&2; return 70; }
+        before_pid="$(pgrep -f '^/Library/PrivilegedHelperTools/macbook-lid-monitor-daemon$')"
+        log_offset="$(stat -f '%z' "$MANAGED_STDOUT_LOG")"
+        printf 'armed task=13 scope=enabled-once pid=%s action=close-lid-within-180-seconds\n' "$before_pid"
+        for _ in {1..180}; do
+            sleep_count="$(dd if="$MANAGED_STDOUT_LOG" bs=1 skip="$log_offset" 2>/dev/null | grep -c 'event=sleep-requested' || true)"
+            if [[ "$sleep_count" -ge 1 ]] && dd if="$MANAGED_STDOUT_LOG" bs=1 skip="$log_offset" 2>/dev/null | grep -q 'event=state-changed.*state=monitoring-disarmed'; then
+                wake_found=1
+                break
+            fi
+            sleep 1
+        done
+    fi
+    [[ "$sleep_count" == 1 ]] || { printf 'error: expected exactly one sleep request, got %s\n' "$sleep_count" >&2; return 70; }
+    [[ "$wake_found" -eq 1 ]] || { printf 'error: wake-recovery production evidence missing\n' >&2; return 70; }
+    if [[ -z "$SYSTEM_ROOT" ]]; then
+        process_count="$({ pgrep -f '^/Library/PrivilegedHelperTools/macbook-lid-monitor-daemon$' || true; } | wc -l | tr -d ' ')"
+        [[ "$process_count" == 1 ]] || { printf 'error: expected one daemon after wake, got %s\n' "$process_count" >&2; return 70; }
+        [[ "$(pgrep -f '^/Library/PrivilegedHelperTools/macbook-lid-monitor-daemon$')" == "$before_pid" ]] || { printf 'error: daemon PID changed across enabled sleep/wake\n' >&2; return 70; }
+    fi
+    printf 'verified task=13 scope=enabled-once sleep-request-count=1 wake-evidence=true pid-stable=true\n'
+    disable_job
+    bootout_job
+    bootstrap_job
+    diagnostics
+    trap - EXIT
+    printf 'accepted task=13 scope=enabled-once final-mode=disabled label=%s\n' "$LAUNCHD_LABEL"
 }
 
 rotate_one_log() {
@@ -719,5 +788,6 @@ case "$1" in
     accept-task12-loginwindow-start) accept_task12_loginwindow_start ;;
     accept-task12-loginwindow-finish) accept_task12_loginwindow_finish ;;
     accept-task12-sleep-wake) accept_task12_sleep_wake ;;
+    accept-task13-enabled-once) accept_task13_enabled_once ;;
     *) usage ;;
 esac

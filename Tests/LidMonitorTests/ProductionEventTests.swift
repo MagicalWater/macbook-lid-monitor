@@ -17,6 +17,10 @@ final class ProductionEventTests: XCTestCase {
             "timestamp=2026-07-27T00:00:00Z event=degraded pid=42 code=unsupported-report"
         )
         XCTAssertFalse(formatter.line(for: .degraded(code: "unsupported-report"), at: Date()).contains("raw="))
+        XCTAssertEqual(
+            formatter.line(for: .sleepRequested, at: Date()),
+            "timestamp=2026-07-27T00:00:00Z event=sleep-requested pid=42"
+        )
     }
 
     func testSensorValueAppearsOnlyOnAllowedTransitionEvent() {

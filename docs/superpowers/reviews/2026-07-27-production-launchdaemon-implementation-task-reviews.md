@@ -1170,3 +1170,42 @@ observer could disappear with the GUI session and leave no evidence.
 
 **Disposition:** corrected loginwindow acceptance implementation approved for a fresh controlled
 retry.
+
+
+## Task 13 — First enabled sensor-driven sleep acceptance command
+
+### Implementation
+
+- Added a privacy-safe `event=sleep-requested` production event emitted only after the real IOKit
+  sleep request is accepted.
+- Added `accept-task13-enabled-once` as the single approved root command for one normal lid-close
+  sleep cycle.
+- The command prepares and upgrades to the current checkout, switches to enabled mode, proves one
+  system-domain PID, and arms for a lid close within 180 seconds.
+- After wake, it requires exactly one sleep-request event, wake-recovery evidence, and the same PID.
+- Success and every failure path restore installed/loaded/disabled state.
+- Recovery resleep is not included and remains separately gated.
+
+### Re-review
+
+- No automatic sleep is triggered by the management command: pass.
+- Real sleep authority exists only in the enabled production daemon: pass.
+- Exactly-once evidence is explicit and countable: pass.
+- Same-PID and single-authority checks span the cycle: pass.
+- EXIT cleanup restores disabled after timeout or validation failure: pass.
+- Sandbox execution does not mutate the real system: pass.
+
+### Fresh verification
+
+- Production event focused tests: 3 tests, 0 failures.
+- Production management focused tests: 34 tests, 0 failures.
+- Full suite: 179 tests, 0 failures.
+- `bash -n`: passed.
+- `shellcheck -x`: passed.
+- Release production daemon: passed.
+- `git diff --check`: passed.
+
+### Disposition
+
+**First enabled sensor-driven sleep command approved for the separately authorized real cycle.**
+Recovery resleep and injected failure acceptance remain pending.
