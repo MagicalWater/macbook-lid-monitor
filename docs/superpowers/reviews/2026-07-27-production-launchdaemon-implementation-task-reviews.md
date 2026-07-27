@@ -1002,3 +1002,42 @@ running until the operator executed explicit disable/bootout/bootstrap recovery.
 After explicit operator recovery, configuration is disabled, the system job is loaded but not
 running, last exit code is zero, and no production daemon PID remains. Loginwindow acceptance must
 be retried from the start command; the prior evidence is not accepted.
+
+## Task 12 — System-domain loginwindow observer redesign
+
+### Root cause
+
+The prior observer was started with `nohup` from the GUI Terminal session that was immediately
+booted out. Root ownership and `nohup` do not move a process into the system launchd domain, so the
+observer could disappear with the GUI session and leave no evidence.
+
+### Resolution
+
+- Replaced the Terminal-child observer with a temporary, fixed-label system LaunchDaemon.
+- The observer script is installed root:wheel `0700` under `/Library/PrivilegedHelperTools`.
+- Its plist is installed root:wheel `0644` under `/Library/LaunchDaemons` and linted before system
+  bootstrap.
+- Evidence is written only after non-user console ownership, the production system job being
+  loaded, and exactly one production PID are stable for two consecutive samples.
+- `finish` and every failure path boot out and remove the temporary observer artifacts, then return
+  the production daemon to disabled/not-running state.
+
+### Re-review
+
+- Observer authority is system launchd, independent from the GUI session: pass.
+- No `nohup` or GUI-session child process is used: pass.
+- Temporary paths and label are fixed and root-owned: pass.
+- Invalid or missing evidence still triggers disabled cleanup: pass.
+- Sandbox acceptance does not mutate real `/Library`: pass.
+
+### Fresh verification
+
+- Focused management tests: 30 tests, 0 failures.
+- Full suite: 174 tests, 0 failures.
+- `bash -n`: passed.
+- `shellcheck`: passed.
+- Release production daemon: passed.
+- `git diff --check`: passed.
+
+**Disposition:** corrected loginwindow acceptance implementation approved for a fresh controlled
+retry.

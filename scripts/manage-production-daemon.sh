@@ -156,15 +156,36 @@ loginwindow_evidence_path() {
     printf '%s\n' "$MANAGED_SUPPORT/task12-loginwindow-evidence.txt"
 }
 
+loginwindow_observer_script_path() {
+    printf '%s\n' "$SYSTEM_ROOT/Library/PrivilegedHelperTools/macbook-lid-monitor-task12-loginwindow-observer"
+}
+
+loginwindow_observer_plist_path() {
+    printf '%s\n' "$SYSTEM_ROOT/Library/LaunchDaemons/com.crazydennies.macbook-lid-monitor.task12-loginwindow-observer.plist"
+}
+
+cleanup_loginwindow_observer() {
+    local observer_script observer_plist
+    observer_script="$(loginwindow_observer_script_path)"
+    observer_plist="$(loginwindow_observer_plist_path)"
+    if [[ -z "$SYSTEM_ROOT" ]]; then
+        /bin/launchctl bootout system/com.crazydennies.macbook-lid-monitor.task12-loginwindow-observer >/dev/null 2>&1 || true
+    fi
+    rm -f -- "$observer_script" "$observer_plist"
+}
+
 accept_task12_loginwindow_start() {
     require_root_for_system
-    local mode invoking_user invoking_uid evidence helper
+    local mode invoking_user invoking_uid evidence observer_script observer_plist
     mode="$(/usr/libexec/PlistBuddy -c 'Print :Mode' "$MANAGED_CONFIG")"
     [[ "$mode" == "disabled" ]] || { printf 'error: expected disabled starting mode\n' >&2; return 65; }
     invoking_user=${SUDO_USER:-}
     [[ -n "$invoking_user" && "$invoking_user" != root ]] || { printf 'error: SUDO_USER is required\n' >&2; return 77; }
     invoking_uid="$(id -u "$invoking_user")"
     evidence="$(loginwindow_evidence_path)"
+    observer_script="$(loginwindow_observer_script_path)"
+    observer_plist="$(loginwindow_observer_plist_path)"
+    cleanup_loginwindow_observer
     rm -f -- "$evidence"
     set_dry_run_mode
     verify_logged_in_dry_run
@@ -173,8 +194,7 @@ accept_task12_loginwindow_start() {
         printf 'started task=12 scope=loginwindow test-root=%s\n' "$SYSTEM_ROOT"
         return 0
     fi
-    helper="/var/tmp/macbook-lid-monitor-task12-loginwindow-$$.sh"
-    cat > "$helper" <<EOF
+    cat > "$observer_script" <<EOF
 #!/usr/bin/env bash
 set -euo pipefail
 stable=0
@@ -190,7 +210,6 @@ for _ in {1..180}; do
       chmod 0600 "$evidence.tmp"
       chown root:wheel "$evidence.tmp"
       mv -f "$evidence.tmp" "$evidence"
-      rm -f -- "$helper"
       exit 0
     fi
   else
@@ -202,12 +221,32 @@ printf 'console-user=timeout\nprocess-count=0\nsystem-job=absent\n' > "$evidence
 chmod 0600 "$evidence.tmp"
 chown root:wheel "$evidence.tmp"
 mv -f "$evidence.tmp" "$evidence"
-rm -f -- "$helper"
 exit 70
 EOF
-    chmod 0700 "$helper"
-    chown root:wheel "$helper"
-    nohup "$helper" >/dev/null 2>&1 &
+    chmod 0700 "$observer_script"
+    chown root:wheel "$observer_script"
+    cat > "$observer_plist" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.crazydennies.macbook-lid-monitor.task12-loginwindow-observer</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>$observer_script</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>ProcessType</key>
+  <string>Background</string>
+</dict>
+</plist>
+EOF
+    chmod 0644 "$observer_plist"
+    chown root:wheel "$observer_plist"
+    plutil -lint "$observer_plist" >/dev/null
+    /bin/launchctl bootstrap system "$observer_plist"
     printf 'logout-imminent task=12 scope=loginwindow user=%s\n' "$invoking_user"
     launchctl bootout "gui/$invoking_uid"
 }
@@ -217,6 +256,7 @@ accept_task12_loginwindow_finish() {
     local evidence owner count job
     evidence="$(loginwindow_evidence_path)"
     cleanup_task12_loginwindow_to_disabled() {
+        cleanup_loginwindow_observer
         if [[ -f "$MANAGED_CONFIG" && ! -L "$MANAGED_CONFIG" ]]; then
             disable_job >/dev/null 2>&1 || true
             bootout_job >/dev/null 2>&1 || true
@@ -237,6 +277,7 @@ accept_task12_loginwindow_finish() {
     bootstrap_job
     diagnostics
     rm -f -- "$evidence"
+    cleanup_loginwindow_observer
     trap - EXIT
     printf 'accepted task=12 scope=loginwindow final-mode=disabled observed-console-user=%s label=%s\n' "$owner" "$LAUNCHD_LABEL"
 }
