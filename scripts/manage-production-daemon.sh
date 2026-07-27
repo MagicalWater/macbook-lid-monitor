@@ -16,6 +16,33 @@ usage() {
     exit 64
 }
 
+verify_managed_sleep_authority() {
+    verify_managed_metadata \
+        "$MANAGED_SLEEP_AUTHORITY" regular \
+        "$(managed_expected_owner)" "$(managed_expected_group)" 600 1
+}
+
+ensure_managed_sleep_authority() {
+    require_root_for_system
+    assert_managed_path_safe "$MANAGED_SLEEP_AUTHORITY"
+    if [[ -e "$MANAGED_SLEEP_AUTHORITY" || -L "$MANAGED_SLEEP_AUTHORITY" ]]; then
+        verify_managed_sleep_authority
+        return
+    fi
+
+    local temporary="$MANAGED_SLEEP_AUTHORITY.tmp"
+    assert_managed_path_safe "$temporary"
+    [[ ! -e "$temporary" && ! -L "$temporary" ]] || {
+        printf 'error: refusing existing sleep-authority temporary path: %s\n' "$temporary" >&2
+        return 74
+    }
+    (umask 077; : > "$temporary")
+    chmod 0600 "$temporary"
+    if [[ -z "$SYSTEM_ROOT" ]]; then chown root:wheel "$temporary"; fi
+    mv -- "$temporary" "$MANAGED_SLEEP_AUTHORITY"
+    verify_managed_sleep_authority
+}
+
 install_package_unlocked() {
     require_root_for_system
     verify_package
@@ -50,6 +77,7 @@ install_package_unlocked() {
     if [[ -z "$SYSTEM_ROOT" ]]; then
         chown root:wheel "$MANAGED_BINARY" "$MANAGED_PLIST" "$MANAGED_CONFIG" "$MANAGED_MANIFEST" "$MANAGED_SUPPORT" "$MANAGED_LOG_DIR"
     fi
+    ensure_managed_sleep_authority
     invalidate_deployment_acceptance install >/dev/null
     printf 'installed mode=disabled\n'
 }
@@ -927,6 +955,7 @@ activate_staged_set_disabled() {
     if [[ -z "$SYSTEM_ROOT" ]]; then
         chown root:wheel "$MANAGED_BINARY" "$MANAGED_PLIST" "$MANAGED_CONFIG" "$MANAGED_MANIFEST"
     fi
+    ensure_managed_sleep_authority
     verify_managed_set
     [[ "$(/usr/libexec/PlistBuddy -c 'Print :Mode' "$MANAGED_CONFIG")" == disabled ]]
 }
@@ -953,12 +982,14 @@ restore_rollback_set_disabled() {
     if [[ -z "$SYSTEM_ROOT" ]]; then
         chown root:wheel "$MANAGED_BINARY" "$MANAGED_PLIST" "$MANAGED_CONFIG" "$MANAGED_MANIFEST"
     fi
+    ensure_managed_sleep_authority
     verify_managed_set
 }
 
 rollback_upgrade_unlocked() {
     require_root_for_system
     verify_installed_set
+    ensure_managed_sleep_authority
     verify_rollback_set
     prepare_maintenance_disabled_state
     restore_rollback_set_disabled
@@ -972,6 +1003,7 @@ rollback_upgrade() { with_lifecycle_guard rollback_upgrade_unlocked; }
 upgrade_package_unlocked() {
     require_root_for_system
     verify_installed_set
+    ensure_managed_sleep_authority
     verify_staged_payload
     if staged_payload_matches_installed_identity; then
         printf 'upgrade=no-op identity=unchanged acceptance=preserved\n'

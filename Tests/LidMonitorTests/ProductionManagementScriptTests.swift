@@ -721,6 +721,24 @@ final class ProductionManagementScriptTests: XCTestCase {
         XCTAssertEqual(config.mode, .disabled)
     }
 
+    func testInstallCreatesSecureManagedSleepAuthorityLease() throws {
+        let sandbox = root.appendingPathComponent(".build/production-package-lease-root")
+        try? FileManager.default.removeItem(at: sandbox)
+        defer { try? FileManager.default.removeItem(at: sandbox) }
+
+        try seedStaging()
+        try runScript("install", environment: ["MLM_TEST_ROOT": sandbox.path])
+
+        let lease = sandbox.appendingPathComponent(
+            "Library/Application Support/MacBookLidMonitor/sleep-authority.lock"
+        )
+        let metadata = try FileManager.default.attributesOfItem(atPath: lease.path)
+        XCTAssertEqual(metadata[.type] as? FileAttributeType, .typeRegular)
+        XCTAssertEqual(metadata[.posixPermissions] as? NSNumber, NSNumber(value: 0o600))
+        XCTAssertEqual(metadata[.referenceCount] as? NSNumber, NSNumber(value: 1))
+        XCTAssertEqual(try Data(contentsOf: lease).count, 0)
+    }
+
     func testStatusFailsWhenPackageIsNotInstalled() throws {
         let sandbox = root.appendingPathComponent(".build/production-package-missing-root")
         try? FileManager.default.removeItem(at: sandbox)
@@ -766,6 +784,27 @@ final class ProductionManagementScriptTests: XCTestCase {
 
         XCTAssertEqual(try Data(contentsOf: installedBinary), try Data(contentsOf: root.appendingPathComponent(".build/production-package/macbook-lid-monitor-daemon")))
         XCTAssertTrue(FileManager.default.fileExists(atPath: sandbox.appendingPathComponent("Library/Application Support/MacBookLidMonitor/rollback/macbook-lid-monitor-daemon").path))
+    }
+
+    func testUpgradeRepairsLegacyInstallMissingManagedSleepAuthorityBeforeNoOp() throws {
+        let sandbox = root.appendingPathComponent(".build/production-package-upgrade-lease-repair-root")
+        try? FileManager.default.removeItem(at: sandbox)
+        defer { try? FileManager.default.removeItem(at: sandbox) }
+
+        try seedStaging()
+        try runScript("install", environment: ["MLM_TEST_ROOT": sandbox.path])
+        let lease = sandbox.appendingPathComponent(
+            "Library/Application Support/MacBookLidMonitor/sleep-authority.lock"
+        )
+        try FileManager.default.removeItem(at: lease)
+
+        try seedStaging()
+        try runScript("upgrade", environment: ["MLM_TEST_ROOT": sandbox.path])
+
+        let metadata = try FileManager.default.attributesOfItem(atPath: lease.path)
+        XCTAssertEqual(metadata[.type] as? FileAttributeType, .typeRegular)
+        XCTAssertEqual(metadata[.posixPermissions] as? NSNumber, NSNumber(value: 0o600))
+        XCTAssertEqual(metadata[.referenceCount] as? NSNumber, NSNumber(value: 1))
     }
 
     func testMaintenanceTransactionsExposeExplicitDisabledBoundaries() throws {
@@ -1404,7 +1443,7 @@ final class ProductionManagementScriptTests: XCTestCase {
             "installed=true", "version=", "source_commit=", "mode=disabled", "job=loaded",
             "process_count=1", "health_state=monitoring-armed", "hardware_model=MacBookPro18,1",
             "hardware_chip=Apple M1 Pro", "integrity=valid", "crash_state=closed",
-            "acceptance_state=missing", "lease_state=missing",
+            "acceptance_state=missing", "lease_state=present",
         ] {
             XCTAssertTrue(status.contains(key), "\(key) in \(status)")
         }

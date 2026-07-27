@@ -748,6 +748,12 @@ identity before any monitoring mode is started.
   is valid, and no foreground real-sleep process or duplicate authority exists.
 - [x] Record disabled-install evidence and immediate review. Leave loaded/disabled/zero PID.
 
+**Reopened finding:** The original live install did not actually create the managed
+`sleep-authority.lock`, despite the checked requirement above. Task 18 exposed the omission when
+enabled startup failed open with `sleep-authority-unavailable`. Task 16 remains reopened until the
+fixed exact commit is redeployed, the lease is verified as root-owned `0600` with link count 1, and
+the system is again loaded/disabled/zero PID.
+
 ### Task 17: Fresh installed dry-run acceptance
 
 **Approval:** Explain that managed config and the system job will change to dry-run, but no real
@@ -761,6 +767,10 @@ sleep requester can be constructed; obtain explicit approval before the mutation
   disable; return loaded/disabled/zero PID.
 - [x] Record matching dry-run acceptance identity and immediate review; do not perform sensor-driven
   real sleep or activation.
+
+**Identity invalidation rule:** The completed evidence above belongs to the pre-remediation
+installed identity. Once Task 16 is redeployed, Task 17 must be rerun and rebound to the new exact
+installed identity before Task 18 resumes.
 
 ### Task 18: Bounded one-sleep acceptance
 

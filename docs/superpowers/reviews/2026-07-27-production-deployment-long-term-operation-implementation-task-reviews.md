@@ -1071,3 +1071,56 @@ See `docs/validation/2026-07-28-production-deployment-dry-run-acceptance.md`.
 **Task 17 approved.** Open P0 = 0 and Open P1 without disposition = 0. Production remains
 loaded/disabled with zero resident PID. Task 18 requires separate approval because it grants one
 bounded sensor-driven real-sleep request.
+
+## Task 16 Reopened — Managed sleep-authority remediation
+
+### Trigger
+
+The user approved Task 18, but the bounded enabled-once command failed before angle monitoring:
+
+```text
+mode=enabled
+daemon started
+event=degraded code=sleep-authority-unavailable
+process-count=0
+cleanup restored disabled
+```
+
+No sensor-driven real sleep occurred. The failure was independent of the broken legacy clamshell
+switch; the product still uses the lid-angle HID stream and the `<=68°` debounce policy.
+
+### Root cause
+
+The implementation Plan required installation to create the managed lease because daemon startup
+opens it with `O_NOFOLLOW` and without `O_CREAT`. `install_package_unlocked()` installed binary,
+plist, config, and manifest but omitted `sleep-authority.lock`. Task 16 review incorrectly accepted
+`lease_state=missing`, so Task 18 enabled startup correctly failed open.
+
+### Remediation implementation
+
+- Add `verify_managed_sleep_authority` and `ensure_managed_sleep_authority`.
+- Initial install atomically creates an empty regular lease with mode `0600`, expected owner/group,
+  and link count 1.
+- Upgrade repairs a legacy missing lease before identity-equal no-op disposition.
+- Staged activation and rollback preserve an existing safe inode and reject unsafe metadata.
+- Uninstall continues to remove the managed lease.
+
+### TDD and verification
+
+```text
+install lease RED: missing sleep-authority.lock
+install lease GREEN: passed
+legacy no-op upgrade repair RED: lease remained missing
+legacy no-op upgrade repair GREEN: passed
+focused final: 3 tests, 0 failures
+management holistic first run: 84 tests, 1 stale expectation
+stale expectation disposition: lease_state=missing -> lease_state=present
+full suite: 269 tests, 0 failures
+```
+
+### Current disposition
+
+The repository fix is implementation-complete but Task 16 remains reopened until an exact-commit
+package is prepared and upgraded on the real Mac. That upgrade invalidates old deployment
+acceptance, so Task 17 must be rerun before Task 18 receives a fresh real-sleep approval. Live state
+after the rejected Task 18 attempt is loaded/disabled/zero PID with last exit code zero.
