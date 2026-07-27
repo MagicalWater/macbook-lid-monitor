@@ -263,3 +263,103 @@ git diff --check: passed
 ### Decision
 
 **Task 5 approved.** No Critical/P0/P1 finding remains. Stage A review may begin.
+
+## Task 6 — Shell installed-set verifier, managed metadata, and lifecycle guard
+
+### RED evidence
+
+The first focused run failed because `scripts/lib/production-installed-set.sh` did not exist. The
+new tests therefore proved the shared verifier and lifecycle interfaces were absent before any
+production implementation was added.
+
+### Implemented
+
+- Added one shared shell verifier for metadata, fixed manifest identity, binary/plist/config
+  checksums, canonical disabled-config hashing, prohibited LaunchDaemon environment entries, and
+  stable installed identity output.
+- Added root/test-root expected ownership, exact type/mode/link-count checks, symlink rejection,
+  and safe ancestor validation.
+- Added one atomic lifecycle guard below the managed support directory. Install, upgrade, rollback,
+  and uninstall share that guard; mode-only commands verify integrity without taking it.
+- Added verification before bootstrap, mode transitions, reset, upgrade, rollback, uninstall, and
+  reboot finish. Historical bounded acceptance paths inherit the same preflight through these
+  shared operations.
+- Added a sandbox-only deterministic guard-hold hook, with static protection preventing production
+  use.
+
+### Immediate review findings
+
+#### T6-P1 — Shell canonical JSON initially added a newline
+
+The initial implementation used Python `print`, producing a different hash from Swift's canonical
+JSON bytes.
+
+**Resolution:** write canonical JSON with `sys.stdout.write` and no trailing newline. Mode-only
+config changes now match the Swift runtime policy exactly.
+
+#### T6-P1 — Verifier failures could emit an error and continue
+
+The initial helper returned nonzero, but callers did not always return immediately. This allowed a
+corrupt manifest to reach later upgrade code under some shell execution contexts.
+
+**Resolution:** make every verifier branch explicitly return on failure and add a regression proving
+corrupt installed identity blocks upgrade before activation.
+
+#### T6-P1 — Lifecycle guard temporarily disabled errexit
+
+The first status-capture implementation used `set +e`, weakening nested integrity checks.
+
+**Resolution:** preserve `errexit`, rely on the EXIT trap for failure cleanup, and retain explicit
+status cleanup for conditional-call contexts.
+
+#### T6-P2 — Guard cleanup could leave an empty support directory after uninstall
+
+The guard directory existed while uninstall attempted to remove the support directory.
+
+**Resolution:** guard cleanup now removes the lock first and then removes the support directory only
+when empty.
+
+#### T6-P2 — Signal cleanup did not explicitly terminate
+
+The original signal trap only removed the guard.
+
+**Resolution:** dedicated HUP/INT/TERM handlers remove the guard, clear traps, and exit with stable
+signal-derived status. A deterministic sandbox test proves no managed binary is written.
+
+### Re-review
+
+- Verifier performs no state mutation: pass.
+- Busy guard fails before managed file replacement with `error=lifecycle-busy`: pass.
+- Normal and signal exits remove the guard: pass.
+- Metadata verifies type, owner, group, mode, link count, symlink, and ancestors: pass.
+- Shell and Swift normalized config hashes are identical: pass.
+- Prohibited `EnvironmentVariables` remains rejected: pass.
+- Mode-only operations do not take the whole-set guard: pass.
+- Production cannot enable the test hold hook: pass.
+- Install/upgrade/rollback/uninstall share one lifecycle guard: pass.
+- Package prepare/verify behavior remains stable: pass.
+- No `/Library`, launchd, sleep, reboot, merge, push, or worktree cleanup occurred: pass.
+
+### Verification
+
+```text
+RED: missing production-installed-set.sh, expected focused failure
+focused: 52 tests, 0 failures
+full XCTest: 231 tests, 0 failures
+bash -n: manager, package common, installed-set library passed
+shellcheck: passed with zero findings
+package prepare/verify: passed
+release daemon build during prepare: passed
+git diff --check: passed
+```
+
+### Remaining risk
+
+Shell verification cannot eliminate every possible cross-process TOCTOU between final verification
+and later command mutation. The lifecycle guard serializes supported whole-set mutations, while the
+Swift daemon independently re-verifies the installed set at enabled startup.
+
+### Decision
+
+**Task 6 approved.** No Critical/P0/P1 finding remains. Task 7 may begin after the independent Task 6
+commit.

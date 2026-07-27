@@ -449,11 +449,11 @@ git commit -m "feat: verify installed set before enabled runtime"
 
 ### Stage A implementation review
 
-- [ ] Independently review Tasks 1–5 for TOCTOU, inode identity, fallback ambiguity, requester
+- [x] Independently review Tasks 1–5 for TOCTOU, inode identity, fallback ambiguity, requester
   composition, checksum normalization, stable errors, and fail-open exit behavior.
-- [ ] Run full tests, release builds for all products, package prepare/verify, Bash syntax,
+- [x] Run full tests, release builds for all products, package prepare/verify, Bash syntax,
   shellcheck, plist lint, and `git diff --check`.
-- [ ] Fix/re-review every finding and commit Stage A closure.
+- [x] Fix/re-review every finding and commit Stage A closure.
 
 ## Stage B — Deployment lifecycle and operations
 
@@ -469,12 +469,12 @@ mutation rather than duplicating partial checks or relying on operator timing.
 - Modify: `scripts/manage-production-daemon.sh`
 - Modify: `Tests/LidMonitorTests/ProductionManagementScriptTests.swift`
 
-- [ ] Write sandbox tests for expected/actual checksums, normalized config, owner/group/mode/type,
+- [x] Write sandbox tests for expected/actual checksums, normalized config, owner/group/mode/type,
   link count, unsafe ancestors, prohibited plist environment, and stable key-value output.
-- [ ] Add a concurrent sandbox test proving a second install/upgrade/rollback/uninstall lifecycle
+- [x] Add a concurrent sandbox test proving a second install/upgrade/rollback/uninstall lifecycle
   mutation fails before changing files while the first operation holds the guard.
-- [ ] Prove RED with `swift test --filter ProductionManagementScriptTests`.
-- [ ] Implement and source these stable shell interfaces:
+- [x] Prove RED with `swift test --filter ProductionManagementScriptTests`.
+- [x] Implement and source these stable shell interfaces:
 
 ```bash
 verify_managed_metadata PATH EXPECTED_TYPE EXPECTED_OWNER EXPECTED_GROUP EXPECTED_MODE EXPECTED_LINKS
@@ -488,12 +488,12 @@ with_lifecycle_guard COMMAND [ARGUMENTS...]
 mode, job state, or files. `with_lifecycle_guard` uses an atomic transient lock directory below the
 root-owned support directory, rejects symlink/unsafe ancestors, records no password/token, cleans up
 on normal/signal exit, and returns a stable busy error for concurrent mutation.
-- [ ] Require verification before bootstrap, dry-run, bounded acceptance, activation, baseline,
+- [x] Require verification before bootstrap, dry-run, bounded acceptance, activation, baseline,
   upgrade, rollback, and reboot finish.
-- [ ] Require the lifecycle guard around install, upgrade, rollback, uninstall, and any future
+- [x] Require the lifecycle guard around install, upgrade, rollback, uninstall, and any future
   whole-set replacement; mode-only operations use installed verification but not the whole-set
   lifecycle guard.
-- [ ] Run focused/full/static checks, immediate review, and commit
+- [x] Run focused/full/static checks, immediate review, and commit
   `feat: add shared installed set verification`.
 
 ### Task 7: Target preflight and atomic deployment acceptance state

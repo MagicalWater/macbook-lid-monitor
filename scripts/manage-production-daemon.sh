@@ -4,26 +4,15 @@ set -euo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 # shellcheck source=scripts/lib/production-package-common.sh
 source "$SCRIPT_DIR/lib/production-package-common.sh"
+# shellcheck source=scripts/lib/production-installed-set.sh
+source "$SCRIPT_DIR/lib/production-installed-set.sh"
 
 usage() {
     printf '%s\n' 'usage: manage-production-daemon.sh prepare|verify|install|bootstrap|status|stop|bootout|disable|dry-run|upgrade|rollback|reset-crash-budget|rotate-logs|diagnostics|uninstall|accept-task9|accept-task10|accept-task11|accept-task12-logged-in|accept-task12-loginwindow-start|accept-task12-loginwindow-finish|accept-task12-sleep-wake|accept-task13-dry-run-path|accept-task13-enabled-once|accept-task13-recovery-resleep|accept-task14-reboot-start|accept-task14-reboot-finish' >&2
     exit 64
 }
 
-normalized_config_sha256() {
-    /usr/bin/swift -e '
-import CryptoKit
-import Foundation
-let path = CommandLine.arguments[1]
-let data = try Data(contentsOf: URL(fileURLWithPath: path))
-guard var object = try PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any] else { exit(65) }
-object["Mode"] = "disabled"
-let canonical = try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])
-print(SHA256.hash(data: canonical).map { String(format: "%02x", $0) }.joined())
-' "$1"
-}
-
-install_package() {
+install_package_unlocked() {
     require_root_for_system
     verify_package
     local initial_mode
@@ -60,8 +49,11 @@ install_package() {
     printf 'installed mode=disabled\n'
 }
 
+install_package() { with_lifecycle_guard install_package_unlocked; }
+
 bootstrap_job() {
     require_root_for_system
+    verify_installed_set
     assert_regular_source "$MANAGED_PLIST"
     launchctl_system bootstrap system "$MANAGED_PLIST"
     printf 'bootstrapped label=%s\n' "$LAUNCHD_LABEL"
@@ -90,6 +82,7 @@ bootout_job() {
 
 disable_job() {
     require_root_for_system
+    verify_installed_set
     assert_regular_source "$MANAGED_CONFIG"
     /usr/libexec/PlistBuddy -c 'Set :Mode disabled' "$MANAGED_CONFIG"
     chmod 0644 "$MANAGED_CONFIG"
@@ -100,6 +93,7 @@ disable_job() {
 
 reset_crash_budget() {
     require_root_for_system
+    verify_installed_set
     assert_regular_source "$MANAGED_CONFIG"
     assert_managed_path_safe "$MANAGED_SUPPORT/crash-budget.json"
     [[ ! -L "$MANAGED_SUPPORT/crash-budget.json" ]] || {
@@ -126,6 +120,7 @@ reset_crash_budget() {
 
 set_enabled_mode() {
     require_root_for_system
+    verify_installed_set
     assert_regular_source "$MANAGED_CONFIG"
     /usr/libexec/PlistBuddy -c 'Set :Mode enabled' "$MANAGED_CONFIG"
     chmod 0644 "$MANAGED_CONFIG"
@@ -137,6 +132,7 @@ set_enabled_mode() {
 
 set_dry_run_mode() {
     require_root_for_system
+    verify_installed_set
     assert_regular_source "$MANAGED_CONFIG"
     /usr/libexec/PlistBuddy -c 'Set :Mode dry-run' "$MANAGED_CONFIG"
     chmod 0644 "$MANAGED_CONFIG"
@@ -626,8 +622,9 @@ diagnostics() {
     done
 }
 
-uninstall_package() {
+uninstall_package_unlocked() {
     require_root_for_system
+    verify_installed_set
     for path in "$MANAGED_BINARY" "$MANAGED_PLIST" "$MANAGED_CONFIG" "$MANAGED_MANIFEST" \
         "$MANAGED_SUPPORT/crash-budget.json" "$MANAGED_TASK14_STATE" "$MANAGED_STDOUT_LOG" "$MANAGED_STDERR_LOG" "$MANAGED_ROLLBACK"; do
         assert_managed_path_safe "$path"
@@ -647,6 +644,9 @@ uninstall_package() {
     rmdir "$MANAGED_LOG_DIR" 2>/dev/null || true
     printf 'uninstalled label=%s\n' "$LAUNCHD_LABEL"
 }
+
+
+uninstall_package() { with_lifecycle_guard uninstall_package_unlocked; }
 
 verify_uninstalled_state() {
     local found=0
@@ -718,6 +718,7 @@ accept_task14_reboot_start() {
 
 accept_task14_reboot_finish() {
     require_root_for_system
+    verify_installed_set
     assert_regular_source "$MANAGED_TASK14_STATE"
     local schema start_boot current_boot expected_current expected_rollback actual_current mode process_count actual_rollback state_mtime
     schema="$(awk -F= '$1 == "schema" {print $2}' "$MANAGED_TASK14_STATE")"
@@ -787,15 +788,7 @@ backup_current_set() {
 }
 
 verify_managed_set() {
-    assert_regular_source "$MANAGED_BINARY"
-    assert_regular_source "$MANAGED_MANIFEST"
-    local expected actual
-    expected="$(/usr/libexec/PlistBuddy -c 'Print :BinarySHA256' "$MANAGED_MANIFEST")"
-    actual="$(sha256_file "$MANAGED_BINARY")"
-    [[ "$expected" == "$actual" ]] || {
-        printf 'error: installed checksum mismatch\n' >&2
-        return 65
-    }
+    verify_installed_set
 }
 
 restore_rollback_set() {
@@ -821,16 +814,20 @@ restore_rollback_set() {
     verify_managed_set
 }
 
-rollback_upgrade() {
+rollback_upgrade_unlocked() {
     require_root_for_system
+    verify_installed_set
     bootout_job
     restore_rollback_set
     bootstrap_job
     printf 'rolled-back label=%s\n' "$LAUNCHD_LABEL"
 }
 
-upgrade_package() {
+rollback_upgrade() { with_lifecycle_guard rollback_upgrade_unlocked; }
+
+upgrade_package_unlocked() {
     require_root_for_system
+    verify_installed_set
     verify_package
     backup_current_set
     bootout_job
@@ -861,6 +858,8 @@ upgrade_package() {
     fi
     printf 'upgraded label=%s\n' "$LAUNCHD_LABEL"
 }
+
+upgrade_package() { with_lifecycle_guard upgrade_package_unlocked; }
 
 print_residual_state() {
     local phase=$1
@@ -1036,6 +1035,7 @@ case "$1" in
     prepare) prepare_package ;;
     verify) verify_package ;;
     install) install_package ;;
+    installed-identity) installed_identity_lines ;;
     bootstrap) bootstrap_job ;;
     status) status_job ;;
     stop) stop_job ;;

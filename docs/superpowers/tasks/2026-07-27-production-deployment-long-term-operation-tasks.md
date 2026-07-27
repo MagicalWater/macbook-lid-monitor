@@ -1,6 +1,6 @@
 # Milestone 16 Production Deployment and Long-term Operation Task Register
 
-Status: Tasks 1–5 complete and reviewed; Stage A review is next. Tasks 15–21 remain approval-gated.
+Status: Tasks 1–6 and Stage A review complete. Task 7 is next. Tasks 15–21 remain approval-gated.
 
 ## Mandatory per-Task workflow
 
@@ -29,8 +29,8 @@ all Task reviews. Historical Milestone 1–15 evidence is context, not Milestone
 | 3 | Remove deployable requester environment override — complete | daemon composition, management script/tests | 52 focused tests; 215 full tests; Bash syntax | none | revert commit; no system state |
 | 4 | Complete package manifest and staged identity — complete | manifest template, package common, package tests | 46 focused tests; 215 full tests; package prepare/verify; plist/Bash/diff checks | none | delete staging; revert commit |
 | 5 | Runtime installed-set verification — complete | `ProductionInstalledSetVerifier.swift`, daemon composition/tests | 16 focused tests; 221 full tests; package prepare/verify; release build | none | revert commit; no system state |
-| A | Stage A implementation review | review/evidence only | full tests, all release builds, static/plist/package checks | none | no system state |
-| 6 | Shell installed verifier, metadata, and lifecycle guard | `production-installed-set.sh`, package common, manager/tests | expected/actual checks, normalization, metadata, concurrent mutation guard | none | revert commit; test-root only |
+| A | Stage A implementation review — complete | review/evidence only | 221 full tests, release/package/static checks | none | no system state |
+| 6 | Shell installed verifier, metadata, and lifecycle guard — complete | `production-installed-set.sh`, package common, manager/tests | 52 focused tests; 231 full tests; shellcheck/syntax/package/diff checks | none | revert commit; test-root only |
 | 7 | Target preflight and deployment acceptance state | `production-deployment-state.sh`, manager/tests | model/chip, atomic state, privacy, mismatch/invalidation | none | revert commit; test-root only |
 | 8 | Bounded deployment commands and evidence-bound activation | manager, deployment/installed libs, tests | bounded cleanup, partial acceptance rejection, sandbox enabled final state | none | revert commit; test-root only |
 | 9 | Bounded runtime health persistence | `ProductionHealthStore.swift`, daemon health/composition/tests | atomic metadata, transitions, throttle, stale/corrupt/redaction | none | revert commit; no system state |

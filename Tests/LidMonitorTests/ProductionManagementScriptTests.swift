@@ -668,6 +668,231 @@ final class ProductionManagementScriptTests: XCTestCase {
         )
     }
 
+    func testInstalledSetLibraryDefinesStableSharedInterfaces() throws {
+        let libraryURL = root.appendingPathComponent("scripts/lib/production-installed-set.sh")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: libraryURL.path))
+        let text = try String(contentsOf: libraryURL, encoding: .utf8)
+        for interface in [
+            "verify_managed_metadata()",
+            "normalized_config_sha256()",
+            "verify_installed_set()",
+            "installed_identity_lines()",
+            "with_lifecycle_guard()",
+        ] {
+            XCTAssertTrue(text.contains(interface), interface)
+        }
+    }
+
+    func testInstalledSetVerificationAcceptsModeOnlyChangeAndEmitsStableIdentity() throws {
+        let sandbox = root.appendingPathComponent(".build/production-installed-set-valid-root")
+        try? FileManager.default.removeItem(at: sandbox)
+        defer { try? FileManager.default.removeItem(at: sandbox) }
+        try seedStaging()
+        try runScript("install", environment: ["MLM_TEST_ROOT": sandbox.path])
+
+        let configURL = sandbox.appendingPathComponent("Library/Application Support/MacBookLidMonitor/config.plist")
+        var config = try plistDictionary(at: configURL)
+        config["Mode"] = "dry-run"
+        try PropertyListSerialization.data(fromPropertyList: config, format: .xml, options: 0).write(to: configURL)
+
+        let output = try runScriptOutput("installed-identity", environment: ["MLM_TEST_ROOT": sandbox.path])
+        let keys = output.split(separator: "\n").map { String($0.split(separator: "=", maxSplits: 1)[0]) }
+        XCTAssertEqual(keys, [
+            "product", "version", "source_commit", "binary_sha256", "plist_sha256",
+            "disabled_config_sha256", "hardware_profile", "binary_path", "plist_path",
+            "config_path", "manifest_path", "sleep_authority_path", "acceptance_state_path",
+            "health_state_path",
+        ])
+    }
+
+    func testInstalledSetVerificationRejectsChecksumPolicyAndEnvironmentDrift() throws {
+        let mutations: [(String, (URL) throws -> Void)] = [
+            ("binary", { sandbox in
+                try Data("drift".utf8).write(to: sandbox.appendingPathComponent("Library/PrivilegedHelperTools/macbook-lid-monitor-daemon"))
+            }),
+            ("plist", { sandbox in
+                let url = sandbox.appendingPathComponent("Library/LaunchDaemons/com.crazydennies.macbook-lid-monitor.plist")
+                var plist = try self.plistDictionary(at: url)
+                plist["RunAtLoad"] = false
+                try PropertyListSerialization.data(fromPropertyList: plist, format: .xml, options: 0).write(to: url)
+            }),
+            ("config", { sandbox in
+                let url = sandbox.appendingPathComponent("Library/Application Support/MacBookLidMonitor/config.plist")
+                var plist = try self.plistDictionary(at: url)
+                plist["DebounceSeconds"] = 99
+                try PropertyListSerialization.data(fromPropertyList: plist, format: .xml, options: 0).write(to: url)
+            }),
+            ("environment", { sandbox in
+                let url = sandbox.appendingPathComponent("Library/LaunchDaemons/com.crazydennies.macbook-lid-monitor.plist")
+                var plist = try self.plistDictionary(at: url)
+                plist["EnvironmentVariables"] = ["UNSAFE": "1"]
+                try PropertyListSerialization.data(fromPropertyList: plist, format: .xml, options: 0).write(to: url)
+            }),
+        ]
+
+        for (name, mutate) in mutations {
+            let sandbox = root.appendingPathComponent(".build/production-installed-set-drift-\(name)-root")
+            try? FileManager.default.removeItem(at: sandbox)
+            defer { try? FileManager.default.removeItem(at: sandbox) }
+            try seedStaging()
+            try runScript("install", environment: ["MLM_TEST_ROOT": sandbox.path])
+            try mutate(sandbox)
+            let failure = try runScriptFailure("installed-identity", environment: ["MLM_TEST_ROOT": sandbox.path])
+            XCTAssertTrue(failure.output.contains("error=installed-set-invalid"), "\(name): \(failure.output)")
+        }
+    }
+
+    func testInstalledSetVerificationRejectsMetadataLinksAndUnsafeAncestors() throws {
+        let variants = ["mode", "hardlink", "symlink", "ancestor"]
+        for variant in variants {
+            let sandbox = root.appendingPathComponent(".build/production-installed-set-metadata-\(variant)-root")
+            try? FileManager.default.removeItem(at: sandbox)
+            defer { try? FileManager.default.removeItem(at: sandbox) }
+            try seedStaging()
+            try runScript("install", environment: ["MLM_TEST_ROOT": sandbox.path])
+            let binary = sandbox.appendingPathComponent("Library/PrivilegedHelperTools/macbook-lid-monitor-daemon")
+            switch variant {
+            case "mode":
+                try FileManager.default.setAttributes([.posixPermissions: 0o777], ofItemAtPath: binary.path)
+            case "hardlink":
+                try FileManager.default.linkItem(at: binary, to: sandbox.appendingPathComponent("binary-alias"))
+            case "symlink":
+                let target = sandbox.appendingPathComponent("binary-target")
+                try FileManager.default.moveItem(at: binary, to: target)
+                try FileManager.default.createSymbolicLink(at: binary, withDestinationURL: target)
+            case "ancestor":
+                try FileManager.default.setAttributes(
+                    [.posixPermissions: 0o777],
+                    ofItemAtPath: sandbox.appendingPathComponent("Library/PrivilegedHelperTools").path
+                )
+            default:
+                XCTFail("unknown variant")
+            }
+            let failure = try runScriptFailure("installed-identity", environment: ["MLM_TEST_ROOT": sandbox.path])
+            XCTAssertTrue(failure.output.contains("error=installed-set-invalid"), "\(variant): \(failure.output)")
+        }
+    }
+
+    func testLifecycleGuardRejectsConcurrentMutationBeforeManagedFilesChange() throws {
+        let sandbox = root.appendingPathComponent(".build/production-lifecycle-guard-root")
+        try? FileManager.default.removeItem(at: sandbox)
+        defer { try? FileManager.default.removeItem(at: sandbox) }
+        try seedStaging()
+
+        let first = Process()
+        first.currentDirectoryURL = root
+        first.executableURL = URL(fileURLWithPath: "/bin/bash")
+        first.arguments = ["scripts/manage-production-daemon.sh", "install"]
+        first.environment = ProcessInfo.processInfo.environment.merging([
+            "MLM_TEST_ROOT": sandbox.path,
+            "MLM_TEST_HOLD_LIFECYCLE_GUARD_SECONDS": "3",
+        ]) { _, new in new }
+        first.standardOutput = FileHandle.nullDevice
+        first.standardError = FileHandle.nullDevice
+        try first.run()
+
+        let guardURL = sandbox.appendingPathComponent("Library/Application Support/MacBookLidMonitor/.lifecycle-guard")
+        for _ in 0..<100 where !FileManager.default.fileExists(atPath: guardURL.path) {
+            usleep(20_000)
+        }
+        XCTAssertTrue(FileManager.default.fileExists(atPath: guardURL.path))
+        let binary = sandbox.appendingPathComponent("Library/PrivilegedHelperTools/macbook-lid-monitor-daemon")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: binary.path))
+
+        let failure = try runScriptFailure("install", environment: ["MLM_TEST_ROOT": sandbox.path])
+        XCTAssertTrue(failure.output.contains("error=lifecycle-busy"), failure.output)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: binary.path))
+
+        first.waitUntilExit()
+        XCTAssertEqual(first.terminationStatus, 0)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: guardURL.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: binary.path))
+    }
+
+    func testLifecycleGuardCleansUpAfterSignalWithoutManagedMutation() throws {
+        let sandbox = root.appendingPathComponent(".build/production-lifecycle-guard-signal-root")
+        try? FileManager.default.removeItem(at: sandbox)
+        defer { try? FileManager.default.removeItem(at: sandbox) }
+        try seedStaging()
+
+        let process = Process()
+        process.currentDirectoryURL = root
+        process.executableURL = URL(fileURLWithPath: "/bin/bash")
+        process.arguments = ["scripts/manage-production-daemon.sh", "install"]
+        process.environment = ProcessInfo.processInfo.environment.merging([
+            "MLM_TEST_ROOT": sandbox.path,
+            "MLM_TEST_HOLD_LIFECYCLE_GUARD_SECONDS": "30",
+        ]) { _, new in new }
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        try process.run()
+
+        let guardURL = sandbox.appendingPathComponent("Library/Application Support/MacBookLidMonitor/.lifecycle-guard")
+        for _ in 0..<100 where !FileManager.default.fileExists(atPath: guardURL.path) {
+            usleep(20_000)
+        }
+        XCTAssertTrue(FileManager.default.fileExists(atPath: guardURL.path))
+
+        process.terminate()
+        process.waitUntilExit()
+
+        XCTAssertNotEqual(process.terminationStatus, 0)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: guardURL.path))
+        XCTAssertFalse(FileManager.default.fileExists(
+            atPath: sandbox.appendingPathComponent("Library/PrivilegedHelperTools/macbook-lid-monitor-daemon").path
+        ))
+    }
+
+    func testManagedMetadataRejectsOwnerGroupAndTypeMismatch() throws {
+        let sandbox = root.appendingPathComponent(".build/production-metadata-direct-root")
+        try? FileManager.default.removeItem(at: sandbox)
+        defer { try? FileManager.default.removeItem(at: sandbox) }
+        try FileManager.default.createDirectory(at: sandbox, withIntermediateDirectories: true)
+        let file = sandbox.appendingPathComponent("file")
+        try Data("x".utf8).write(to: file)
+        try FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: file.path)
+
+        for arguments in [
+            [file.path, "regular", "99999", String(getgid()), "644", "1"],
+            [file.path, "regular", String(getuid()), "99999", "644", "1"],
+            [file.path, "directory", String(getuid()), String(getgid()), "644", "1"],
+        ] {
+            let script = "export MLM_TEST_ROOT=\"$1\"; shift; source scripts/lib/production-package-common.sh; source scripts/lib/production-installed-set.sh; verify_managed_metadata \"$1\" \"$2\" \"$3\" \"$4\" \"$5\" \"$6\""
+            let result = try commandResult("/bin/bash", ["-c", script, "metadata-test", sandbox.path] + arguments)
+            XCTAssertNotEqual(result.status, 0, result.output)
+            XCTAssertTrue(result.output.contains("error=installed-set-invalid"), result.output)
+        }
+    }
+
+    func testLifecycleAndModeCommandIntegrationUsesRequiredBoundaries() throws {
+        let text = try String(
+            contentsOf: root.appendingPathComponent("scripts/manage-production-daemon.sh"),
+            encoding: .utf8
+        )
+        for wrapper in [
+            "install_package() { with_lifecycle_guard install_package_unlocked",
+            "upgrade_package() { with_lifecycle_guard upgrade_package_unlocked",
+            "rollback_upgrade() { with_lifecycle_guard rollback_upgrade_unlocked",
+            "uninstall_package() { with_lifecycle_guard uninstall_package_unlocked",
+        ] {
+            XCTAssertTrue(text.contains(wrapper), wrapper)
+        }
+        XCTAssertTrue(text.contains("bootstrap_job() {\n    require_root_for_system\n    verify_installed_set"))
+        XCTAssertTrue(text.contains("set_dry_run_mode() {\n    require_root_for_system\n    verify_installed_set"))
+        XCTAssertTrue(text.contains("set_enabled_mode() {\n    require_root_for_system\n    verify_installed_set"))
+        XCTAssertFalse(text.contains("set_dry_run_mode() { with_lifecycle_guard"))
+        XCTAssertFalse(text.contains("set_enabled_mode() { with_lifecycle_guard"))
+    }
+
+    func testLifecycleGuardTestHookCannotRunOutsideSandbox() throws {
+        let library = try String(
+            contentsOf: root.appendingPathComponent("scripts/lib/production-installed-set.sh"),
+            encoding: .utf8
+        )
+        XCTAssertTrue(library.contains("MLM_TEST_HOLD_LIFECYCLE_GUARD_SECONDS"))
+        XCTAssertTrue(library.contains("[[ -n \"$SYSTEM_ROOT\" ]] || { printf 'error=test-hook-production-disabled"))
+    }
+
     private func seedStaging() throws {
         let staging = root.appendingPathComponent(".build/production-package")
         try? FileManager.default.removeItem(at: staging)
@@ -752,6 +977,22 @@ final class ProductionManagementScriptTests: XCTestCase {
         return output
     }
 
+    private func commandResult(_ executable: String, _ arguments: [String]) throws -> (status: Int32, output: String) {
+        let process = Process()
+        process.currentDirectoryURL = root
+        process.executableURL = URL(fileURLWithPath: executable)
+        process.arguments = arguments
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = pipe
+        try process.run()
+        process.waitUntilExit()
+        return (
+            process.terminationStatus,
+            String(decoding: pipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+        )
+    }
+
     private func normalizedConfigChecksum(_ url: URL) throws -> String {
         let data = try Data(contentsOf: url)
         var object = try XCTUnwrap(
@@ -763,21 +1004,46 @@ final class ProductionManagementScriptTests: XCTestCase {
     }
 
     private func runScript(_ command: String, environment: [String: String] = [:]) throws {
+        let result = try runScriptResult(command, environment: environment)
+        guard result.status == 0 else {
+            throw NSError(
+                domain: "ProductionManagementScriptTests",
+                code: Int(result.status),
+                userInfo: [NSLocalizedDescriptionKey: result.output]
+            )
+        }
+    }
+
+    private func runScriptOutput(_ command: String, environment: [String: String] = [:]) throws -> String {
+        let result = try runScriptResult(command, environment: environment)
+        guard result.status == 0 else {
+            throw NSError(
+                domain: "ProductionManagementScriptTests",
+                code: Int(result.status),
+                userInfo: [NSLocalizedDescriptionKey: result.output]
+            )
+        }
+        return result.output.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func runScriptFailure(_ command: String, environment: [String: String] = [:]) throws -> (status: Int32, output: String) {
+        let result = try runScriptResult(command, environment: environment)
+        XCTAssertNotEqual(result.status, 0, result.output)
+        return result
+    }
+
+    private func runScriptResult(_ command: String, environment: [String: String]) throws -> (status: Int32, output: String) {
         let process = Process()
         process.currentDirectoryURL = root
         process.executableURL = URL(fileURLWithPath: "/bin/bash")
         process.arguments = ["scripts/manage-production-daemon.sh", command]
         process.environment = ProcessInfo.processInfo.environment.merging(environment) { _, new in new }
-        process.standardOutput = FileHandle.nullDevice
-        process.standardError = FileHandle.nullDevice
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = pipe
         try process.run()
         process.waitUntilExit()
-        guard process.terminationStatus == 0 else {
-            throw NSError(
-                domain: "ProductionManagementScriptTests",
-                code: Int(process.terminationStatus),
-                userInfo: nil
-            )
-        }
+        let output = String(decoding: pipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+        return (process.terminationStatus, output)
     }
 }

@@ -26,6 +26,10 @@ export MANAGED_STDOUT_LOG="$MANAGED_LOG_DIR/production.log"
 export MANAGED_STDERR_LOG="$MANAGED_LOG_DIR/production-error.log"
 export MANAGED_ROLLBACK="$MANAGED_SUPPORT/rollback"
 export MANAGED_TASK14_STATE="$MANAGED_SUPPORT/task14-reboot-state"
+export MANAGED_SLEEP_AUTHORITY="$MANAGED_SUPPORT/sleep-authority.lock"
+export MANAGED_ACCEPTANCE_STATE="$MANAGED_SUPPORT/deployment-acceptance.plist"
+export MANAGED_HEALTH_STATE="$MANAGED_SUPPORT/health.plist"
+export MANAGED_LIFECYCLE_GUARD="$MANAGED_SUPPORT/.lifecycle-guard"
 export LAUNCHD_LABEL="com.crazydennies.macbook-lid-monitor"
 
 assert_regular_source() {
