@@ -393,6 +393,33 @@ final class ProductionManagementScriptTests: XCTestCase {
         XCTAssertFalse(text.contains("read -s"))
     }
 
+    func testTask13RecoveryResleepAcceptanceReturnsDisabledInSandbox() throws {
+        let sandbox = root.appendingPathComponent(".build/production-package-task13-recovery-resleep-root")
+        try? FileManager.default.removeItem(at: sandbox)
+        defer { try? FileManager.default.removeItem(at: sandbox) }
+
+        try seedStaging()
+        try runScript("install", environment: ["MLM_TEST_ROOT": sandbox.path])
+        try runScript("bootstrap", environment: ["MLM_TEST_ROOT": sandbox.path])
+        try runScript("accept-task13-recovery-resleep", environment: ["MLM_TEST_ROOT": sandbox.path])
+
+        let configURL = sandbox.appendingPathComponent("Library/Application Support/MacBookLidMonitor/config.plist")
+        let config = try ProductionConfigurationDecoder().decode(Data(contentsOf: configURL))
+        XCTAssertEqual(config.mode, .disabled)
+    }
+
+    func testTask13RecoveryResleepCommandIsBoundedExactlyTwiceAndFailSafe() throws {
+        let text = try String(contentsOf: root.appendingPathComponent("scripts/manage-production-daemon.sh"), encoding: .utf8)
+        XCTAssertTrue(text.contains("accept-task13-recovery-resleep)"))
+        XCTAssertTrue(text.contains("expected exactly two sleep-request-attempted events"))
+        XCTAssertTrue(text.contains("expected exactly one recovery-resleep event"))
+        XCTAssertTrue(text.contains("expected two wake-recovery events"))
+        XCTAssertTrue(text.contains("trap cleanup_task13_recovery_resleep_to_disabled EXIT"))
+        XCTAssertTrue(text.contains("after-first-wake-keep-lid-below-68-degrees-for-15-seconds"))
+        XCTAssertFalse(text.contains("sudo -S"))
+        XCTAssertFalse(text.contains("read -s"))
+    }
+
     func testTask13DryRunPathAcceptanceReturnsDisabledInSandbox() throws {
         let sandbox = root.appendingPathComponent(".build/production-package-task13-dry-run-path-root")
         try? FileManager.default.removeItem(at: sandbox)

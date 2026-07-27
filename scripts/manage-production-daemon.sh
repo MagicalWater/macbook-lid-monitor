@@ -6,7 +6,7 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 source "$SCRIPT_DIR/lib/production-package-common.sh"
 
 usage() {
-    printf '%s\n' 'usage: manage-production-daemon.sh prepare|verify|install|bootstrap|status|stop|bootout|disable|dry-run|upgrade|rollback|rotate-logs|diagnostics|uninstall|accept-task9|accept-task10|accept-task11|accept-task12-logged-in|accept-task12-loginwindow-start|accept-task12-loginwindow-finish|accept-task12-sleep-wake|accept-task13-dry-run-path|accept-task13-enabled-once' >&2
+    printf '%s\n' 'usage: manage-production-daemon.sh prepare|verify|install|bootstrap|status|stop|bootout|disable|dry-run|upgrade|rollback|rotate-logs|diagnostics|uninstall|accept-task9|accept-task10|accept-task11|accept-task12-logged-in|accept-task12-loginwindow-start|accept-task12-loginwindow-finish|accept-task12-sleep-wake|accept-task13-dry-run-path|accept-task13-enabled-once|accept-task13-recovery-resleep' >&2
     exit 64
 }
 
@@ -407,6 +407,73 @@ accept_task13_enabled_once() {
     diagnostics
     trap - EXIT
     printf 'accepted task=13 scope=enabled-once final-mode=disabled label=%s\n' "$LAUNCHD_LABEL"
+}
+
+accept_task13_recovery_resleep() {
+    require_root_for_system
+    local mode before_pid process_count log_offset attempt_count=0 return_count=0 recovery_count=0 wake_count=0
+    mode="$(/usr/libexec/PlistBuddy -c 'Print :Mode' "$MANAGED_CONFIG")"
+    [[ "$mode" == "disabled" ]] || { printf 'error: expected disabled starting mode\n' >&2; return 65; }
+    cleanup_task13_recovery_resleep_to_disabled() {
+        if [[ -f "$MANAGED_CONFIG" && ! -L "$MANAGED_CONFIG" ]]; then
+            disable_job >/dev/null 2>&1 || true
+            bootout_job >/dev/null 2>&1 || true
+            bootstrap_job >/dev/null 2>&1 || true
+        fi
+    }
+    trap cleanup_task13_recovery_resleep_to_disabled EXIT
+    prepare_as_invoking_user
+    verify_package
+    upgrade_package
+    set_enabled_mode
+    if [[ -n "$SYSTEM_ROOT" ]]; then
+        {
+            printf 'timestamp=test event=transition pid=1 name=sleep-request-attempted\n'
+            printf 'timestamp=test event=sleep-requested pid=1\n'
+            printf 'timestamp=test event=state-changed pid=1 state=monitoring-disarmed\n'
+            printf 'timestamp=test event=transition pid=1 name=recovery-resleep\n'
+            printf 'timestamp=test event=transition pid=1 name=sleep-request-attempted\n'
+            printf 'timestamp=test event=sleep-requested pid=1\n'
+            printf 'timestamp=test event=state-changed pid=1 state=monitoring-disarmed\n'
+        } >> "$MANAGED_STDOUT_LOG"
+        before_pid=1
+        log_offset=0
+    else
+        sleep 2
+        launchctl print "system/$LAUNCHD_LABEL" >/dev/null
+        process_count="$({ pgrep -f '^/Library/PrivilegedHelperTools/macbook-lid-monitor-daemon$' || true; } | wc -l | tr -d ' ')"
+        [[ "$process_count" == 1 ]] || { printf 'error: expected one enabled daemon before recovery acceptance, got %s\n' "$process_count" >&2; return 70; }
+        before_pid="$(pgrep -f '^/Library/PrivilegedHelperTools/macbook-lid-monitor-daemon$')"
+        log_offset="$(stat -f '%z' "$MANAGED_STDOUT_LOG")"
+        printf 'armed task=13 scope=recovery-resleep pid=%s first-action=move-lid-below-68-degrees-and-hold-2-seconds second-action=after-first-wake-keep-lid-below-68-degrees-for-15-seconds third-action=after-second-sleep-open-lid-and-wake-with-keyboard\n' "$before_pid"
+        for _ in {1..300}; do
+            attempt_count="$(dd if="$MANAGED_STDOUT_LOG" bs=1 skip="$log_offset" 2>/dev/null | grep -c 'event=transition.*name=sleep-request-attempted' || true)"
+            recovery_count="$(dd if="$MANAGED_STDOUT_LOG" bs=1 skip="$log_offset" 2>/dev/null | grep -c 'event=transition.*name=recovery-resleep' || true)"
+            wake_count="$(dd if="$MANAGED_STDOUT_LOG" bs=1 skip="$log_offset" 2>/dev/null | grep -c 'event=state-changed.*state=monitoring-disarmed' || true)"
+            [[ "$attempt_count" -ge 2 && "$recovery_count" -ge 1 && "$wake_count" -ge 2 ]] && break
+            sleep 1
+        done
+    fi
+    attempt_count="$(dd if="$MANAGED_STDOUT_LOG" bs=1 skip="$log_offset" 2>/dev/null | grep -c 'event=transition.*name=sleep-request-attempted' || true)"
+    return_count="$(dd if="$MANAGED_STDOUT_LOG" bs=1 skip="$log_offset" 2>/dev/null | grep -c 'event=sleep-requested' || true)"
+    recovery_count="$(dd if="$MANAGED_STDOUT_LOG" bs=1 skip="$log_offset" 2>/dev/null | grep -c 'event=transition.*name=recovery-resleep' || true)"
+    wake_count="$(dd if="$MANAGED_STDOUT_LOG" bs=1 skip="$log_offset" 2>/dev/null | grep -c 'event=state-changed.*state=monitoring-disarmed' || true)"
+    [[ "$attempt_count" == 2 ]] || { printf 'error: expected exactly two sleep-request-attempted events, got %s\n' "$attempt_count" >&2; return 70; }
+    [[ "$return_count" -le 2 ]] || { printf 'error: expected at most two sleep-requested return events, got %s\n' "$return_count" >&2; return 70; }
+    [[ "$recovery_count" == 1 ]] || { printf 'error: expected exactly one recovery-resleep event, got %s\n' "$recovery_count" >&2; return 70; }
+    [[ "$wake_count" -ge 2 ]] || { printf 'error: expected two wake-recovery events, got %s\n' "$wake_count" >&2; return 70; }
+    if [[ -z "$SYSTEM_ROOT" ]]; then
+        process_count="$({ pgrep -f '^/Library/PrivilegedHelperTools/macbook-lid-monitor-daemon$' || true; } | wc -l | tr -d ' ')"
+        [[ "$process_count" == 1 ]] || { printf 'error: expected one daemon after recovery resleep, got %s\n' "$process_count" >&2; return 70; }
+        [[ "$(pgrep -f '^/Library/PrivilegedHelperTools/macbook-lid-monitor-daemon$')" == "$before_pid" ]] || { printf 'error: daemon PID changed across recovery resleep\n' >&2; return 70; }
+    fi
+    printf 'verified task=13 scope=recovery-resleep attempt-count=2 return-count=%s recovery-count=1 wake-count=%s pid-stable=true\n' "$return_count" "$wake_count"
+    disable_job
+    bootout_job
+    bootstrap_job
+    diagnostics
+    trap - EXIT
+    printf 'accepted task=13 scope=recovery-resleep final-mode=disabled label=%s\n' "$LAUNCHD_LABEL"
 }
 
 accept_task13_dry_run_path() {
@@ -851,5 +918,6 @@ case "$1" in
     accept-task12-sleep-wake) accept_task12_sleep_wake ;;
     accept-task13-dry-run-path) accept_task13_dry_run_path ;;
     accept-task13-enabled-once) accept_task13_enabled_once ;;
+    accept-task13-recovery-resleep) accept_task13_recovery_resleep ;;
     *) usage ;;
 esac

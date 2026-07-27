@@ -1297,6 +1297,40 @@ debounce, and requester-attempt path.
 **Corrected enabled acceptance command approved for a fresh separately authorized real cycle.**
 Recovery resleep remains separately gated.
 
+## Task 13 — Bounded recovery-resleep acceptance command
+
+### Implementation
+
+- Added `accept-task13-recovery-resleep` for the separately approved real recovery cycle.
+- The command upgrades to the current checkout, enters enabled mode, and records the initial PID
+  before any lid movement.
+- It requires exactly two pre-call sleep-request attempts, exactly one `recovery-resleep`
+  transition, at least two wake-recovery observations, and the same daemon PID across both cycles.
+- Post-call `sleep-requested` events remain timing evidence and are bounded to at most two.
+- The real-system waiting window is bounded to 300 seconds.
+- Success, timeout, count mismatch, PID mismatch, and every other failure path restore disabled.
+
+### Operator sequence
+
+1. Move the lid below 68 degrees and hold for the normal two-second debounce.
+2. After the first sleep, move the lid only enough to use the keyboard, wake manually, and keep
+   the lid below 68 degrees for the full 15-second recovery period.
+3. After the second sleep, open above the recovery threshold and wake manually so no third
+   recovery request can be created.
+
+### Re-review
+
+- Exactly two real request attempts are allowed: pass.
+- Recovery transition is explicit rather than inferred: pass.
+- Two wake boundaries are required: pass.
+- Same process authority spans both cycles: pass.
+- The command cannot leave enabled mode after any exit path: pass.
+- Sandbox coverage exercises the complete bounded evidence contract: pass.
+
+### Disposition
+
+**Recovery-resleep command ready for fresh verification and the separately approved real cycle.**
+
 ## Task 13 — First enabled real-system sleep closure
 
 ### Evidence
