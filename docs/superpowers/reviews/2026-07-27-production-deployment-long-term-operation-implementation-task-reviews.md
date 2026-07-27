@@ -909,6 +909,51 @@ independent clean snapshot: bash/shellcheck/plist/package/diff/status passed
 **Stage B approved.** No Critical/P0/P1 finding remains. Task 14 may begin after the independent
 Stage B closure commit.
 
+## Task 16 — Disabled production installation
+
+### Approval and execution
+
+The user explicitly approved `/Library` installation and system-domain bootstrap while preserving
+disabled mode. The reviewed formal-main release commit was
+`412fcc207b447d42ffdf58e9e35bd545d1b04ad4`.
+
+### Immediate review finding
+
+#### T16-P2 — Non-root status misclassified a root-only health snapshot as corrupt
+
+The first post-install status invocation ran without root privileges. Installed-set and launchd
+state were readable, but the root-owned `0600` health snapshot raised `PermissionError`; the
+read-only observability wrapper consequently printed `health_state=corrupt`.
+
+**Resolution:** no production mutation was needed. Root evidence proved the snapshot was valid,
+schema 1, identity-bound, and disabled. The root status correctly classified it as `stale`, which is
+expected because a disabled daemon exits and no longer refreshes health. Future production
+acceptance uses root status/diagnostics for root-only state.
+
+### Re-review
+
+- Formal release, origin/main, package manifest, and installed manifest identity match: pass.
+- Binary, launchd plist, config, and manifest checksums match the prepared package: pass.
+- Managed files/directories have fixed root:wheel metadata and no unsafe links: pass.
+- Installed config is disabled: pass.
+- System job is loaded, not running, last exit code zero, and process count zero: pass.
+- Deployment acceptance, reboot state, lease, lifecycle guard, and GUI duplicate job are absent:
+  pass.
+- Root-only health snapshot is valid disabled evidence; stale is expected and not corrupt: pass.
+- Crash circuit is closed with zero unexpected exits and no active run: pass.
+- Historical unrelated temp log was preserved because deletion was not separately approved: pass.
+- No dry-run, real sleep, persistent activation, or reboot occurred: pass.
+
+### Evidence
+
+See `docs/validation/2026-07-27-production-deployment-disabled-install.md`.
+
+### Decision
+
+**Task 16 approved.** No Critical/P0/P1 finding remains. The production job remains
+loaded/disabled with zero resident PID. Task 17 requires a new explicit approval before changing
+managed mode or launchd runtime behavior.
+
 ## Task 15 — Formal-main integration and package provenance
 
 ### Approval and integration scope

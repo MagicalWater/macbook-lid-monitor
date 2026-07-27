@@ -740,13 +740,13 @@ uninstall_package
 **Purpose:** Install the approved release in its safest persistent state and verify artifact/job
 identity before any monitoring mode is started.
 
-- [ ] Capture broad pre-install residual inventory and explicitly dispose of the historical
+- [x] Capture broad pre-install residual inventory and explicitly dispose of the historical
   user-owned `/private/tmp/macbook-lid-monitor-task15-final-test.log` only with user approval.
-- [ ] Install root-owned artifacts in disabled mode, create the managed lease, bootstrap the job,
+- [x] Install root-owned artifacts in disabled mode, create the managed lease, bootstrap the job,
   and verify loaded/disabled/zero PID plus every checksum and permission.
-- [ ] Verify acceptance state is absent/invalidated, health state is absent or disabled, crash state
+- [x] Verify acceptance state is absent/invalidated, health state is absent or disabled, crash state
   is valid, and no foreground real-sleep process or duplicate authority exists.
-- [ ] Record disabled-install evidence and immediate review. Leave loaded/disabled/zero PID.
+- [x] Record disabled-install evidence and immediate review. Leave loaded/disabled/zero PID.
 
 ### Task 17: Fresh installed dry-run acceptance
 
