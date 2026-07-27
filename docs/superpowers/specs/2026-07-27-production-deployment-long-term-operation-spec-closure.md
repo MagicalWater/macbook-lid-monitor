@@ -5,11 +5,12 @@ Date: 2026-07-27
 ## Gate
 
 ```text
-Spec draft
-→ review
-→ findings
-→ revision
-→ re-review
+Spec Tasks S1–S4
+→ each Task implement
+→ immediate review
+→ findings/fix/re-review
+→ whole-Spec implementation review
+→ holistic Spec review
 → closure
 ```
 
@@ -18,6 +19,10 @@ Spec draft
 - `docs/audits/2026-07-27-production-deployment-long-term-operation-audit.md`
 - `docs/superpowers/specs/2026-07-27-production-deployment-long-term-operation-design.md`
 - `docs/superpowers/specs/2026-07-27-production-deployment-long-term-operation-spec-review.md`
+- `docs/superpowers/tasks/2026-07-27-production-deployment-long-term-operation-spec-tasks.md`
+- `docs/superpowers/reviews/2026-07-27-production-deployment-long-term-operation-spec-task-reviews.md`
+- `docs/superpowers/reviews/2026-07-27-production-deployment-long-term-operation-spec-implementation-review.md`
+- `docs/superpowers/reviews/2026-07-27-production-deployment-long-term-operation-spec-holistic-review.md`
 
 ## Closure checks
 
@@ -38,19 +43,23 @@ Spec draft
 - Operator documentation and fresh deployment evidence are mandatory.
 - No password handling, automatic reboot, raw HID evidence, or unnecessary unique device ID is
   authorized.
+- Spec Tasks S1–S4 each completed immediate review, findings disposition, correction where
+  required, and re-review before the next Spec Task began.
+- The assembled Spec passed an independent whole-Spec implementation review and a holistic review.
 
 ## Findings disposition
 
-All findings in the Spec review are resolved at the design level. Implementation evidence is not
-claimed and no finding is considered operationally closed until its future Task passes immediate
+All findings in the Spec Task reviews, original Spec review, whole-Spec implementation review, and
+holistic review are resolved at the design level. Implementation evidence is not claimed and no
+finding is considered operationally closed until its future implementation Task passes immediate
 review, focused/full verification, and any required real-system acceptance.
 
 ## Decision
 
-**Closed for user review.** The Spec is the architecture and safety authority for Milestone 16
-Plan governance.
+**Closed and user-approved.** The Spec is the architecture and safety authority for Milestone 16
+Plan governance under the complete dual-layer governance model.
 
-The next permitted activity, after user acceptance of this Spec, is:
+The user authorized the following next activity on 2026-07-27:
 
 ```text
 Implementation Plan draft
@@ -60,6 +69,7 @@ Implementation Plan draft
 → Plan closure
 ```
 
-Production code changes, `/Library` changes, launchd mutation, real sleep, persistent activation,
-reboot, merge, push, and worktree cleanup remain prohibited at this closure.
+Production code changes remain prohibited until Plan and Task governance close. `/Library`
+changes, launchd mutation, real sleep, persistent activation, and reboot remain separately
+approval-gated. Merge, push, and worktree cleanup remain prohibited without explicit approval.
 

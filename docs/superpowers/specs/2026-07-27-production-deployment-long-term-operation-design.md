@@ -1,6 +1,6 @@
 # Milestone 16 — Production Deployment and Long-term Operation Design Specification
 
-Status: Internally reviewed and closed for user review; implementation and system mutation remain prohibited
+Status: Approved and closed under dual-layer Spec governance; Plan and system mutation remain prohibited
 Baseline: `e2b8afeac0bf8f7560d6a9d60b4da328d9650bd3`
 Target machine: `MacBookPro18,1` (Apple M1 Pro)
 
