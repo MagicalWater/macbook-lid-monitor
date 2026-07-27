@@ -36,6 +36,19 @@ final class ProductionPackagingTests: XCTestCase {
         XCTAssertEqual(plist["BinaryPath"] as? String, "/Library/PrivilegedHelperTools/macbook-lid-monitor-daemon")
         XCTAssertEqual(plist["PlistPath"] as? String, "/Library/LaunchDaemons/com.crazydennies.macbook-lid-monitor.plist")
         XCTAssertEqual(plist["ConfigPath"] as? String, ProductionConfigurationLoader.fixedPath)
+        XCTAssertEqual(plist["SourceCommit"] as? String, "UNPREPARED")
+        XCTAssertEqual(plist["PlistSHA256"] as? String, "UNPREPARED")
+        XCTAssertEqual(plist["DisabledConfigSHA256"] as? String, "UNPREPARED")
+        XCTAssertEqual(plist["HardwareProfileID"] as? String, "m1-pro-0x8104-report-id-1-v1")
+        XCTAssertEqual(plist["SleepAuthorityPath"] as? String, SleepAuthorityPathResolver.managedPath)
+        XCTAssertEqual(
+            plist["AcceptanceStatePath"] as? String,
+            "/Library/Application Support/MacBookLidMonitor/deployment-acceptance.plist"
+        )
+        XCTAssertEqual(
+            plist["HealthStatePath"] as? String,
+            "/Library/Application Support/MacBookLidMonitor/health.plist"
+        )
     }
 
     private func dictionary(_ path: String) throws -> [String: Any] {

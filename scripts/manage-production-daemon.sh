@@ -968,12 +968,19 @@ prepare_package() {
     chmod 0755 "$STAGING_DIR/macbook-lid-monitor-daemon"
     chmod 0644 "$STAGING_DIR"/*.plist
 
-    local version checksum
+    local version source_commit checksum plist_checksum config_checksum
     version="$(package_version)"
+    source_commit="$(git -C "$REPO_ROOT" rev-parse HEAD)"
     checksum="$(sha256_file "$STAGING_DIR/macbook-lid-monitor-daemon")"
+    plist_checksum="$(sha256_file "$STAGING_DIR/com.crazydennies.macbook-lid-monitor.plist")"
+    config_checksum="$(sha256_file "$STAGING_DIR/config.plist")"
     /usr/libexec/PlistBuddy -c "Set :Version $version" "$STAGING_DIR/manifest.plist"
+    /usr/libexec/PlistBuddy -c "Set :SourceCommit $source_commit" "$STAGING_DIR/manifest.plist"
     /usr/libexec/PlistBuddy -c "Set :BinarySHA256 $checksum" "$STAGING_DIR/manifest.plist"
-    printf 'prepared staging=%s version=%s checksum=%s\n' "$STAGING_DIR" "$version" "$checksum"
+    /usr/libexec/PlistBuddy -c "Set :PlistSHA256 $plist_checksum" "$STAGING_DIR/manifest.plist"
+    /usr/libexec/PlistBuddy -c "Set :DisabledConfigSHA256 $config_checksum" "$STAGING_DIR/manifest.plist"
+    printf 'prepared staging=%s version=%s source-commit=%s binary=%s plist=%s config=%s\n' \
+        "$STAGING_DIR" "$version" "$source_commit" "$checksum" "$plist_checksum" "$config_checksum"
 }
 
 verify_package() {
@@ -989,13 +996,26 @@ verify_package() {
     test -x "$binary"
     plutil -lint "$plist" "$config" "$manifest" >/dev/null
 
-    local expected actual version
+    local expected actual version source_commit expected_plist actual_plist expected_config actual_config
     expected="$(/usr/libexec/PlistBuddy -c 'Print :BinarySHA256' "$manifest")"
     actual="$(sha256_file "$binary")"
     version="$(/usr/libexec/PlistBuddy -c 'Print :Version' "$manifest")"
+    source_commit="$(/usr/libexec/PlistBuddy -c 'Print :SourceCommit' "$manifest")"
+    expected_plist="$(/usr/libexec/PlistBuddy -c 'Print :PlistSHA256' "$manifest")"
+    actual_plist="$(sha256_file "$plist")"
+    expected_config="$(/usr/libexec/PlistBuddy -c 'Print :DisabledConfigSHA256' "$manifest")"
+    actual_config="$(sha256_file "$config")"
     test "$expected" = "$actual"
     test "$version" = "$(package_version)"
-    printf 'verified staging=%s version=%s checksum=%s\n' "$STAGING_DIR" "$version" "$actual"
+    test "$source_commit" = "$(git -C "$REPO_ROOT" rev-parse HEAD)"
+    test "$expected_plist" = "$actual_plist"
+    test "$expected_config" = "$actual_config"
+    if /usr/libexec/PlistBuddy -c 'Print :EnvironmentVariables' "$plist" >/dev/null 2>&1; then
+        printf 'error: staged LaunchDaemon must not define EnvironmentVariables\n' >&2
+        return 65
+    fi
+    printf 'verified staging=%s version=%s source-commit=%s binary=%s plist=%s config=%s\n' \
+        "$STAGING_DIR" "$version" "$source_commit" "$actual" "$actual_plist" "$actual_config"
 }
 
 [[ $# -eq 1 ]] || usage

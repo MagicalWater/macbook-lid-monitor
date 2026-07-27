@@ -322,7 +322,7 @@ git add Sources/LidMonitorCore/Production/ProductionDaemonApplication.swift \
 git commit -m "fix: remove production sleep requester override"
 ```
 
-### Task 4: Complete package manifest and source preparation integrity
+### Task 4: Complete package manifest and source preparation integrity — complete
 
 **Purpose:** Record binary, plist, normalized disabled config, source commit, profile, and managed
 paths in one reproducible package identity.
@@ -335,7 +335,7 @@ paths in one reproducible package identity.
 - Modify: `Tests/LidMonitorTests/ProductionPackagingTests.swift`
 - Modify: `Tests/LidMonitorTests/ProductionManagementScriptTests.swift`
 
-- [ ] **Step 1: Add failing schema and checksum tests**
+- [x] **Step 1: Add failing schema and checksum tests**
 
 Require manifest keys:
 
@@ -354,19 +354,19 @@ AcceptanceStatePath
 HealthStatePath
 ```
 
-- [ ] **Step 2: Prove RED**
+- [x] **Step 2: Prove RED**
 
 ```bash
 swift test --filter 'ProductionPackagingTests|ProductionManagementScriptTests'
 ```
 
-- [ ] **Step 3: Implement deterministic preparation**
+- [x] **Step 3: Implement deterministic preparation**
 
 `prepare` must build, copy, chmod, lint, calculate all hashes, and write the exact full source
 commit. `verify` must recompute every staged hash and reject `EnvironmentVariables` in the staged
 plist.
 
-- [ ] **Step 4: Verify package reproduction**
+- [x] **Step 4: Verify package reproduction**
 
 ```bash
 rm -rf .build/production-package
@@ -376,7 +376,7 @@ plutil -lint .build/production-package/*.plist
 swift test --filter 'ProductionPackagingTests|ProductionManagementScriptTests'
 ```
 
-- [ ] **Step 5: Review and commit**
+- [x] **Step 5: Review and commit**
 
 Review mutable-mode normalization boundaries and source-commit accuracy, then commit:
 

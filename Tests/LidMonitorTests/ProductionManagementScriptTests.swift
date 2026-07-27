@@ -26,6 +26,9 @@ final class ProductionManagementScriptTests: XCTestCase {
         XCTAssertTrue(text.contains("sha256_file"))
         XCTAssertTrue(text.contains("Set :Version"))
         XCTAssertTrue(text.contains("Set :BinarySHA256"))
+        XCTAssertTrue(text.contains("Set :SourceCommit"))
+        XCTAssertTrue(text.contains("Set :PlistSHA256"))
+        XCTAssertTrue(text.contains("Set :DisabledConfigSHA256"))
         XCTAssertTrue(text.contains("test \"$expected\" = \"$actual\""))
         XCTAssertTrue(text.contains("test \"$version\" = \"$(package_version)\""))
     }
@@ -424,7 +427,8 @@ final class ProductionManagementScriptTests: XCTestCase {
         let text = try String(contentsOf: root.appendingPathComponent("scripts/manage-production-daemon.sh"), encoding: .utf8)
         XCTAssertFalse(text.contains("accept-task13-injected-failure"))
         XCTAssertFalse(text.contains("MLM_SLEEP_OPERATION"))
-        XCTAssertFalse(text.contains("EnvironmentVariables"))
+        XCTAssertFalse(text.contains("Add :EnvironmentVariables"))
+        XCTAssertFalse(text.contains("Delete :EnvironmentVariables"))
     }
 
     func testTask14RebootRollbackAndUninstallAcceptanceInSandbox() throws {
@@ -686,8 +690,17 @@ final class ProductionManagementScriptTests: XCTestCase {
             PropertyListSerialization.propertyList(from: sourceData, format: nil) as? [String: Any]
         )
         manifest["Version"] = try commandOutput("/usr/bin/git", ["rev-parse", "--short=12", "HEAD"])
+        manifest["SourceCommit"] = try commandOutput("/usr/bin/git", ["rev-parse", "HEAD"])
         manifest["BinarySHA256"] = try commandOutput("/usr/bin/shasum", ["-a", "256", binary.path])
             .split(separator: " ").first.map(String.init)
+        let stagedPlist = staging.appendingPathComponent("com.crazydennies.macbook-lid-monitor.plist")
+        let stagedConfig = staging.appendingPathComponent("config.plist")
+        manifest["PlistSHA256"] = try commandOutput(
+            "/usr/bin/shasum", ["-a", "256", stagedPlist.path]
+        ).split(separator: " ").first.map(String.init)
+        manifest["DisabledConfigSHA256"] = try commandOutput(
+            "/usr/bin/shasum", ["-a", "256", stagedConfig.path]
+        ).split(separator: " ").first.map(String.init)
         let data = try PropertyListSerialization.data(fromPropertyList: manifest, format: .xml, options: 0)
         try data.write(to: manifestURL)
         try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: binary.path)

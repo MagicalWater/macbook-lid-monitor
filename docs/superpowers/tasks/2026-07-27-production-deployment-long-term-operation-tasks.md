@@ -1,6 +1,6 @@
 # Milestone 16 Production Deployment and Long-term Operation Task Register
 
-Status: Tasks 1–3 complete and reviewed; Task 4 is next. Tasks 15–21 remain approval-gated.
+Status: Tasks 1–4 complete and reviewed; Task 5 is next. Tasks 15–21 remain approval-gated.
 
 ## Mandatory per-Task workflow
 
@@ -27,7 +27,7 @@ all Task reviews. Historical Milestone 1–15 evidence is context, not Milestone
 | 1 | Shared filesystem metadata and non-replaceable managed lease primitive — complete | `ProductionFileSystem.swift`, `ProductionConfigurationLoader.swift`, `SleepAuthorityLease.swift`, filesystem/lease tests | 21 focused tests; 209 full tests; daemon release build | none | revert Task 1 commit; no system state |
 | 2 | Shared authority path resolution for daemon and foreground CLI — complete | `SleepAuthorityPathResolver.swift`, daemon/CLI composition, integration tests | 33 focused tests; 215 full tests; daemon release build | none | revert commit; no system state |
 | 3 | Remove deployable requester environment override — complete | daemon composition, management script/tests | 52 focused tests; 215 full tests; Bash syntax | none | revert commit; no system state |
-| 4 | Complete package manifest and staged identity | manifest template, package common, package tests | binary/plist/config/source/profile hashes and lint | none | delete staging; revert commit |
+| 4 | Complete package manifest and staged identity — complete | manifest template, package common, package tests | 46 focused tests; 215 full tests; package prepare/verify; plist/Bash/diff checks | none | delete staging; revert commit |
 | 5 | Runtime installed-set verification | `ProductionInstalledSetVerifier.swift`, daemon composition/tests | metadata/hash/config normalization/prohibited env/fail-open | none | revert commit; no system state |
 | A | Stage A implementation review | review/evidence only | full tests, all release builds, static/plist/package checks | none | no system state |
 | 6 | Shell installed verifier, metadata, and lifecycle guard | `production-installed-set.sh`, package common, manager/tests | expected/actual checks, normalization, metadata, concurrent mutation guard | none | revert commit; test-root only |

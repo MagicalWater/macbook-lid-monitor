@@ -6,16 +6,30 @@
     <integer>1</integer>
     <key>Product</key>
     <string>macbook-lid-monitor-daemon</string>
+    <key>SourceCommit</key>
+    <string>UNPREPARED</string>
     <key>Version</key>
     <string>development</string>
     <key>BinaryPath</key>
     <string>/Library/PrivilegedHelperTools/macbook-lid-monitor-daemon</string>
     <key>PlistPath</key>
     <string>/Library/LaunchDaemons/com.crazydennies.macbook-lid-monitor.plist</string>
+    <key>PlistSHA256</key>
+    <string>UNPREPARED</string>
     <key>ConfigPath</key>
     <string>/Library/Application Support/MacBookLidMonitor/config.plist</string>
+    <key>DisabledConfigSHA256</key>
+    <string>UNPREPARED</string>
+    <key>HardwareProfileID</key>
+    <string>m1-pro-0x8104-report-id-1-v1</string>
     <key>CrashBudgetPath</key>
     <string>/Library/Application Support/MacBookLidMonitor/crash-budget.json</string>
+    <key>SleepAuthorityPath</key>
+    <string>/Library/Application Support/MacBookLidMonitor/sleep-authority.lock</string>
+    <key>AcceptanceStatePath</key>
+    <string>/Library/Application Support/MacBookLidMonitor/deployment-acceptance.plist</string>
+    <key>HealthStatePath</key>
+    <string>/Library/Application Support/MacBookLidMonitor/health.plist</string>
     <key>BinarySHA256</key>
     <string>UNPREPARED</string>
 </dict>

@@ -164,3 +164,55 @@ bash -n: passed
 ### Decision
 
 **Task 3 approved.** No Critical/P0/P1 finding remains. Task 4 may begin.
+
+## Task 4 — Complete package manifest and source preparation integrity
+
+### Implemented
+
+- Manifest now records full source commit, binary/plist/disabled-config hashes, hardware profile,
+  managed authority path, deployment acceptance path, and health path.
+- `prepare` writes the exact full Git commit and all staged artifact checksums.
+- `verify` recomputes binary/plist/config checksums, checks exact source commit and version, lints
+  every plist, and rejects staged LaunchDaemon environment variables.
+- Sandbox staging fixtures now produce the same complete manifest identity as production staging.
+
+### TDD evidence
+
+The initial focused run produced ten expected failures for missing manifest keys and missing package
+preparation assignments. After implementation, lifecycle sandbox tests initially failed before
+mutation because their fixture still emitted the legacy one-checksum manifest.
+
+### Immediate review finding
+
+#### T4-P1 — Sandbox fixture did not implement the new package contract
+
+The first GREEN package implementation was correct, but `seedStaging()` omitted source, plist, and
+config identity. This caused `verify_package` to reject fixtures and generated secondary cleanup
+noise.
+
+**Resolution:** update the fixture to calculate the same complete identity and narrow the source
+override assertion to actual Add/Delete environment mutations. Production verification remained
+strict.
+
+### Re-review
+
+- Full source commit is recorded and verified: pass.
+- Binary, plist, and disabled-template config hashes are reproducible: pass.
+- Staged environment variables are rejected: pass.
+- Hardware/profile and managed state paths are fixed in the manifest: pass.
+- Package preparation performs no `/Library` or launchd mutation: pass.
+
+### Verification
+
+```text
+focused: 46 tests, 0 failures
+full XCTest: 215 tests, 0 failures
+prepare/verify: passed
+plist lint: passed
+bash -n: passed
+git diff --check: passed
+```
+
+### Decision
+
+**Task 4 approved.** No Critical/P0/P1 finding remains. Task 5 may begin.
