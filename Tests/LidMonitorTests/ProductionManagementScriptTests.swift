@@ -474,6 +474,45 @@ final class ProductionManagementScriptTests: XCTestCase {
         XCTAssertEqual(config.mode, .disabled)
     }
 
+    func testDeploymentDryRunSleepWakeUsesInstalledIdentityAndReturnsDisabled() throws {
+        let sandbox = root.appendingPathComponent(".build/production-deployment-dry-run-sleep-wake-root")
+        try? FileManager.default.removeItem(at: sandbox)
+        defer { try? FileManager.default.removeItem(at: sandbox) }
+
+        try seedStaging()
+        try runScript("install", environment: ["MLM_TEST_ROOT": sandbox.path])
+        try runScript("bootstrap", environment: ["MLM_TEST_ROOT": sandbox.path])
+        try runScript("deployment-dry-run", environment: ["MLM_TEST_ROOT": sandbox.path])
+        try runScript("deployment-dry-run-sleep-wake", environment: ["MLM_TEST_ROOT": sandbox.path])
+
+        let configURL = sandbox.appendingPathComponent("Library/Application Support/MacBookLidMonitor/config.plist")
+        let config = try ProductionConfigurationDecoder().decode(Data(contentsOf: configURL))
+        XCTAssertEqual(config.mode, .disabled)
+    }
+
+    func testDeploymentDryRunReopenRearmsSameInstalledDaemonAndReturnsDisabled() throws {
+        let sandbox = root.appendingPathComponent(".build/production-deployment-dry-run-reopen-root")
+        try? FileManager.default.removeItem(at: sandbox)
+        defer { try? FileManager.default.removeItem(at: sandbox) }
+
+        try seedStaging()
+        try runScript("install", environment: ["MLM_TEST_ROOT": sandbox.path])
+        try runScript("bootstrap", environment: ["MLM_TEST_ROOT": sandbox.path])
+        try runScript("deployment-dry-run", environment: ["MLM_TEST_ROOT": sandbox.path])
+        let output = try runScriptOutput(
+            "deployment-dry-run-reopen",
+            environment: ["MLM_TEST_ROOT": sandbox.path]
+        )
+
+        XCTAssertTrue(output.contains("would-sleep=true"), output)
+        XCTAssertTrue(output.contains("rearmed=true"), output)
+        XCTAssertTrue(output.contains("pid-stable=true"), output)
+
+        let configURL = sandbox.appendingPathComponent("Library/Application Support/MacBookLidMonitor/config.plist")
+        let config = try ProductionConfigurationDecoder().decode(Data(contentsOf: configURL))
+        XCTAssertEqual(config.mode, .disabled)
+    }
+
     func testTask12SleepWakeCommandIsExplicitAndFailSafe() throws {
         let text = try String(contentsOf: root.appendingPathComponent("scripts/manage-production-daemon.sh"), encoding: .utf8)
         XCTAssertTrue(text.contains("accept-task12-sleep-wake)"))
@@ -1393,6 +1432,23 @@ final class ProductionManagementScriptTests: XCTestCase {
         let corrupt = try runScriptOutput("diagnostics", environment: ["MLM_TEST_ROOT": sandbox.path])
         XCTAssertTrue(corrupt.contains("health_state=corrupt"), corrupt)
         XCTAssertTrue(corrupt.contains("crash_state=corrupt"), corrupt)
+    }
+
+    func testObservabilityReportsPartialDeploymentAcceptanceWithoutCallingItCorrupt() throws {
+        let sandbox = root.appendingPathComponent(".build/production-observability-partial-acceptance-root")
+        try? FileManager.default.removeItem(at: sandbox)
+        defer { try? FileManager.default.removeItem(at: sandbox) }
+        try seedStaging()
+        try runScript("install", environment: ["MLM_TEST_ROOT": sandbox.path])
+
+        _ = try runDeploymentLibrary(
+            "record_deployment_acceptance deployment-dry-run pass",
+            sandbox: sandbox
+        )
+
+        let status = try runScriptOutput("status", environment: ["MLM_TEST_ROOT": sandbox.path])
+        XCTAssertTrue(status.contains("acceptance_state=partial"), status)
+        XCTAssertFalse(status.contains("acceptance_state=corrupt"), status)
     }
 
     func testOperationalBaselineRequiresCompleteHealthyEnabledEvidence() throws {

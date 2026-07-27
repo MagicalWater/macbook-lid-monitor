@@ -755,12 +755,12 @@ sleep requester can be constructed; obtain explicit approval before the mutation
 
 **Purpose:** Prove the complete installed sensor/power path without granting real-sleep authority.
 
-- [ ] Run logged-in installed dry-run close/debounce/would-sleep/reopen/rearm acceptance.
-- [ ] Run installed dry-run sleep/wake continuity acceptance without sensor-driven real sleep.
-- [ ] Verify one PID in dry-run, no duplicate authority, crash state, health, logs, and emergency
+- [x] Run logged-in installed dry-run close/debounce/would-sleep/reopen/rearm acceptance.
+- [x] Run installed dry-run sleep/wake continuity acceptance without sensor-driven real sleep.
+- [x] Verify one PID in dry-run, no duplicate authority, crash state, health, logs, and emergency
   disable; return loaded/disabled/zero PID.
-- [ ] Record matching dry-run acceptance identity and immediate review; do not perform real sleep or
-  activation.
+- [x] Record matching dry-run acceptance identity and immediate review; do not perform sensor-driven
+  real sleep or activation.
 
 ### Task 18: Bounded one-sleep acceptance
 

@@ -12,7 +12,7 @@ source "$SCRIPT_DIR/lib/production-deployment-state.sh"
 source "$SCRIPT_DIR/lib/production-observability.sh"
 
 usage() {
-    printf '%s\n' 'usage: manage-production-daemon.sh prepare|verify|install|bootstrap|status|stop|bootout|disable|dry-run|deployment-dry-run|deployment-enabled-once|deployment-recovery-resleep|activate|upgrade|rollback|reset-crash-budget|rotate-logs|diagnostics|operational-baseline|uninstall|accept-task9|accept-task10|accept-task11|accept-task12-logged-in|accept-task12-loginwindow-start|accept-task12-loginwindow-finish|accept-task12-sleep-wake|accept-task13-dry-run-path|accept-task13-enabled-once|accept-task13-recovery-resleep|accept-task14-reboot-start|accept-task14-reboot-finish' >&2
+    printf '%s\n' 'usage: manage-production-daemon.sh prepare|verify|install|bootstrap|status|stop|bootout|disable|dry-run|deployment-dry-run|deployment-dry-run-reopen|deployment-dry-run-sleep-wake|deployment-enabled-once|deployment-recovery-resleep|activate|upgrade|rollback|reset-crash-budget|rotate-logs|diagnostics|operational-baseline|uninstall|accept-task9|accept-task10|accept-task11|accept-task12-logged-in|accept-task12-loginwindow-start|accept-task12-loginwindow-finish|accept-task12-sleep-wake|accept-task13-dry-run-path|accept-task13-enabled-once|accept-task13-recovery-resleep|accept-task14-reboot-start|accept-task14-reboot-finish' >&2
     exit 64
 }
 
@@ -360,9 +360,13 @@ accept_task12_sleep_wake() {
         fi
     }
     trap cleanup_task12_sleep_wake_to_disabled EXIT
-    prepare_as_invoking_user
-    verify_package
-    upgrade_package
+    if [[ "${1:-legacy}" != stable ]]; then
+        prepare_as_invoking_user
+        verify_package
+        upgrade_package
+    else
+        verify_installed_set
+    fi
     set_dry_run_mode
     verify_logged_in_dry_run
     if [[ -n "$SYSTEM_ROOT" ]]; then
@@ -398,6 +402,76 @@ accept_task12_sleep_wake() {
     diagnostics
     trap - EXIT
     printf 'accepted task=12 scope=sleep-wake final-mode=disabled label=%s\n' "$LAUNCHD_LABEL"
+}
+
+deployment_dry_run_sleep_wake() {
+    require_root_for_system
+    verify_deployment_acceptance deployment-dry-run
+    accept_task12_sleep_wake stable
+}
+
+deployment_dry_run_reopen() {
+    require_root_for_system
+    local mode before_pid after_pid log_offset would_sleep_count rearmed_count process_count
+    verify_deployment_acceptance deployment-dry-run
+    mode="$(/usr/libexec/PlistBuddy -c 'Print :Mode' "$MANAGED_CONFIG")"
+    [[ "$mode" == disabled ]] || { printf 'error: expected disabled starting mode\n' >&2; return 65; }
+    cleanup_task17_dry_run_reopen_to_disabled() {
+        if [[ -f "$MANAGED_CONFIG" && ! -L "$MANAGED_CONFIG" ]]; then
+            disable_job >/dev/null 2>&1 || true
+            bootout_job >/dev/null 2>&1 || true
+            bootstrap_job >/dev/null 2>&1 || true
+        fi
+    }
+    trap cleanup_task17_dry_run_reopen_to_disabled EXIT
+    set_dry_run_mode
+    verify_logged_in_dry_run
+    if [[ -n "$SYSTEM_ROOT" ]]; then
+        before_pid=1
+        mkdir -p -- "$MANAGED_LOG_DIR"
+        touch "$MANAGED_STDOUT_LOG"
+        log_offset="$(stat -f '%z' "$MANAGED_STDOUT_LOG")"
+        {
+            printf 'timestamp=test event=transition pid=1 name=candidate-started\n'
+            printf 'timestamp=test event=transition pid=1 name=debounce-elapsed\n'
+            printf 'timestamp=test event=transition pid=1 name=sleep-request-attempted\n'
+            printf 'timestamp=test event=transition pid=1 name=would-sleep\n'
+            printf 'timestamp=test event=transition pid=1 name=monitoring-armed\n'
+        } >> "$MANAGED_STDOUT_LOG"
+    else
+        before_pid="$(pgrep -f '^/Library/PrivilegedHelperTools/macbook-lid-monitor-daemon$')"
+        log_offset="$(stat -f '%z' "$MANAGED_STDOUT_LOG")"
+        printf 'armed task=17 scope=dry-run-reopen pid=%s action=move-lid-below-68-degrees-and-hold-2-seconds-within-180-seconds\n' "$before_pid"
+        for _ in {1..180}; do
+            would_sleep_count="$(dd if="$MANAGED_STDOUT_LOG" bs=1 skip="$log_offset" 2>/dev/null | grep -c 'event=transition.*name=would-sleep' || true)"
+            [[ "$would_sleep_count" -ge 1 ]] && break
+            sleep 1
+        done
+        [[ "${would_sleep_count:-0}" -ge 1 ]] || { printf 'error: would-sleep evidence missing\n' >&2; return 70; }
+        printf 'reopen task=17 scope=dry-run-reopen action=move-lid-above-78-degrees-within-180-seconds\n'
+        for _ in {1..180}; do
+            rearmed_count="$(dd if="$MANAGED_STDOUT_LOG" bs=1 skip="$log_offset" 2>/dev/null | grep -c 'event=transition.*name=monitoring-armed' || true)"
+            [[ "$rearmed_count" -ge 1 ]] && break
+            sleep 1
+        done
+    fi
+    would_sleep_count="$(dd if="$MANAGED_STDOUT_LOG" bs=1 skip="$log_offset" 2>/dev/null | grep -c 'event=transition.*name=would-sleep' || true)"
+    rearmed_count="$(dd if="$MANAGED_STDOUT_LOG" bs=1 skip="$log_offset" 2>/dev/null | grep -c 'event=transition.*name=monitoring-armed' || true)"
+    [[ "$would_sleep_count" == 1 ]] || { printf 'error: expected exactly one would-sleep event, got %s\n' "$would_sleep_count" >&2; return 70; }
+    [[ "$rearmed_count" -ge 1 ]] || { printf 'error: reopen rearm evidence missing\n' >&2; return 70; }
+    if [[ -z "$SYSTEM_ROOT" ]]; then
+        process_count="$({ pgrep -f '^/Library/PrivilegedHelperTools/macbook-lid-monitor-daemon$' || true; } | wc -l | tr -d ' ')"
+        [[ "$process_count" == 1 ]] || { printf 'error: expected one dry-run daemon after reopen, got %s\n' "$process_count" >&2; return 70; }
+        after_pid="$(pgrep -f '^/Library/PrivilegedHelperTools/macbook-lid-monitor-daemon$')"
+        [[ "$after_pid" == "$before_pid" ]] || { printf 'error: daemon PID changed across reopen\n' >&2; return 70; }
+    fi
+    printf 'verified task=17 scope=dry-run-reopen would-sleep=true rearmed=true pid-stable=true\n'
+    disable_job
+    bootout_job
+    bootstrap_job
+    diagnostics
+    trap - EXIT
+    printf 'accepted task=17 scope=dry-run-reopen final-mode=disabled label=%s\n' "$LAUNCHD_LABEL"
 }
 
 accept_task13_enabled_once() {
@@ -1112,6 +1186,8 @@ case "$1" in
     disable) disable_job ;;
     dry-run) set_dry_run_mode ;;
     deployment-dry-run) deployment_dry_run ;;
+    deployment-dry-run-reopen) deployment_dry_run_reopen ;;
+    deployment-dry-run-sleep-wake) deployment_dry_run_sleep_wake ;;
     deployment-enabled-once) deployment_enabled_once ;;
     deployment-recovery-resleep) deployment_recovery_resleep ;;
     activate) activate_deployment ;;

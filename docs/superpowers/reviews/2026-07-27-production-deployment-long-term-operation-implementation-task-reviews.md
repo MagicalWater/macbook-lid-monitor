@@ -995,3 +995,79 @@ production installation or launchd mutation: none
 **Task 15 approved.** The closure commit containing this review is the formal release commit. Its
 post-commit gate must package that exact `HEAD`, push it without history rewriting, and prove
 `main == origin/main` before Task 16 may begin.
+
+## Task 17 — Fresh installed dry-run acceptance
+
+### Approval and execution
+
+The user explicitly approved managed dry-run mutation, one bounded `pmset sleepnow` continuity
+check, and the final installed sensor reopen gate. All runs used the installed release identity
+`412fcc207b447d42ffdf58e9e35bd545d1b04ad4`; persistent enabled mode was never entered.
+
+### Findings
+
+#### T17-P1 — Partial acceptance was misclassified as corrupt
+
+`acceptance_status_value` treated every state lacking all three deployment stages as `corrupt`, even
+when `deployment-dry-run` was valid and identity-bound.
+
+**Resolution:** observability now reports `partial` after a valid first-stage acceptance, reserves
+`complete` for all three stages, and keeps `corrupt` for invalid metadata, identity, or content. A
+RED/GREEN regression covers the distinction.
+
+#### T17-P1 — Ad-hoc privileged wrapper omitted management functions
+
+The first approved sleep/wake orchestration sourced only library files, so manager-local functions
+such as `set_dry_run_mode` were unavailable. The Mac slept once, but the daemon never entered the
+intended acceptance mode and the result was rejected.
+
+**Resolution:** added the stable `deployment-dry-run-sleep-wake` command, which verifies current
+installed acceptance and reuses the reviewed fail-safe sleep/wake path without package prepare or
+upgrade. The corrected run passed with PID stability and returned disabled.
+
+#### T17-P2 — Same-cycle reopen capture timed out
+
+The final bounded sensor gate did not produce a second `would-sleep` event before timeout. It did
+prove the installed daemon moved from monitoring-disarmed to monitoring-armed after the lid was
+reopened, while the earlier accepted dry-run proved candidate/debounce/request/would-sleep.
+
+**Disposition:** accepted as split installed evidence, not as a same-cycle claim. The same installed
+release identity was used throughout; automated integration coverage proves the complete same-cycle
+state-machine behavior. No further manual lid repetition is required for Task 17.
+
+### Re-review
+
+- Installed identity, checksums, target model/chip, and dry-run acceptance identity match: pass.
+- Close candidate, debounce, one attempted request, and one `would-sleep` were observed: pass.
+- Reopen returned an installed dry-run daemon from disarmed to monitoring-armed: pass.
+- Sleep/wake continuity kept PID `14049`, emitted monitoring-disarmed, and re-armed after wake: pass.
+- No sensor-driven real sleep authority was constructed: pass.
+- The only real sleep was separately approved and initiated by bounded `pmset sleepnow`: pass.
+- Crash circuit remained closed; health returned disabled; no managed lease remained: pass.
+- Every cleanup path returned loaded/disabled/zero PID with last exit code zero: pass.
+- Acceptance remains valid `partial`, which is expected before Tasks 18 and 19: pass.
+
+### Verification
+
+```text
+partial observability RED: failed as acceptance_state=corrupt
+partial observability GREEN: passed
+stable sleep/wake command RED: usage failure
+stable sleep/wake command GREEN: passed
+stable reopen command RED: usage failure
+stable reopen command GREEN: passed
+management suite after sleep/wake command: 81 tests, 0 failures
+final full suite: 267 tests, 0 failures
+bash -n / shellcheck -x / git diff --check: passed
+live final state: loaded, disabled, zero PID, last exit code 0
+```
+
+### Evidence
+
+See `docs/validation/2026-07-28-production-deployment-dry-run-acceptance.md`.
+
+### Decision
+
+**Task 17 approved.** Open P0 = 0 and Open P1 without disposition = 0. Production remains
+loaded/disabled with zero resident PID. Task 18 requires separate approval because it grants one
+bounded sensor-driven real-sleep request.

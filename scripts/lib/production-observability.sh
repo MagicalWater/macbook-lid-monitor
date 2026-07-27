@@ -96,6 +96,8 @@ acceptance_status_value() {
     if [[ ! -e "$MANAGED_ACCEPTANCE_STATE" ]]; then printf '%s\n' missing; return; fi
     if verify_deployment_acceptance deployment-dry-run deployment-enabled-once deployment-recovery-resleep >/dev/null 2>&1; then
         printf '%s\n' complete
+    elif verify_deployment_acceptance deployment-dry-run >/dev/null 2>&1; then
+        printf '%s\n' partial
     else
         printf '%s\n' corrupt
     fi

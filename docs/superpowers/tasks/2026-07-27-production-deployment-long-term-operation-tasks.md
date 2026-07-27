@@ -1,7 +1,6 @@
 # Milestone 16 Production Deployment and Long-term Operation Task Register
 
-Status: Tasks 1–16 and Stage A/B reviews complete. Task 17 is approval-gated. Tasks 18–21 retain
-their own later approvals.
+Status: Tasks 1–17 and Stage A/B reviews complete. Tasks 18–21 retain their own later approvals.
 
 ## Mandatory per-Task workflow
 
@@ -43,7 +42,7 @@ all Task reviews. Historical Milestone 1–15 evidence is context, not Milestone
 | 14 | Full automated clean-checkout release gate — complete | implementation review and automated validation evidence | 264 tests in main and clean snapshot; four release products; static/package/residual gates | none | no system state; production remains uninstalled |
 | 15 | Formal-main integration and package provenance — complete | Git and package evidence | pre/post integration 264-test suites; fast-forward main; exact release package; main/origin equality | approved | no install occurred; release remains safely uninstalled |
 | 16 | Disabled production installation — complete | manager and install evidence | exact package identity and checksums; root metadata; loaded/disabled/zero PID; valid disabled health and closed crash circuit | approved | live state remains loaded/disabled/zero PID |
-| 17 | Fresh installed dry-run acceptance | deployment dry-run evidence | close/debounce/would-sleep, reopen, sleep/wake continuity, return disabled | explicit managed config/launchd mutation approval | cleanup trap to loaded/disabled/zero PID |
+| 17 | Fresh installed dry-run acceptance — complete | deployment dry-run evidence | close/debounce/would-sleep, reopen/rearm split installed evidence, PID-stable sleep/wake continuity, 267-test final full suite, static gates, return disabled | approved, including bounded pmset continuity | cleanup trap verified loaded/disabled/zero PID |
 | 18 | Bounded one-sleep acceptance | enabled-once evidence | one attempt, wake, PID stable, exact identity, return disabled | separate real-sleep approval | cleanup trap to loaded/disabled/zero PID |
 | 19 | Bounded recovery-resleep acceptance | recovery evidence | two attempts, one recovery transition, no third, return disabled | separate recovery-resleep approval | cleanup trap to loaded/disabled/zero PID |
 | 20 | Persistent production activation | activation evidence | complete acceptance identity, one PID, managed authority, healthy enabled | separate persistent activation approval | emergency disable/bootout; Milestone becomes incomplete until redeployed |
