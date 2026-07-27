@@ -18,7 +18,7 @@ Status: Implementation in progress; Tasks 1–11 and Stage C complete; Task 12 l
 | 10 | upgrade/rollback — complete | script/fixtures/evidence | injected failure + rollback acceptance | approved and completed | automatic restore previous set |
 | 11 | logs/diagnostics/uninstall — complete | script/docs/tests | rotation/privacy/residual-state | approved and completed | bootout and scoped removal |
 | C | Packaging stage review — complete | reviews/evidence | clean checkout + residual state | completed with zero installed residual | explicit uninstall |
-| 12 | Production dry-run acceptance — logged-in complete; loginwindow retry ready | validation evidence | logged-in complete; system-domain loginwindow observer verified; sleep/wake pending | logout approved; separate sleep/reboot approvals remain | automatic disable/bootout/bootstrap and observer cleanup |
+| 12 | Production dry-run acceptance — logged-in and loginwindow scopes complete | validation evidence | logged-in and loginwindow complete; sleep/wake pending | logout completed; separate sleep/reboot approvals remain | automatic disable/bootout/bootstrap and observer cleanup |
 | 13 | Enabled bounded acceptance | validation evidence | one sleep, one recovery, injected failure | **separate approval per real sleep cycle** | disable/bootout/uninstall |
 | 14 | Reboot/rollback/uninstall acceptance | validation evidence | boot, rollback, zero residual | **separate reboot and uninstall approvals** | rollback then uninstall |
 | 15 | Docs, tooling disposition, final review | README/docs/tool moves | full clean validation + holistic review | approval if cleanup touches installed state | restore archived tooling from git |

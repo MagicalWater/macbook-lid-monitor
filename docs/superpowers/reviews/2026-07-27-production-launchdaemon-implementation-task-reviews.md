@@ -1003,6 +1003,29 @@ After explicit operator recovery, configuration is disabled, the system job is l
 running, last exit code is zero, and no production daemon PID remains. Loginwindow acceptance must
 be retried from the start command; the prior evidence is not accepted.
 
+## Task 12 — Loginwindow real system acceptance closure
+
+### Evidence
+
+- The temporary observer ran in the system launchd domain and survived GUI logout.
+- Finish accepted evidence with `observed-console-user=root`, confirming the sample was taken while
+  the invoking user GUI session was absent.
+- Production diagnostics after cleanup reported loaded, disabled, and `process-count=0`.
+- Production error log remained empty and both production logs retained mode `0600`.
+
+### Independent re-review
+
+- Production mode: disabled.
+- Production job: loaded, not running.
+- Last exit code: zero.
+- Production PID: absent.
+- Temporary observer job, executable, plist, and evidence: all absent.
+
+### Disposition
+
+**Task 12 loginwindow scope approved and complete.** Remaining Task 12 work is limited to the
+separately gated real sleep/wake dry-run acceptance.
+
 ## Task 12 — System-domain loginwindow observer redesign
 
 ### Root cause
