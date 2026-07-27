@@ -893,6 +893,165 @@ final class ProductionManagementScriptTests: XCTestCase {
         XCTAssertTrue(library.contains("[[ -n \"$SYSTEM_ROOT\" ]] || { printf 'error=test-hook-production-disabled"))
     }
 
+    func testDeploymentStateLibraryDefinesStableInterfacesAndPrivacyBoundary() throws {
+        let url = root.appendingPathComponent("scripts/lib/production-deployment-state.sh")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: url.path))
+        let text = try String(contentsOf: url, encoding: .utf8)
+        for interface in [
+            "target_hardware_identity_lines()",
+            "deployment_identity_lines()",
+            "record_deployment_acceptance()",
+            "verify_deployment_acceptance()",
+            "invalidate_deployment_acceptance()",
+            "write_deployment_reboot_state()",
+            "verify_deployment_reboot_state()",
+        ] {
+            XCTAssertTrue(text.contains(interface), interface)
+        }
+        for prohibited in ["serial", "uuid", "udid", "raw_report", "ioreg"] {
+            XCTAssertFalse(text.lowercased().contains(prohibited), prohibited)
+        }
+    }
+
+    func testDeploymentIdentityRejectsModelAndChipMismatch() throws {
+        let sandbox = root.appendingPathComponent(".build/production-deployment-target-root")
+        try? FileManager.default.removeItem(at: sandbox)
+        defer { try? FileManager.default.removeItem(at: sandbox) }
+        try seedStaging()
+        try runScript("install", environment: ["MLM_TEST_ROOT": sandbox.path])
+
+        for override in [
+            ["MLM_TEST_TARGET_MODEL": "MacBookPro99,9"],
+            ["MLM_TEST_TARGET_CHIP": "Unknown Chip"],
+        ] {
+            let result = try runDeploymentLibrary(
+                "deployment_identity_lines",
+                sandbox: sandbox,
+                environment: override
+            )
+            XCTAssertNotEqual(result.status, 0, result.output)
+            XCTAssertTrue(result.output.contains("error=target-hardware-invalid"), result.output)
+        }
+    }
+
+    func testDeploymentAcceptanceIsAtomicCompleteAndIdentityBound() throws {
+        let sandbox = root.appendingPathComponent(".build/production-deployment-acceptance-root")
+        try? FileManager.default.removeItem(at: sandbox)
+        defer { try? FileManager.default.removeItem(at: sandbox) }
+        try seedStaging()
+        try runScript("install", environment: ["MLM_TEST_ROOT": sandbox.path])
+
+        _ = try runDeploymentLibrary(
+            "record_deployment_acceptance deployment-dry-run pass",
+            sandbox: sandbox
+        )
+        let partial = try runDeploymentLibrary(
+            "verify_deployment_acceptance deployment-dry-run deployment-enabled-once",
+            sandbox: sandbox
+        )
+        XCTAssertNotEqual(partial.status, 0, partial.output)
+
+        _ = try runDeploymentLibrary(
+            "record_deployment_acceptance deployment-enabled-once pass",
+            sandbox: sandbox
+        )
+        let complete = try runDeploymentLibrary(
+            "verify_deployment_acceptance deployment-dry-run deployment-enabled-once",
+            sandbox: sandbox
+        )
+        XCTAssertEqual(complete.status, 0, complete.output)
+
+        let acceptance = sandbox.appendingPathComponent("Library/Application Support/MacBookLidMonitor/deployment-acceptance.plist")
+        let attributes = try FileManager.default.attributesOfItem(atPath: acceptance.path)
+        XCTAssertEqual((attributes[.posixPermissions] as? NSNumber)?.intValue, 0o600)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: acceptance.path + ".tmp"))
+
+        let binary = sandbox.appendingPathComponent("Library/PrivilegedHelperTools/macbook-lid-monitor-daemon")
+        try Data("identity-drift".utf8).write(to: binary)
+        let stale = try runDeploymentLibrary(
+            "verify_deployment_acceptance deployment-dry-run deployment-enabled-once",
+            sandbox: sandbox
+        )
+        XCTAssertNotEqual(stale.status, 0, stale.output)
+        XCTAssertTrue(stale.output.contains("error=deployment-acceptance-invalid"), stale.output)
+    }
+
+    func testLifecycleReplacementInvalidatesDeploymentAcceptance() throws {
+        let sandbox = root.appendingPathComponent(".build/production-deployment-invalidation-root")
+        try? FileManager.default.removeItem(at: sandbox)
+        defer { try? FileManager.default.removeItem(at: sandbox) }
+        try seedStaging()
+        try runScript("install", environment: ["MLM_TEST_ROOT": sandbox.path])
+        let acceptance = sandbox.appendingPathComponent("Library/Application Support/MacBookLidMonitor/deployment-acceptance.plist")
+
+        _ = try runDeploymentLibrary("record_deployment_acceptance deployment-dry-run pass", sandbox: sandbox)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: acceptance.path))
+        try seedStaging()
+        try runScript("upgrade", environment: ["MLM_TEST_ROOT": sandbox.path])
+        XCTAssertFalse(FileManager.default.fileExists(atPath: acceptance.path))
+
+        _ = try runDeploymentLibrary("record_deployment_acceptance deployment-dry-run pass", sandbox: sandbox)
+        try runScript("rollback", environment: ["MLM_TEST_ROOT": sandbox.path])
+        XCTAssertFalse(FileManager.default.fileExists(atPath: acceptance.path))
+    }
+
+    func testInitialInstallInvalidatesPreexistingDeploymentState() throws {
+        let sandbox = root.appendingPathComponent(".build/production-deployment-install-invalidation-root")
+        try? FileManager.default.removeItem(at: sandbox)
+        defer { try? FileManager.default.removeItem(at: sandbox) }
+        let support = sandbox.appendingPathComponent("Library/Application Support/MacBookLidMonitor")
+        try FileManager.default.createDirectory(at: support, withIntermediateDirectories: true)
+        let acceptance = support.appendingPathComponent("deployment-acceptance.plist")
+        let reboot = support.appendingPathComponent("deployment-reboot.plist")
+        try Data("stale".utf8).write(to: acceptance)
+        try Data("stale".utf8).write(to: reboot)
+
+        try seedStaging()
+        try runScript("install", environment: ["MLM_TEST_ROOT": sandbox.path])
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: acceptance.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: reboot.path))
+    }
+
+    func testDeploymentRebootStateRequiresChangedBootAndMatchingIdentity() throws {
+        let sandbox = root.appendingPathComponent(".build/production-deployment-reboot-root")
+        try? FileManager.default.removeItem(at: sandbox)
+        defer { try? FileManager.default.removeItem(at: sandbox) }
+        try seedStaging()
+        try runScript("install", environment: ["MLM_TEST_ROOT": sandbox.path])
+
+        _ = try runDeploymentLibrary("write_deployment_reboot_state 1700000000", sandbox: sandbox)
+        let unchanged = try runDeploymentLibrary(
+            "verify_deployment_reboot_state",
+            sandbox: sandbox,
+            environment: ["MLM_TEST_BOOT_EPOCH": "1700000000"]
+        )
+        XCTAssertNotEqual(unchanged.status, 0, unchanged.output)
+
+        let changed = try runDeploymentLibrary(
+            "verify_deployment_reboot_state",
+            sandbox: sandbox,
+            environment: ["MLM_TEST_BOOT_EPOCH": "1700000100"]
+        )
+        XCTAssertEqual(changed.status, 0, changed.output)
+    }
+
+    func testDeploymentTestHooksAreSandboxOnly() throws {
+        let manager = try String(
+            contentsOf: root.appendingPathComponent("scripts/manage-production-daemon.sh"),
+            encoding: .utf8
+        )
+        let deployment = try String(
+            contentsOf: root.appendingPathComponent("scripts/lib/production-deployment-state.sh"),
+            encoding: .utf8
+        )
+        XCTAssertTrue(manager.contains("error=test-hook-production-disabled reason=boot-epoch"))
+        XCTAssertTrue(manager.contains("error=test-hook-production-disabled reason=state-mtime"))
+        XCTAssertTrue(deployment.contains("test-hook-production-disabled target-model"))
+        XCTAssertTrue(deployment.contains("test-hook-production-disabled target-chip"))
+        XCTAssertTrue(deployment.contains("test-hook-production-disabled boot-epoch"))
+    }
+
     private func seedStaging() throws {
         let staging = root.appendingPathComponent(".build/production-package")
         try? FileManager.default.removeItem(at: staging)
@@ -982,6 +1141,30 @@ final class ProductionManagementScriptTests: XCTestCase {
         process.currentDirectoryURL = root
         process.executableURL = URL(fileURLWithPath: executable)
         process.arguments = arguments
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = pipe
+        try process.run()
+        process.waitUntilExit()
+        return (
+            process.terminationStatus,
+            String(decoding: pipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+        )
+    }
+
+    private func runDeploymentLibrary(
+        _ command: String,
+        sandbox: URL,
+        environment: [String: String] = [:]
+    ) throws -> (status: Int32, output: String) {
+        let script = "source scripts/lib/production-package-common.sh; source scripts/lib/production-installed-set.sh; source scripts/lib/production-deployment-state.sh; \(command)"
+        let process = Process()
+        process.currentDirectoryURL = root
+        process.executableURL = URL(fileURLWithPath: "/bin/bash")
+        process.arguments = ["-c", script]
+        process.environment = ProcessInfo.processInfo.environment.merging(
+            ["MLM_TEST_ROOT": sandbox.path].merging(environment) { _, new in new }
+        ) { _, new in new }
         let pipe = Pipe()
         process.standardOutput = pipe
         process.standardError = pipe

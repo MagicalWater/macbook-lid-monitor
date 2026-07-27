@@ -1,6 +1,6 @@
 # Milestone 16 Production Deployment and Long-term Operation Task Register
 
-Status: Tasks 1–6 and Stage A review complete. Task 7 is next. Tasks 15–21 remain approval-gated.
+Status: Tasks 1–7 and Stage A review complete. Task 8 is next. Tasks 15–21 remain approval-gated.
 
 ## Mandatory per-Task workflow
 
@@ -31,7 +31,7 @@ all Task reviews. Historical Milestone 1–15 evidence is context, not Milestone
 | 5 | Runtime installed-set verification — complete | `ProductionInstalledSetVerifier.swift`, daemon composition/tests | 16 focused tests; 221 full tests; package prepare/verify; release build | none | revert commit; no system state |
 | A | Stage A implementation review — complete | review/evidence only | 221 full tests, release/package/static checks | none | no system state |
 | 6 | Shell installed verifier, metadata, and lifecycle guard — complete | `production-installed-set.sh`, package common, manager/tests | 52 focused tests; 231 full tests; shellcheck/syntax/package/diff checks | none | revert commit; test-root only |
-| 7 | Target preflight and deployment acceptance state | `production-deployment-state.sh`, manager/tests | model/chip, atomic state, privacy, mismatch/invalidation | none | revert commit; test-root only |
+| 7 | Target preflight and deployment acceptance state — complete | `production-deployment-state.sh`, manager/tests | 59 focused tests; 238 full tests; atomic/privacy/static/package checks | none | revert commit; test-root only |
 | 8 | Bounded deployment commands and evidence-bound activation | manager, deployment/installed libs, tests | bounded cleanup, partial acceptance rejection, sandbox enabled final state | none | revert commit; test-root only |
 | 9 | Bounded runtime health persistence | `ProductionHealthStore.swift`, daemon health/composition/tests | atomic metadata, transitions, throttle, stale/corrupt/redaction | none | revert commit; no system state |
 | 10 | Stable status, diagnostics, and baseline | `production-observability.sh`, manager/tests | stable fields, corrupt/missing states, metrics, strict baseline | none | revert commit; test-root only |

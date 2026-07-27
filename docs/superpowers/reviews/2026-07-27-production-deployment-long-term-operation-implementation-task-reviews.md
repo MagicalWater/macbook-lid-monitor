@@ -363,3 +363,71 @@ Swift daemon independently re-verifies the installed set at enabled startup.
 
 **Task 6 approved.** No Critical/P0/P1 finding remains. Task 7 may begin after the independent Task 6
 commit.
+
+## Task 7 — Target preflight and atomic deployment acceptance state
+
+### RED evidence
+
+Five focused tests failed because `production-deployment-state.sh` and all target, acceptance,
+invalidation, and reboot-state interfaces were absent.
+
+### Implemented
+
+- Added exact target preflight for `MacBookPro18,1` and `Apple M1 Pro` with sandbox-only overrides.
+- Added stable deployment identity combining installed artifact identity, hardware profile, model,
+  and chip.
+- Added atomic root-owned/test-root `0600` acceptance and reboot state writes using same-directory
+  temporary files plus rename.
+- Acceptance records named stages and timestamps and verifies every required stage against the
+  current installed identity.
+- Install, upgrade, and rollback invalidate acceptance and reboot evidence.
+- State contains no machine-unique identifiers or raw sensor evidence.
+
+### Immediate review findings
+
+#### T7-P1 — Legacy reboot test hooks were not sandbox-restricted
+
+The historical Task 14 helpers accepted boot and state-time overrides outside `MLM_TEST_ROOT`.
+
+**Resolution:** both overrides now fail with `error=test-hook-production-disabled` outside the
+sandbox. Target model/chip and new reboot hooks follow the same rule.
+
+#### T7-P2 — Install invalidation lacked direct proof
+
+Upgrade and rollback invalidation were covered first, but initial install invalidation was only
+visible in implementation.
+
+**Resolution:** add a stale pre-install acceptance/reboot fixture and prove install removes both.
+
+#### T7-P2 — Atomic cleanup helper triggered an indirect-call ShellCheck finding
+
+**Resolution:** add one precise `SC2329` suppression documenting the RETURN-trap invocation.
+
+### Re-review
+
+- Model/chip mismatch fails before state recording: pass.
+- Partial, failed, stale, or identity-mismatched acceptance is rejected: pass.
+- Writes are atomic, mode `0600`, and leave no fixed temp file: pass.
+- Install/upgrade/rollback invalidate acceptance and reboot evidence: pass.
+- Reboot proof requires changed boot epoch and matching identity: pass.
+- Production test hooks are disabled: pass.
+- Privacy exclusions are statically enforced: pass.
+- No `/Library`, launchd, sleep, reboot, merge, push, or worktree cleanup occurred: pass.
+
+### Verification
+
+```text
+RED: 5 focused tests failed because deployment state interfaces were absent
+focused: 59 tests, 0 failures
+full XCTest: 238 tests, 0 failures
+bash -n: manager and all sourced libraries passed
+shellcheck: passed with zero findings
+package prepare/verify: passed
+release daemon build during prepare: passed
+git diff --check: passed
+```
+
+### Decision
+
+**Task 7 approved.** No Critical/P0/P1 finding remains. Task 8 may begin after the independent Task 7
+commit.

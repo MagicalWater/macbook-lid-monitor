@@ -508,9 +508,9 @@ validated non-unique hardware compatibility fields.
 - Modify: `scripts/lib/production-package-common.sh`
 - Modify: `Tests/LidMonitorTests/ProductionManagementScriptTests.swift`
 
-- [ ] Add failing tests for model/chip mismatch, missing/partial/stale acceptance, atomic writes,
+- [x] Add failing tests for model/chip mismatch, missing/partial/stale acceptance, atomic writes,
   checksum mismatch, install/upgrade/rollback invalidation, and privacy exclusions.
-- [ ] Implement these state interfaces with root-owned `0600` temp+rename writes:
+- [x] Implement these state interfaces with root-owned `0600` temp+rename writes:
 
 ```bash
 target_hardware_identity_lines
@@ -522,11 +522,11 @@ write_deployment_reboot_state BOOT_EPOCH
 verify_deployment_reboot_state
 ```
 
-- [ ] Store only source/artifact checksums, profile, `MacBookPro18,1`, Apple M1 Pro, timestamps, and
+- [x] Store only source/artifact checksums, profile, `MacBookPro18,1`, Apple M1 Pro, timestamps, and
   pass/fail state; never store serial/UUID/UDID/raw reports.
-- [ ] Add `invalidate_deployment_acceptance` to install, upgrade, rollback, and non-mode config
+- [x] Add `invalidate_deployment_acceptance` to install, upgrade, rollback, and non-mode config
   changes.
-- [ ] Verify, review, and commit `feat: add deployment acceptance identity`.
+- [x] Verify, review, and commit `feat: add deployment acceptance identity`.
 
 ### Task 8: Bounded deployment acceptance commands and persistent activation
 

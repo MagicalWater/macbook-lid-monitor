@@ -29,6 +29,7 @@ export MANAGED_TASK14_STATE="$MANAGED_SUPPORT/task14-reboot-state"
 export MANAGED_SLEEP_AUTHORITY="$MANAGED_SUPPORT/sleep-authority.lock"
 export MANAGED_ACCEPTANCE_STATE="$MANAGED_SUPPORT/deployment-acceptance.plist"
 export MANAGED_HEALTH_STATE="$MANAGED_SUPPORT/health.plist"
+export MANAGED_REBOOT_STATE="$MANAGED_SUPPORT/deployment-reboot.plist"
 export MANAGED_LIFECYCLE_GUARD="$MANAGED_SUPPORT/.lifecycle-guard"
 export LAUNCHD_LABEL="com.crazydennies.macbook-lid-monitor"
 

@@ -6,6 +6,8 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 source "$SCRIPT_DIR/lib/production-package-common.sh"
 # shellcheck source=scripts/lib/production-installed-set.sh
 source "$SCRIPT_DIR/lib/production-installed-set.sh"
+# shellcheck source=scripts/lib/production-deployment-state.sh
+source "$SCRIPT_DIR/lib/production-deployment-state.sh"
 
 usage() {
     printf '%s\n' 'usage: manage-production-daemon.sh prepare|verify|install|bootstrap|status|stop|bootout|disable|dry-run|upgrade|rollback|reset-crash-budget|rotate-logs|diagnostics|uninstall|accept-task9|accept-task10|accept-task11|accept-task12-logged-in|accept-task12-loginwindow-start|accept-task12-loginwindow-finish|accept-task12-sleep-wake|accept-task13-dry-run-path|accept-task13-enabled-once|accept-task13-recovery-resleep|accept-task14-reboot-start|accept-task14-reboot-finish' >&2
@@ -46,6 +48,7 @@ install_package_unlocked() {
     if [[ -z "$SYSTEM_ROOT" ]]; then
         chown root:wheel "$MANAGED_BINARY" "$MANAGED_PLIST" "$MANAGED_CONFIG" "$MANAGED_MANIFEST" "$MANAGED_SUPPORT" "$MANAGED_LOG_DIR"
     fi
+    invalidate_deployment_acceptance install >/dev/null
     printf 'installed mode=disabled\n'
 }
 
@@ -682,6 +685,10 @@ verify_uninstalled_state() {
 
 current_boot_epoch() {
     if [[ -n "${MLM_TEST_BOOT_EPOCH:-}" ]]; then
+        [[ -n "$SYSTEM_ROOT" ]] || {
+            printf 'error=test-hook-production-disabled reason=boot-epoch\n' >&2
+            return 64
+        }
         printf '%s\n' "$MLM_TEST_BOOT_EPOCH"
         return
     fi
@@ -734,7 +741,15 @@ accept_task14_reboot_finish() {
         [[ "$current_boot" -gt "$start_boot" ]] || { printf 'error: reboot not detected
 ' >&2; return 70; }
     else
-        state_mtime="${MLM_TEST_STATE_MTIME:-$(stat -f '%m' "$MANAGED_TASK14_STATE")}"
+        if [[ -n "${MLM_TEST_STATE_MTIME:-}" ]]; then
+            [[ -n "$SYSTEM_ROOT" ]] || {
+                printf 'error=test-hook-production-disabled reason=state-mtime\n' >&2
+                return 64
+            }
+            state_mtime="$MLM_TEST_STATE_MTIME"
+        else
+            state_mtime="$(stat -f '%m' "$MANAGED_TASK14_STATE")"
+        fi
         [[ "$state_mtime" -lt "$current_boot" ]] || { printf 'error: legacy reboot state predates no detected boot
 ' >&2; return 70; }
         printf 'verified task=14 scope=reboot-proof migration=legacy-usec state-mtime=%s boot-epoch=%s
@@ -819,6 +834,7 @@ rollback_upgrade_unlocked() {
     verify_installed_set
     bootout_job
     restore_rollback_set
+    invalidate_deployment_acceptance rollback >/dev/null
     bootstrap_job
     printf 'rolled-back label=%s\n' "$LAUNCHD_LABEL"
 }
@@ -829,6 +845,7 @@ upgrade_package_unlocked() {
     require_root_for_system
     verify_installed_set
     verify_package
+    invalidate_deployment_acceptance upgrade >/dev/null
     backup_current_set
     bootout_job
     local failed=0
