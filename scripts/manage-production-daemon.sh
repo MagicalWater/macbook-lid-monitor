@@ -10,7 +10,7 @@ source "$SCRIPT_DIR/lib/production-installed-set.sh"
 source "$SCRIPT_DIR/lib/production-deployment-state.sh"
 
 usage() {
-    printf '%s\n' 'usage: manage-production-daemon.sh prepare|verify|install|bootstrap|status|stop|bootout|disable|dry-run|upgrade|rollback|reset-crash-budget|rotate-logs|diagnostics|uninstall|accept-task9|accept-task10|accept-task11|accept-task12-logged-in|accept-task12-loginwindow-start|accept-task12-loginwindow-finish|accept-task12-sleep-wake|accept-task13-dry-run-path|accept-task13-enabled-once|accept-task13-recovery-resleep|accept-task14-reboot-start|accept-task14-reboot-finish' >&2
+    printf '%s\n' 'usage: manage-production-daemon.sh prepare|verify|install|bootstrap|status|stop|bootout|disable|dry-run|deployment-dry-run|deployment-enabled-once|deployment-recovery-resleep|activate|upgrade|rollback|reset-crash-budget|rotate-logs|diagnostics|uninstall|accept-task9|accept-task10|accept-task11|accept-task12-logged-in|accept-task12-loginwindow-start|accept-task12-loginwindow-finish|accept-task12-sleep-wake|accept-task13-dry-run-path|accept-task13-enabled-once|accept-task13-recovery-resleep|accept-task14-reboot-start|accept-task14-reboot-finish' >&2
     exit 64
 }
 
@@ -83,13 +83,29 @@ bootout_job() {
     printf 'booted-out label=%s\n' "$LAUNCHD_LABEL"
 }
 
-disable_job() {
+set_managed_mode() {
+    local requested_mode=$1 temporary
+    case "$requested_mode" in
+        disabled|dry-run|enabled) ;;
+        *) printf 'error=managed-mode-invalid mode=%s\n' "$requested_mode" >&2; return 64 ;;
+    esac
     require_root_for_system
     verify_installed_set
     assert_regular_source "$MANAGED_CONFIG"
-    /usr/libexec/PlistBuddy -c 'Set :Mode disabled' "$MANAGED_CONFIG"
-    chmod 0644 "$MANAGED_CONFIG"
-    if [[ -z "$SYSTEM_ROOT" ]]; then chown root:wheel "$MANAGED_CONFIG"; fi
+    temporary="$(mktemp "$MANAGED_SUPPORT/.config-mode.XXXXXX")"
+    cleanup_managed_mode_temporary() { rm -f -- "$temporary"; }
+    trap cleanup_managed_mode_temporary RETURN
+    cp -- "$MANAGED_CONFIG" "$temporary"
+    /usr/libexec/PlistBuddy -c "Set :Mode $requested_mode" "$temporary"
+    chmod 0644 "$temporary"
+    if [[ -z "$SYSTEM_ROOT" ]]; then chown root:wheel "$temporary"; fi
+    mv -f -- "$temporary" "$MANAGED_CONFIG"
+    trap - RETURN
+    verify_installed_set
+}
+
+disable_job() {
+    set_managed_mode disabled
     stop_job
     printf 'disabled label=%s\n' "$LAUNCHD_LABEL"
 }
@@ -122,27 +138,34 @@ reset_crash_budget() {
 
 
 set_enabled_mode() {
-    require_root_for_system
-    verify_installed_set
-    assert_regular_source "$MANAGED_CONFIG"
-    /usr/libexec/PlistBuddy -c 'Set :Mode enabled' "$MANAGED_CONFIG"
-    chmod 0644 "$MANAGED_CONFIG"
-    if [[ -z "$SYSTEM_ROOT" ]]; then chown root:wheel "$MANAGED_CONFIG"; fi
+    set_managed_mode enabled
     bootout_job
     bootstrap_job
     printf 'mode=enabled label=%s\n' "$LAUNCHD_LABEL"
 }
 
 set_dry_run_mode() {
-    require_root_for_system
-    verify_installed_set
-    assert_regular_source "$MANAGED_CONFIG"
-    /usr/libexec/PlistBuddy -c 'Set :Mode dry-run' "$MANAGED_CONFIG"
-    chmod 0644 "$MANAGED_CONFIG"
-    if [[ -z "$SYSTEM_ROOT" ]]; then chown root:wheel "$MANAGED_CONFIG"; fi
+    set_managed_mode dry-run
     bootout_job
     bootstrap_job
     printf 'mode=dry-run label=%s\n' "$LAUNCHD_LABEL"
+}
+
+deployment_test_checkpoint() {
+    local stage=$1
+    if [[ -n "${MLM_TEST_DEPLOYMENT_FAIL_STAGE:-}" || -n "${MLM_TEST_DEPLOYMENT_HOLD_SECONDS:-}" ]]; then
+        [[ -n "$SYSTEM_ROOT" ]] || {
+            printf 'error=test-hook-production-disabled reason=deployment\n' >&2
+            return 64
+        }
+    fi
+    if [[ "${MLM_TEST_DEPLOYMENT_FAIL_STAGE:-}" == "$stage" ]]; then
+        printf 'error=deployment-test-failure stage=%s\n' "$stage" >&2
+        return 70
+    fi
+    if [[ -n "${MLM_TEST_DEPLOYMENT_HOLD_SECONDS:-}" ]]; then
+        sleep "$MLM_TEST_DEPLOYMENT_HOLD_SECONDS"
+    fi
 }
 
 verify_logged_in_dry_run() {
@@ -397,17 +420,22 @@ accept_task13_enabled_once() {
         fi
     }
     trap cleanup_task13_enabled_once_to_disabled EXIT
-    prepare_as_invoking_user
-    verify_package
-    upgrade_package
+    if [[ "${1:-legacy}" != stable ]]; then
+        prepare_as_invoking_user
+        verify_package
+        upgrade_package
+    fi
     set_enabled_mode
+    deployment_test_checkpoint enabled-once
     if [[ -n "$SYSTEM_ROOT" ]]; then
+        mkdir -p -- "$MANAGED_LOG_DIR"
+        touch "$MANAGED_STDOUT_LOG"
+        log_offset="$(stat -f '%z' "$MANAGED_STDOUT_LOG")"
         {
             printf 'timestamp=test event=transition pid=1 name=sleep-request-attempted\n'
             printf 'timestamp=test event=state-changed pid=1 state=monitoring-disarmed\n'
         } >> "$MANAGED_STDOUT_LOG"
         before_pid=1
-        log_offset=0
         attempt_count=1
         wake_found=1
     else
@@ -459,11 +487,17 @@ accept_task13_recovery_resleep() {
         fi
     }
     trap cleanup_task13_recovery_resleep_to_disabled EXIT
-    prepare_as_invoking_user
-    verify_package
-    upgrade_package
+    if [[ "${1:-legacy}" != stable ]]; then
+        prepare_as_invoking_user
+        verify_package
+        upgrade_package
+    fi
     set_enabled_mode
+    deployment_test_checkpoint recovery-resleep
     if [[ -n "$SYSTEM_ROOT" ]]; then
+        mkdir -p -- "$MANAGED_LOG_DIR"
+        touch "$MANAGED_STDOUT_LOG"
+        log_offset="$(stat -f '%z' "$MANAGED_STDOUT_LOG")"
         {
             printf 'timestamp=test event=transition pid=1 name=sleep-request-attempted\n'
             printf 'timestamp=test event=sleep-requested pid=1\n'
@@ -474,7 +508,6 @@ accept_task13_recovery_resleep() {
             printf 'timestamp=test event=state-changed pid=1 state=monitoring-disarmed\n'
         } >> "$MANAGED_STDOUT_LOG"
         before_pid=1
-        log_offset=0
     else
         sleep 2
         launchctl print "system/$LAUNCHD_LABEL" >/dev/null
@@ -526,19 +559,24 @@ accept_task13_dry_run_path() {
         fi
     }
     trap cleanup_task13_dry_run_path_to_disabled EXIT
-    prepare_as_invoking_user
-    verify_package
-    upgrade_package
+    if [[ "${1:-legacy}" != stable ]]; then
+        prepare_as_invoking_user
+        verify_package
+        upgrade_package
+    fi
     set_dry_run_mode
+    deployment_test_checkpoint dry-run
     verify_logged_in_dry_run
     if [[ -n "$SYSTEM_ROOT" ]]; then
+        mkdir -p -- "$MANAGED_LOG_DIR"
+        touch "$MANAGED_STDOUT_LOG"
+        log_offset="$(stat -f '%z' "$MANAGED_STDOUT_LOG")"
         {
             printf 'timestamp=test event=transition pid=1 name=candidate-started\n'
             printf 'timestamp=test event=transition pid=1 name=debounce-elapsed\n'
             printf 'timestamp=test event=transition pid=1 name=sleep-request-attempted\n'
             printf 'timestamp=test event=transition pid=1 name=would-sleep\n'
         } >> "$MANAGED_STDOUT_LOG"
-        log_offset=0
     else
         log_offset="$(stat -f '%z' "$MANAGED_STDOUT_LOG")"
         printf 'armed task=13 scope=dry-run-path action=move-lid-below-68-degrees-and-hold-2-seconds-within-180-seconds\n'
@@ -567,6 +605,37 @@ accept_task13_dry_run_path() {
     diagnostics
     trap - EXIT
     printf 'accepted task=13 scope=dry-run-path final-mode=disabled label=%s\n' "$LAUNCHD_LABEL"
+}
+
+deployment_dry_run() {
+    require_root_for_system
+    verify_installed_set
+    verify_target_hardware
+    accept_task13_dry_run_path stable
+    record_deployment_acceptance deployment-dry-run pass
+}
+
+deployment_enabled_once() {
+    require_root_for_system
+    verify_deployment_acceptance deployment-dry-run
+    accept_task13_enabled_once stable
+    record_deployment_acceptance deployment-enabled-once pass
+}
+
+deployment_recovery_resleep() {
+    require_root_for_system
+    verify_deployment_acceptance deployment-dry-run deployment-enabled-once
+    accept_task13_recovery_resleep stable
+    record_deployment_acceptance deployment-recovery-resleep pass
+}
+
+activate_deployment() {
+    require_root_for_system
+    verify_deployment_acceptance deployment-dry-run deployment-enabled-once deployment-recovery-resleep
+    set_managed_mode enabled
+    bootout_job
+    bootstrap_job
+    printf 'activated deployment mode=enabled label=%s\n' "$LAUNCHD_LABEL"
 }
 
 rotate_one_log() {
@@ -1059,6 +1128,10 @@ case "$1" in
     bootout) bootout_job ;;
     disable) disable_job ;;
     dry-run) set_dry_run_mode ;;
+    deployment-dry-run) deployment_dry_run ;;
+    deployment-enabled-once) deployment_enabled_once ;;
+    deployment-recovery-resleep) deployment_recovery_resleep ;;
+    activate) activate_deployment ;;
     upgrade) upgrade_package ;;
     rollback) rollback_upgrade ;;
     reset-crash-budget) reset_crash_budget ;;

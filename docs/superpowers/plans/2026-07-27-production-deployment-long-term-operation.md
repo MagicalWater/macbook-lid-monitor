@@ -540,13 +540,13 @@ evidence-bound persistent activation path.
 - Modify: `scripts/lib/production-installed-set.sh`
 - Modify: `Tests/LidMonitorTests/ProductionManagementScriptTests.swift`
 
-- [ ] Add sandbox tests for `deployment-dry-run`, `deployment-enabled-once`,
+- [x] Add sandbox tests for `deployment-dry-run`, `deployment-enabled-once`,
   `deployment-recovery-resleep`, and `activate`.
-- [ ] Prove all bounded commands return disabled on success, timeout, signal, malformed evidence,
+- [x] Prove all bounded commands return disabled on success, timeout, signal, malformed evidence,
   and injected script failure.
-- [ ] Prove `activate` rejects partial/mismatched acceptance and leaves enabled only with complete
+- [x] Prove `activate` rejects partial/mismatched acceptance and leaves enabled only with complete
   matching evidence.
-- [ ] Implement one atomic mode editor and the command contracts:
+- [x] Implement one atomic mode editor and the command contracts:
 
 ```bash
 set_managed_mode disabled|dry-run|enabled
@@ -558,8 +558,8 @@ activate_deployment
 
 Bounded commands wrap the editor with mandatory cleanup traps,
   while `activate` intentionally has no disable cleanup after final verification succeeds.
-- [ ] Verify no unrestricted `enable` dispatcher entry exists.
-- [ ] Focused/full review and commit `feat: add evidence-bound production activation`.
+- [x] Verify no unrestricted `enable` dispatcher entry exists.
+- [x] Focused/full review and commit `feat: add evidence-bound production activation`.
 
 ### Task 9: Bounded runtime health persistence
 

@@ -431,3 +431,72 @@ git diff --check: passed
 
 **Task 7 approved.** No Critical/P0/P1 finding remains. Task 8 may begin after the independent Task 7
 commit.
+
+## Task 8 — Bounded deployment acceptance commands and persistent activation
+
+### RED evidence
+
+Five focused tests failed because the stable deployment dispatcher, atomic mode editor, bounded
+cleanup contract, and evidence-bound activation path did not exist.
+
+### Implemented
+
+- Added one atomic `set_managed_mode disabled|dry-run|enabled` editor using a same-directory
+  temporary plist plus rename.
+- Added stable `deployment-dry-run`, `deployment-enabled-once`,
+  `deployment-recovery-resleep`, and `activate` commands.
+- Every bounded command verifies the installed set and prior stage requirements, records matching
+  acceptance only after success, and restores disabled mode on normal failure, injected failure,
+  timeout, or signal.
+- Persistent activation requires all three matching acceptance stages and intentionally has no
+  post-success disable cleanup.
+- Removed any unrestricted `enable` dispatcher path.
+- Added sandbox-only deterministic hold/failure hooks for cleanup testing.
+
+### Immediate review findings
+
+#### T8-P1 — Sandbox evidence counting reused earlier stage log entries
+
+The first GREEN implementation counted from byte offset zero for every bounded sandbox stage, so
+the second stage could count the first stage's sleep-attempt evidence.
+
+**Resolution:** each bounded stage now records the current log size before emitting its fixture and
+counts only newly appended evidence.
+
+#### T8-P2 — Existing static tests were coupled to direct plist mutation
+
+Historical tests searched for literal `PlistBuddy Set :Mode` statements inside the mode wrappers.
+The atomic editor correctly moved that responsibility into one shared function.
+
+**Resolution:** update the tests to prove wrappers call the shared atomic editor and retain
+installed-set verification without taking the whole-set lifecycle guard.
+
+### Re-review
+
+- Bounded dry-run, enabled-once, and recovery-resleep finish disabled on success: pass.
+- Injected failure and TERM cleanup restore disabled: pass.
+- Partial, corrupt, failed, and identity-mismatched acceptance cannot activate: pass.
+- Complete matching three-stage acceptance leaves enabled only through `activate`: pass.
+- Mode edits are atomic and preserve managed metadata: pass.
+- No unrestricted `enable` dispatcher entry exists: pass.
+- Sandbox-only hooks cannot be enabled in production: pass.
+- Historical acceptance commands remain behaviorally compatible: pass.
+- No `/Library`, production launchd, sleep, reboot, merge, push, or worktree cleanup occurred: pass.
+
+### Verification
+
+```text
+RED: 5 focused tests failed because stable deployment commands were absent
+focused: 64 tests, 0 failures
+full XCTest: 243 tests, 0 failures
+bash -n: manager and sourced libraries passed
+shellcheck: passed with zero findings
+release daemon build: passed
+package prepare/verify: passed
+git diff --check: passed
+```
+
+### Decision
+
+**Task 8 approved.** No Critical/P0/P1 finding remains. Task 9 may begin after the independent Task 8
+commit.

@@ -387,7 +387,7 @@ final class ProductionManagementScriptTests: XCTestCase {
     func testTask13EnabledOnceCommandIsExplicitExactlyOnceAndFailSafe() throws {
         let text = try String(contentsOf: root.appendingPathComponent("scripts/manage-production-daemon.sh"), encoding: .utf8)
         XCTAssertTrue(text.contains("accept-task13-enabled-once)"))
-        XCTAssertTrue(text.contains("Set :Mode enabled"))
+        XCTAssertTrue(text.contains("set_managed_mode enabled"))
         XCTAssertTrue(text.contains("expected exactly one sleep-request-attempted event"))
         XCTAssertTrue(text.contains("expected at most one sleep-requested return event"))
         XCTAssertTrue(text.contains("attempt-count=1 return-count=%s"))
@@ -878,8 +878,9 @@ final class ProductionManagementScriptTests: XCTestCase {
             XCTAssertTrue(text.contains(wrapper), wrapper)
         }
         XCTAssertTrue(text.contains("bootstrap_job() {\n    require_root_for_system\n    verify_installed_set"))
-        XCTAssertTrue(text.contains("set_dry_run_mode() {\n    require_root_for_system\n    verify_installed_set"))
-        XCTAssertTrue(text.contains("set_enabled_mode() {\n    require_root_for_system\n    verify_installed_set"))
+        XCTAssertTrue(text.contains("set_managed_mode() {"))
+        XCTAssertTrue(text.contains("set_dry_run_mode() {\n    set_managed_mode dry-run"))
+        XCTAssertTrue(text.contains("set_enabled_mode() {\n    set_managed_mode enabled"))
         XCTAssertFalse(text.contains("set_dry_run_mode() { with_lifecycle_guard"))
         XCTAssertFalse(text.contains("set_enabled_mode() { with_lifecycle_guard"))
     }
@@ -1050,6 +1051,125 @@ final class ProductionManagementScriptTests: XCTestCase {
         XCTAssertTrue(deployment.contains("test-hook-production-disabled target-model"))
         XCTAssertTrue(deployment.contains("test-hook-production-disabled target-chip"))
         XCTAssertTrue(deployment.contains("test-hook-production-disabled boot-epoch"))
+    }
+
+    func testBoundedDeploymentCommandsRecordAcceptanceAndReturnDisabled() throws {
+        let sandbox = root.appendingPathComponent(".build/production-bounded-deployment-root")
+        try? FileManager.default.removeItem(at: sandbox)
+        defer { try? FileManager.default.removeItem(at: sandbox) }
+        try seedStaging()
+        try runScript("install", environment: ["MLM_TEST_ROOT": sandbox.path])
+        try runScript("bootstrap", environment: ["MLM_TEST_ROOT": sandbox.path])
+        let configURL = sandbox.appendingPathComponent("Library/Application Support/MacBookLidMonitor/config.plist")
+
+        for command in ["deployment-dry-run", "deployment-enabled-once", "deployment-recovery-resleep"] {
+            try runScript(command, environment: ["MLM_TEST_ROOT": sandbox.path])
+            XCTAssertEqual(try ProductionConfigurationDecoder().decode(Data(contentsOf: configURL)).mode, .disabled)
+        }
+
+        let verified = try runDeploymentLibrary(
+            "verify_deployment_acceptance deployment-dry-run deployment-enabled-once deployment-recovery-resleep",
+            sandbox: sandbox
+        )
+        XCTAssertEqual(verified.status, 0, verified.output)
+    }
+
+    func testActivationRejectsPartialOrCorruptAcceptanceAndPreservesDisabled() throws {
+        for variant in ["partial", "corrupt"] {
+            let sandbox = root.appendingPathComponent(".build/production-activation-\(variant)-root")
+            try? FileManager.default.removeItem(at: sandbox)
+            defer { try? FileManager.default.removeItem(at: sandbox) }
+            try seedStaging()
+            try runScript("install", environment: ["MLM_TEST_ROOT": sandbox.path])
+            try runScript("bootstrap", environment: ["MLM_TEST_ROOT": sandbox.path])
+            try runScript("deployment-dry-run", environment: ["MLM_TEST_ROOT": sandbox.path])
+            if variant == "corrupt" {
+                let acceptance = sandbox.appendingPathComponent("Library/Application Support/MacBookLidMonitor/deployment-acceptance.plist")
+                try Data("corrupt".utf8).write(to: acceptance)
+            }
+
+            let failure = try runScriptFailure("activate", environment: ["MLM_TEST_ROOT": sandbox.path])
+            XCTAssertTrue(failure.output.contains("deployment-acceptance-invalid"), failure.output)
+            let configURL = sandbox.appendingPathComponent("Library/Application Support/MacBookLidMonitor/config.plist")
+            XCTAssertEqual(try ProductionConfigurationDecoder().decode(Data(contentsOf: configURL)).mode, .disabled)
+        }
+    }
+
+    func testActivationLeavesEnabledOnlyAfterCompleteMatchingAcceptance() throws {
+        let sandbox = root.appendingPathComponent(".build/production-activation-complete-root")
+        try? FileManager.default.removeItem(at: sandbox)
+        defer { try? FileManager.default.removeItem(at: sandbox) }
+        try seedStaging()
+        try runScript("install", environment: ["MLM_TEST_ROOT": sandbox.path])
+        try runScript("bootstrap", environment: ["MLM_TEST_ROOT": sandbox.path])
+        for command in ["deployment-dry-run", "deployment-enabled-once", "deployment-recovery-resleep"] {
+            try runScript(command, environment: ["MLM_TEST_ROOT": sandbox.path])
+        }
+
+        try runScript("activate", environment: ["MLM_TEST_ROOT": sandbox.path])
+
+        let configURL = sandbox.appendingPathComponent("Library/Application Support/MacBookLidMonitor/config.plist")
+        XCTAssertEqual(try ProductionConfigurationDecoder().decode(Data(contentsOf: configURL)).mode, .enabled)
+    }
+
+    func testBoundedDeploymentInjectedFailureAndSignalRestoreDisabled() throws {
+        let failureRoot = root.appendingPathComponent(".build/production-bounded-failure-root")
+        try? FileManager.default.removeItem(at: failureRoot)
+        defer { try? FileManager.default.removeItem(at: failureRoot) }
+        try seedStaging()
+        try runScript("install", environment: ["MLM_TEST_ROOT": failureRoot.path])
+        try runScript("bootstrap", environment: ["MLM_TEST_ROOT": failureRoot.path])
+        _ = try runScriptFailure("deployment-dry-run", environment: [
+            "MLM_TEST_ROOT": failureRoot.path,
+            "MLM_TEST_DEPLOYMENT_FAIL_STAGE": "dry-run",
+        ])
+        let failureConfig = failureRoot.appendingPathComponent("Library/Application Support/MacBookLidMonitor/config.plist")
+        XCTAssertEqual(try ProductionConfigurationDecoder().decode(Data(contentsOf: failureConfig)).mode, .disabled)
+
+        let signalRoot = root.appendingPathComponent(".build/production-bounded-signal-root")
+        try? FileManager.default.removeItem(at: signalRoot)
+        defer { try? FileManager.default.removeItem(at: signalRoot) }
+        try seedStaging()
+        try runScript("install", environment: ["MLM_TEST_ROOT": signalRoot.path])
+        try runScript("bootstrap", environment: ["MLM_TEST_ROOT": signalRoot.path])
+        let process = Process()
+        process.currentDirectoryURL = root
+        process.executableURL = URL(fileURLWithPath: "/bin/bash")
+        process.arguments = ["scripts/manage-production-daemon.sh", "deployment-dry-run"]
+        process.environment = ProcessInfo.processInfo.environment.merging([
+            "MLM_TEST_ROOT": signalRoot.path,
+            "MLM_TEST_DEPLOYMENT_HOLD_SECONDS": "30",
+        ]) { _, new in new }
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        try process.run()
+        let signalConfig = signalRoot.appendingPathComponent("Library/Application Support/MacBookLidMonitor/config.plist")
+        for _ in 0..<150 {
+            if let data = try? Data(contentsOf: signalConfig),
+               let decoded = try? ProductionConfigurationDecoder().decode(data),
+               decoded.mode == .dryRun { break }
+            usleep(20_000)
+        }
+        XCTAssertEqual(try ProductionConfigurationDecoder().decode(Data(contentsOf: signalConfig)).mode, .dryRun)
+        process.terminate()
+        process.waitUntilExit()
+        XCTAssertNotEqual(process.terminationStatus, 0)
+        XCTAssertEqual(try ProductionConfigurationDecoder().decode(Data(contentsOf: signalConfig)).mode, .disabled)
+    }
+
+    func testDeploymentDispatcherHasStableCommandsAndNoUnrestrictedEnable() throws {
+        let text = try String(
+            contentsOf: root.appendingPathComponent("scripts/manage-production-daemon.sh"),
+            encoding: .utf8
+        )
+        XCTAssertTrue(text.contains("deployment-dry-run) deployment_dry_run"))
+        XCTAssertTrue(text.contains("deployment-enabled-once) deployment_enabled_once"))
+        XCTAssertTrue(text.contains("deployment-recovery-resleep) deployment_recovery_resleep"))
+        XCTAssertTrue(text.contains("activate) activate_deployment"))
+        XCTAssertFalse(text.contains("enable)"))
+        XCTAssertTrue(text.contains("set_managed_mode()"))
+        XCTAssertTrue(text.contains("MLM_TEST_DEPLOYMENT_FAIL_STAGE"))
+        XCTAssertTrue(text.contains("error=test-hook-production-disabled reason=deployment"))
     }
 
     private func seedStaging() throws {
