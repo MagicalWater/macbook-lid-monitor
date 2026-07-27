@@ -1,6 +1,6 @@
 # Production LaunchDaemon Task Register
 
-Status: Implementation in progress; Tasks 1–11 complete; Stage C packaging review in progress.
+Status: Implementation in progress; Tasks 1–11 and Stage C packaging review complete; Stage D acceptance pending approval gates.
 
 | Task | Purpose | Primary files | Verification | Approval gate | Rollback/safe stop |
 | ---: | --- | --- | --- | --- | --- |
@@ -17,7 +17,7 @@ Status: Implementation in progress; Tasks 1–11 complete; Stage C packaging rev
 | 9 | install/control lifecycle — complete | script/docs/harness | controlled disabled acceptance | approved and completed | disable, stop, bootout, uninstall staged artifacts |
 | 10 | upgrade/rollback — complete | script/fixtures/evidence | injected failure + rollback acceptance | approved and completed | automatic restore previous set |
 | 11 | logs/diagnostics/uninstall — complete | script/docs/tests | rotation/privacy/residual-state | approved and completed | bootout and scoped removal |
-| C | Packaging stage review | reviews/evidence | clean checkout + residual state | approval for any cleanup mutation | explicit uninstall |
+| C | Packaging stage review — complete | reviews/evidence | clean checkout + residual state | completed with zero installed residual | explicit uninstall |
 | 12 | Production dry-run acceptance | validation evidence | loginwindow/power/HID/single authority | logout/sleep/reboot approvals as applicable | disable/bootout |
 | 13 | Enabled bounded acceptance | validation evidence | one sleep, one recovery, injected failure | **separate approval per real sleep cycle** | disable/bootout/uninstall |
 | 14 | Reboot/rollback/uninstall acceptance | validation evidence | boot, rollback, zero residual | **separate reboot and uninstall approvals** | rollback then uninstall |
