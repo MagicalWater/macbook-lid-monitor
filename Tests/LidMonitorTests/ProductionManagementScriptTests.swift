@@ -63,6 +63,7 @@ final class ProductionManagementScriptTests: XCTestCase {
         XCTAssertTrue(text.contains("normalized_config_sha256"))
         XCTAssertTrue(text.contains("test \"$expected\" = \"$actual\""))
         XCTAssertTrue(text.contains("test \"$version\" = \"$(package_version)\""))
+        XCTAssertTrue(text.contains("git -c safe.directory=\"$REPO_ROOT\" -C \"$REPO_ROOT\" rev-parse HEAD"))
     }
 
     func testScriptsContainFixedStagingPathAndSymlinkRefusal() throws {

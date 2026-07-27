@@ -1166,7 +1166,7 @@ prepare_package() {
 
     local version source_commit checksum plist_checksum config_checksum
     version="$(package_version)"
-    source_commit="$(git -C "$REPO_ROOT" rev-parse HEAD)"
+    source_commit="$(git -c safe.directory="$REPO_ROOT" -C "$REPO_ROOT" rev-parse HEAD)"
     checksum="$(sha256_file "$STAGING_DIR/macbook-lid-monitor-daemon")"
     plist_checksum="$(sha256_file "$STAGING_DIR/com.crazydennies.macbook-lid-monitor.plist")"
     config_checksum="$(normalized_config_sha256 "$STAGING_DIR/config.plist")"
@@ -1203,7 +1203,7 @@ verify_package() {
     actual_config="$(normalized_config_sha256 "$config")"
     test "$expected" = "$actual"
     test "$version" = "$(package_version)"
-    test "$source_commit" = "$(git -C "$REPO_ROOT" rev-parse HEAD)"
+    test "$source_commit" = "$(git -c safe.directory="$REPO_ROOT" -C "$REPO_ROOT" rev-parse HEAD)"
     test "$expected_plist" = "$actual_plist"
     test "$expected_config" = "$actual_config"
     if /usr/libexec/PlistBuddy -c 'Print :EnvironmentVariables' "$plist" >/dev/null 2>&1; then

@@ -42,6 +42,8 @@ legacy no-op upgrade repair RED: file missing
 legacy no-op upgrade repair GREEN: passed
 provenance-only upgrade RED: old manifest and acceptance were preserved
 provenance-only upgrade GREEN: staged Version/SourceCommit installed; acceptance invalidated
+root package verification RED: Git rejected repository ownership under privileged upgrade
+root package verification GREEN: repository trust scoped to each provenance command only
 management suite: 84 tests, 0 failures
 full suite: 269 tests, 0 failures
 ```
@@ -56,3 +58,11 @@ The repository fix does not close the incident by itself. Closure requires:
 4. Verify the lease is root-owned, `0600`, regular, link count 1, and not held.
 5. Verify loaded/disabled/zero PID and valid installed identity.
 6. Rerun Task 17 against the new identity before Task 18.
+
+## Privileged provenance follow-up
+
+The first real provenance-only upgrade was rejected before mutation because root Git did not trust
+the user-owned checkout. The fix uses `git -c safe.directory="$REPO_ROOT"` only on the package
+version and source-commit reads. It does not modify global or system Git configuration. The failed
+attempt left the old installed manifest, partial acceptance, secure lease, disabled mode, and zero
+resident PID unchanged.

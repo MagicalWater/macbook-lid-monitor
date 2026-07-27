@@ -50,7 +50,7 @@ sha256_file() {
 }
 
 package_version() {
-    git -C "$REPO_ROOT" rev-parse --short=12 HEAD
+    git -c safe.directory="$REPO_ROOT" -C "$REPO_ROOT" rev-parse --short=12 HEAD
 }
 
 require_root_for_system() {

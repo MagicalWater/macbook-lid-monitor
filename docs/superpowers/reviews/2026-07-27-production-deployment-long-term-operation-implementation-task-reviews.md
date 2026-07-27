@@ -1117,6 +1117,8 @@ legacy no-op upgrade repair RED: lease remained missing
 legacy no-op upgrade repair GREEN: passed
 provenance-only upgrade RED: old manifest and acceptance were preserved
 provenance-only upgrade GREEN: staged provenance installed and acceptance invalidated
+root provenance RED: privileged verify_package failed with dubious repository ownership
+root provenance GREEN: per-command safe.directory allows exact read without global Git mutation
 management holistic first run: 84 tests, 1 stale expectation
 stale expectation disposition: lease_state=missing -> lease_state=present
 management final: 84 tests, 0 failures
