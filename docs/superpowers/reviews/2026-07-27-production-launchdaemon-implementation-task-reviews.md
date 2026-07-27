@@ -1524,3 +1524,29 @@ The failed enabled acceptance is therefore not an angle-sensor, arming, threshol
 **Task 14 two-phase command approved for the separately authorized real reboot, rollback, and
 uninstall acceptance.** Run the start phase before reboot and the finish phase only after the new
 boot has completed.
+
+
+## Task 14 — Real-system reboot, rollback, and uninstall closure
+
+### Evidence
+
+- The start phase installed version `ada5cd961e0f` with rollback version `20c369b823d1` and left the LaunchDaemon loaded, disabled, and nonresident.
+- The machine was manually rebooted.
+- The original start state used the legacy microseconds value `279182`; the corrected finish path safely migrated this evidence by proving the root-owned state file mtime `1785132400` was earlier than the new boot epoch `1785132459`.
+- Post-reboot validation confirmed the expected current version, loaded job, disabled mode, and zero resident process.
+- Rollback restored version `20c369b823d1` in disabled mode.
+- Uninstall removed the LaunchDaemon, privileged helper, configuration, manifest, rollback slot, acceptance state, logs, and rotated logs.
+- The command reported `residual-state=clean`.
+
+### Independent re-review
+
+- LaunchDaemon label: absent.
+- Resident production PID: absent.
+- `/Library/PrivilegedHelperTools/macbook-lid-monitor-daemon`: absent.
+- `/Library/LaunchDaemons/com.crazydennies.macbook-lid-monitor.plist`: absent.
+- `/Library/Application Support/MacBookLidMonitor`: absent.
+- `/Library/Logs/MacBookLidMonitor`: absent.
+
+### Disposition
+
+**Task 14 approved and complete.** The real reboot, post-boot disabled state, rollback, uninstall, and zero-residual acceptance all passed. No production LaunchDaemon artifacts remain installed.

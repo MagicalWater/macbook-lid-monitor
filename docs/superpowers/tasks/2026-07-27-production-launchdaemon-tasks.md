@@ -1,6 +1,6 @@
 # Production LaunchDaemon Task Register
 
-Status: Implementation in progress; Tasks 1–11 and Stage C complete; Task 12 logged-in dry-run acceptance complete. Loginwindow/logout, real sleep/wake, and reboot remain behind separate approval gates.
+Status: Implementation in progress; Tasks 1–14 complete. Task 15 documentation, tooling disposition, and holistic final review remain.
 
 | Task | Purpose | Primary files | Verification | Approval gate | Rollback/safe stop |
 | ---: | --- | --- | --- | --- | --- |
@@ -20,7 +20,7 @@ Status: Implementation in progress; Tasks 1–11 and Stage C complete; Task 12 l
 | C | Packaging stage review — complete | reviews/evidence | clean checkout + residual state | completed with zero installed residual | explicit uninstall |
 | 12 | Production dry-run acceptance — complete | validation evidence | logged-in, loginwindow, and real sleep/wake dry-run acceptance complete | completed; separate reboot approval remains for Task 14 | automatic disable/bootout/bootstrap cleanup |
 | 13 | Enabled bounded acceptance — complete | validation evidence | dry-run path, first enabled sleep, bounded recovery-resleep, and non-sleeping injected failure all accepted on the real system | completed; no further Task 13 approval remains | automatic removal of injection plus disable/bootout/bootstrap cleanup |
-| 14 | Reboot/rollback/uninstall acceptance — two-phase command ready | validation evidence | boot-session proof, disabled startup, rollback, uninstall, zero residual | reboot and uninstall approved; operator performs reboot manually | finish refuses without a changed boot epoch; rollback then uninstall only after proof |
+| 14 | Reboot/rollback/uninstall acceptance — complete | validation evidence | real reboot proof, disabled startup, rollback to `20c369b823d1`, uninstall, independently verified zero residual | completed | rollback and uninstall completed; no managed system state remains |
 | 15 | Docs, tooling disposition, final review | README/docs/tool moves | full clean validation + holistic review | approval if cleanup touches installed state | restore archived tooling from git |
 
 ## Per-task mandatory workflow
