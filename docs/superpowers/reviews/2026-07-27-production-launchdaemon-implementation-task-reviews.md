@@ -1,3 +1,49 @@
+## Task 12 — Logged-in dry-run acceptance command
+
+### Implementation
+
+- Added explicit `dry-run` mode activation for the installed production configuration.
+- Added `accept-task12-logged-in` as the single root entry point for the non-disruptive logged-in portion of Task 12.
+- The command requires zero production residual state, prepares as the invoking non-root user, installs disabled, activates dry-run, verifies one system-domain daemon and dry-run startup evidence, captures redacted diagnostics, enforces log bounds, and returns the job to loaded/disabled.
+- Logout/loginwindow, real sleep/wake, and reboot are intentionally excluded and remain separate approval gates.
+
+### TDD evidence
+
+- RED: no Task 12 lifecycle command or sandbox acceptance existed.
+- GREEN: sandbox acceptance proves install → dry-run → disabled final state, and contract tests prove explicit invocation without password handling.
+
+### Immediate review finding
+
+#### P0 — Mid-acceptance failure could leave dry-run active
+
+The first implementation only disabled the daemon on the success path.
+
+**Resolution:** Added an EXIT cleanup trap that, whenever a managed config exists, best-effort disables, bootouts, and re-bootstraps the job before process exit. The trap is cleared only after the normal disabled final state is established.
+
+### Re-review
+
+- Starts only from verified zero production residual state: pass.
+- Initial install remains disabled: pass.
+- Dry-run activation performs no real sleep request construction: covered by existing production composition tests.
+- Real-system verification requires exactly one production daemon PID and dry-run startup evidence: pass by implementation review.
+- Failure path returns to disabled through EXIT cleanup: pass.
+- Success path returns to loaded/disabled and emits diagnostics: pass.
+- No logout, sleep, reboot, or enabled-mode mutation is included: pass.
+- No password reading, `sudo -S`, or embedded credentials: pass.
+
+### Fresh verification
+
+- Focused management tests: 27 tests, 0 failures.
+- Full suite: 171 tests, 0 failures.
+- `bash -n`: passed.
+- `shellcheck`: passed.
+- Release production daemon: passed.
+- `git diff --check`: passed.
+
+### Disposition
+
+**Task 12 logged-in acceptance command approved.** Real root execution is pending the user's already-granted Task 12 approval. Loginwindow/logout and real sleep/wake remain blocked by separate explicit gates.
+
 # Production LaunchDaemon Implementation Task Reviews
 
 ## Task 1 — Typed configuration and modes

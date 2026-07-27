@@ -6,7 +6,7 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 source "$SCRIPT_DIR/lib/production-package-common.sh"
 
 usage() {
-    printf '%s\n' 'usage: manage-production-daemon.sh prepare|verify|install|bootstrap|status|stop|bootout|disable|upgrade|rollback|rotate-logs|diagnostics|uninstall|accept-task9|accept-task10|accept-task11' >&2
+    printf '%s\n' 'usage: manage-production-daemon.sh prepare|verify|install|bootstrap|status|stop|bootout|disable|dry-run|upgrade|rollback|rotate-logs|diagnostics|uninstall|accept-task9|accept-task10|accept-task11|accept-task12-logged-in' >&2
     exit 64
 }
 
@@ -83,6 +83,73 @@ disable_job() {
     if [[ -z "$SYSTEM_ROOT" ]]; then chown root:wheel "$MANAGED_CONFIG"; fi
     stop_job
     printf 'disabled label=%s\n' "$LAUNCHD_LABEL"
+}
+
+set_dry_run_mode() {
+    require_root_for_system
+    assert_regular_source "$MANAGED_CONFIG"
+    /usr/libexec/PlistBuddy -c 'Set :Mode dry-run' "$MANAGED_CONFIG"
+    chmod 0644 "$MANAGED_CONFIG"
+    if [[ -z "$SYSTEM_ROOT" ]]; then chown root:wheel "$MANAGED_CONFIG"; fi
+    bootout_job
+    bootstrap_job
+    printf 'mode=dry-run label=%s\n' "$LAUNCHD_LABEL"
+}
+
+verify_logged_in_dry_run() {
+    local mode process_count
+    mode="$(/usr/libexec/PlistBuddy -c 'Print :Mode' "$MANAGED_CONFIG")"
+    [[ "$mode" == "dry-run" ]] || {
+        printf 'error: expected dry-run mode, got %s\n' "$mode" >&2
+        return 65
+    }
+    if [[ -n "$SYSTEM_ROOT" ]]; then
+        printf 'verified logged-in dry-run test-root=%s\n' "$SYSTEM_ROOT"
+        return 0
+    fi
+    sleep 2
+    launchctl print "system/$LAUNCHD_LABEL" >/dev/null
+    process_count="$({ pgrep -f '^/Library/PrivilegedHelperTools/macbook-lid-monitor-daemon$' || true; } | wc -l | tr -d ' ')"
+    [[ "$process_count" == "1" ]] || {
+        printf 'error: expected one production daemon process, got %s\n' "$process_count" >&2
+        return 70
+    }
+    [[ -f "$MANAGED_STDOUT_LOG" && ! -L "$MANAGED_STDOUT_LOG" ]] || {
+        printf 'error: production stdout log missing\n' >&2
+        return 70
+    }
+    grep -q 'mode=dry-run' "$MANAGED_STDOUT_LOG" || {
+        printf 'error: dry-run startup evidence missing\n' >&2
+        return 70
+    }
+    printf 'verified logged-in dry-run process-count=1 label=%s\n' "$LAUNCHD_LABEL"
+}
+
+accept_task12_logged_in() {
+    require_root_for_system
+    verify_uninstalled_state
+    cleanup_task12_to_disabled() {
+        if [[ -f "$MANAGED_CONFIG" && ! -L "$MANAGED_CONFIG" ]]; then
+            disable_job >/dev/null 2>&1 || true
+            bootout_job >/dev/null 2>&1 || true
+            bootstrap_job >/dev/null 2>&1 || true
+        fi
+    }
+    trap cleanup_task12_to_disabled EXIT
+    prepare_as_invoking_user
+    verify_package
+    install_package
+    bootstrap_job
+    set_dry_run_mode
+    verify_logged_in_dry_run
+    diagnostics
+    rotate_logs
+    disable_job
+    bootout_job
+    bootstrap_job
+    diagnostics
+    trap - EXIT
+    printf 'accepted task=12 scope=logged-in final-mode=disabled label=%s\n' "$LAUNCHD_LABEL"
 }
 
 rotate_one_log() {
@@ -456,6 +523,7 @@ case "$1" in
     stop) stop_job ;;
     bootout) bootout_job ;;
     disable) disable_job ;;
+    dry-run) set_dry_run_mode ;;
     upgrade) upgrade_package ;;
     rollback) rollback_upgrade ;;
     rotate-logs) rotate_logs ;;
@@ -464,5 +532,6 @@ case "$1" in
     accept-task9) accept_task9 ;;
     accept-task10) accept_task10 ;;
     accept-task11) accept_task11 ;;
+    accept-task12-logged-in) accept_task12_logged_in ;;
     *) usage ;;
 esac

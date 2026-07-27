@@ -256,6 +256,32 @@ final class ProductionManagementScriptTests: XCTestCase {
         XCTAssertFalse(text.contains("read -s"))
     }
 
+    func testAcceptTask12LoggedInInstallsDryRunsAndReturnsDisabled() throws {
+        let sandbox = root.appendingPathComponent(".build/production-package-accept-task12-root")
+        try? FileManager.default.removeItem(at: sandbox)
+        defer { try? FileManager.default.removeItem(at: sandbox) }
+
+        try seedStaging()
+        try runScript("accept-task12-logged-in", environment: ["MLM_TEST_ROOT": sandbox.path])
+
+        let configURL = sandbox.appendingPathComponent("Library/Application Support/MacBookLidMonitor/config.plist")
+        let config = try ProductionConfigurationDecoder().decode(Data(contentsOf: configURL))
+        XCTAssertEqual(config.mode, .disabled)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: sandbox.appendingPathComponent("Library/PrivilegedHelperTools/macbook-lid-monitor-daemon").path))
+    }
+
+    func testAcceptTask12LoggedInIsExplicitAndDoesNotHandlePasswords() throws {
+        let text = try String(
+            contentsOf: root.appendingPathComponent("scripts/manage-production-daemon.sh"),
+            encoding: .utf8
+        )
+        XCTAssertTrue(text.contains("accept-task12-logged-in)"))
+        XCTAssertTrue(text.contains("verify_logged_in_dry_run"))
+        XCTAssertTrue(text.contains("trap cleanup_task12_to_disabled EXIT"))
+        XCTAssertFalse(text.contains("sudo -S"))
+        XCTAssertFalse(text.contains("read -s"))
+    }
+
     func testInstallRejectsManagedPathSymlink() throws {
         let sandbox = root.appendingPathComponent(".build/production-package-symlink-root")
         try? FileManager.default.removeItem(at: sandbox)
