@@ -857,7 +857,7 @@ final class ProductionManagementScriptTests: XCTestCase {
         ))
     }
 
-    func testEvidenceOnlyUpgradePreservesAcceptanceAndInstalledIdentity() throws {
+    func testEvidenceOnlyUpgradeUpdatesInstalledProvenanceAndInvalidatesAcceptance() throws {
         let sandbox = root.appendingPathComponent(".build/production-maintenance-evidence-only-root")
         try? FileManager.default.removeItem(at: sandbox)
         defer { try? FileManager.default.removeItem(at: sandbox) }
@@ -868,24 +868,31 @@ final class ProductionManagementScriptTests: XCTestCase {
             sandbox: sandbox
         )
         let installedManifest = sandbox.appendingPathComponent("Library/Application Support/MacBookLidMonitor/manifest.plist")
-        let originalSourceCommit = try XCTUnwrap(try plistDictionary(at: installedManifest)["SourceCommit"] as? String)
+        var installed = try plistDictionary(at: installedManifest)
+        installed["Version"] = "legacy-evidence"
+        installed["SourceCommit"] = String(repeating: "a", count: 40)
+        try PropertyListSerialization.data(fromPropertyList: installed, format: .xml, options: 0)
+            .write(to: installedManifest)
 
         try seedStaging()
         let stagedManifest = root.appendingPathComponent(".build/production-package/manifest.plist")
-        var staged = try plistDictionary(at: stagedManifest)
-        staged["Version"] = "evidence-only"
-        staged["SourceCommit"] = String(repeating: "a", count: 40)
-        try PropertyListSerialization.data(fromPropertyList: staged, format: .xml, options: 0).write(to: stagedManifest)
+        let staged = try plistDictionary(at: stagedManifest)
+        let stagedSourceCommit = try XCTUnwrap(staged["SourceCommit"] as? String)
+        let stagedVersion = try XCTUnwrap(staged["Version"] as? String)
 
         let output = try runScriptOutput("upgrade", environment: ["MLM_TEST_ROOT": sandbox.path])
 
-        XCTAssertTrue(output.contains("upgrade=no-op identity=unchanged"), output)
-        XCTAssertTrue(FileManager.default.fileExists(
+        XCTAssertTrue(output.contains("upgrade=provenance-updated acceptance=invalidated"), output)
+        XCTAssertFalse(FileManager.default.fileExists(
             atPath: sandbox.appendingPathComponent("Library/Application Support/MacBookLidMonitor/deployment-acceptance.plist").path
         ))
         XCTAssertEqual(
             try XCTUnwrap(try plistDictionary(at: installedManifest)["SourceCommit"] as? String),
-            originalSourceCommit
+            stagedSourceCommit
+        )
+        XCTAssertEqual(
+            try XCTUnwrap(try plistDictionary(at: installedManifest)["Version"] as? String),
+            stagedVersion
         )
     }
 

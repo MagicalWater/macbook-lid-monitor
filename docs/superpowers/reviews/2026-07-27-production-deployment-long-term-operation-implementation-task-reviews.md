@@ -1102,6 +1102,9 @@ plist, config, and manifest but omitted `sleep-authority.lock`. Task 16 review i
 - Initial install atomically creates an empty regular lease with mode `0600`, expected owner/group,
   and link count 1.
 - Upgrade repairs a legacy missing lease before identity-equal no-op disposition.
+- Full no-op now requires payload identity plus matching `Version` and `SourceCommit`; when only
+  provenance differs, the normal disabled rollback transaction installs the staged manifest and
+  invalidates prior acceptance.
 - Staged activation and rollback preserve an existing safe inode and reject unsafe metadata.
 - Uninstall continues to remove the managed lease.
 
@@ -1112,9 +1115,11 @@ install lease RED: missing sleep-authority.lock
 install lease GREEN: passed
 legacy no-op upgrade repair RED: lease remained missing
 legacy no-op upgrade repair GREEN: passed
-focused final: 3 tests, 0 failures
+provenance-only upgrade RED: old manifest and acceptance were preserved
+provenance-only upgrade GREEN: staged provenance installed and acceptance invalidated
 management holistic first run: 84 tests, 1 stale expectation
 stale expectation disposition: lease_state=missing -> lease_state=present
+management final: 84 tests, 0 failures
 full suite: 269 tests, 0 failures
 ```
 

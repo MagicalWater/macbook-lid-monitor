@@ -27,6 +27,9 @@ accepted `lease_state=missing`.
 - Existing safe lease inodes are preserved.
 - Unsafe existing files, symlinks, metadata, or hard links are rejected.
 - Legacy identity-equal upgrade repairs a missing lease before returning no-op.
+- A payload-identical package with a newer valid Version/SourceCommit is not treated as a full
+  identity no-op: the staged manifest is installed transactionally and prior acceptance is
+  invalidated.
 - Staged upgrade and rollback ensure the same lease contract.
 - Uninstall removes the lease as a managed artifact.
 
@@ -37,7 +40,9 @@ install regression RED: file missing
 install regression GREEN: passed
 legacy no-op upgrade repair RED: file missing
 legacy no-op upgrade repair GREEN: passed
-focused final: 3 tests, 0 failures
+provenance-only upgrade RED: old manifest and acceptance were preserved
+provenance-only upgrade GREEN: staged Version/SourceCommit installed; acceptance invalidated
+management suite: 84 tests, 0 failures
 full suite: 269 tests, 0 failures
 ```
 

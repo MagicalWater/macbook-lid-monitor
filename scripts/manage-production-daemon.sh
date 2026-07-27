@@ -1002,12 +1002,17 @@ rollback_upgrade() { with_lifecycle_guard rollback_upgrade_unlocked; }
 
 upgrade_package_unlocked() {
     require_root_for_system
+    local provenance_only=0
     verify_installed_set
     ensure_managed_sleep_authority
     verify_staged_payload
     if staged_payload_matches_installed_identity; then
-        printf 'upgrade=no-op identity=unchanged acceptance=preserved\n'
-        return 0
+        if [[ "$(manifest_value Version)" == "$(staged_manifest_value Version)" && \
+              "$(manifest_value SourceCommit)" == "$(staged_manifest_value SourceCommit)" ]]; then
+            printf 'upgrade=no-op identity=unchanged acceptance=preserved\n'
+            return 0
+        fi
+        provenance_only=1
     fi
     verify_package
     prepare_maintenance_disabled_state
@@ -1031,7 +1036,11 @@ upgrade_package_unlocked() {
         printf 'error: upgrade failed and rollback restored previous set\n' >&2
         return 70
     fi
-    printf 'upgraded mode=disabled label=%s\n' "$LAUNCHD_LABEL"
+    if [[ "$provenance_only" -eq 1 ]]; then
+        printf 'upgrade=provenance-updated acceptance=invalidated mode=disabled label=%s\n' "$LAUNCHD_LABEL"
+    else
+        printf 'upgraded mode=disabled label=%s\n' "$LAUNCHD_LABEL"
+    fi
 }
 
 upgrade_package() { with_lifecycle_guard upgrade_package_unlocked; }
