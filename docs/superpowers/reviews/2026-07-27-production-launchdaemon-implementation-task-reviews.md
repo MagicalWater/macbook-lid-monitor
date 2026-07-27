@@ -406,3 +406,60 @@ clean standalone shellcheck result.
 **Task 8 approved and complete. Approval Gate C1 is now active.** Task 9 may be designed and
 reviewed further without mutation, but no install, bootstrap, `/Library` write, or launchd mutation
 may occur until the user explicitly approves that gate.
+
+## Task 9 — Install and control lifecycle (pre-acceptance review)
+
+### Implementation
+
+- Added explicit `install`, `bootstrap`, `status`, `disable`, `stop`, and `bootout` commands.
+- Added sandbox-root lifecycle tests that never touch `/Library` or real launchd state.
+- Added a single `accept-task9` command that records pre/post state, prepares as the invoking
+  non-root user, verifies staging, installs disabled configuration, exercises bootstrap/control,
+  and leaves the system job loaded with mode disabled.
+- Added root:wheel/mode handling, managed-path symlink refusal, duplicate authority refusal, and
+  unrelated-file preservation.
+
+### TDD and debugging evidence
+
+- Initial lifecycle tests failed before command implementation.
+- Test compilation failure was traced to a missing `LidMonitorCore` import and corrected.
+- Child-process stalls were traced to nested release builds and buffered subprocess output.
+- Sandbox acceptance now uses seeded staging; the real acceptance path still forces a fresh
+  non-root release prepare through `sudo -u "$SUDO_USER"`.
+
+### Immediate review findings
+
+#### P0 — Test root could target arbitrary absolute paths
+
+**Resolution:** `MLM_TEST_ROOT` is restricted to the repository `.build` subtree.
+
+#### P0 — Install did not reassert disabled initial mode
+
+**Resolution:** Install rejects staged configuration unless `Mode=disabled`.
+
+#### P1 — One-command root acceptance could create root-owned build artifacts
+
+**Resolution:** `accept-task9` requires sudo invocation but performs `prepare` as the original
+non-root user before returning to root-only installation operations.
+
+### Re-review
+
+- Sandbox lifecycle and single-command acceptance: pass.
+- Managed path symlink and non-disabled staging rejection: pass.
+- No password reading, `sudo -S`, or embedded credential handling: pass.
+- Unrelated files remain untouched: pass.
+- Final sandbox configuration remains disabled: pass.
+
+### Fresh verification
+
+- Focused management tests: 12 tests, 0 failures.
+- Full suite: 156 tests, 0 failures.
+- `bash -n`: passed.
+- `shellcheck`: passed.
+- Release production daemon: passed.
+- `git diff --check`: passed.
+
+### Disposition
+
+**Implementation approved.** Task 9 remains open until the separately approved root
+`accept-task9` command completes and its real system evidence is reviewed.
