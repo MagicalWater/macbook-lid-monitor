@@ -70,6 +70,12 @@ deployment_identity_value() {
     esac
 }
 
+deployment_payload_identity_keys() {
+    printf '%s\n' \
+        Product BinarySHA256 PlistSHA256 DisabledConfigSHA256 HardwareProfileID \
+        BinaryPath PlistPath ConfigPath SleepAuthorityPath AcceptanceStatePath HealthStatePath
+}
+
 verify_state_identity() {
     local path=$1 error_key=$2 key expected actual
     for key in Product SourceCommit BinarySHA256 PlistSHA256 DisabledConfigSHA256 HardwareProfileID TargetModel TargetChip; do

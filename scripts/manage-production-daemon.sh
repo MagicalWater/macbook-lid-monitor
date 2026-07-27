@@ -635,14 +635,17 @@ uninstall_package_unlocked() {
     require_root_for_system
     verify_installed_set
     for path in "$MANAGED_BINARY" "$MANAGED_PLIST" "$MANAGED_CONFIG" "$MANAGED_MANIFEST" \
-        "$MANAGED_SUPPORT/crash-budget.json" "$MANAGED_TASK14_STATE" "$MANAGED_STDOUT_LOG" "$MANAGED_STDERR_LOG" "$MANAGED_ROLLBACK"; do
+        "$MANAGED_SLEEP_AUTHORITY" "$MANAGED_ACCEPTANCE_STATE" "$MANAGED_REBOOT_STATE" \
+        "$MANAGED_HEALTH_STATE" "$MANAGED_SUPPORT/crash-budget.json" "$MANAGED_TASK14_STATE" \
+        "$MANAGED_STDOUT_LOG" "$MANAGED_STDERR_LOG" "$MANAGED_ROLLBACK"; do
         assert_managed_path_safe "$path"
         [[ -L "$path" ]] && { printf 'error: refusing symlink uninstall path: %s\n' "$path" >&2; return 74; }
     done
-    disable_job 2>/dev/null || true
-    bootout_job
+    prepare_maintenance_disabled_state
     for path in "$MANAGED_BINARY" "$MANAGED_PLIST" "$MANAGED_CONFIG" "$MANAGED_MANIFEST" \
-        "$MANAGED_SUPPORT/crash-budget.json" "$MANAGED_TASK14_STATE" "$MANAGED_STDOUT_LOG" "$MANAGED_STDERR_LOG"; do
+        "$MANAGED_SLEEP_AUTHORITY" "$MANAGED_ACCEPTANCE_STATE" "$MANAGED_REBOOT_STATE" \
+        "$MANAGED_HEALTH_STATE" "$MANAGED_SUPPORT/crash-budget.json" "$MANAGED_TASK14_STATE" \
+        "$MANAGED_STDOUT_LOG" "$MANAGED_STDERR_LOG"; do
         rm -f -- "$path"
     done
     for path in "$MANAGED_STDOUT_LOG" "$MANAGED_STDERR_LOG"; do
@@ -660,7 +663,8 @@ uninstall_package() { with_lifecycle_guard uninstall_package_unlocked; }
 verify_uninstalled_state() {
     local found=0
     for path in "$MANAGED_BINARY" "$MANAGED_PLIST" "$MANAGED_CONFIG" "$MANAGED_MANIFEST" \
-        "$MANAGED_SUPPORT/crash-budget.json" "$MANAGED_TASK14_STATE" "$MANAGED_ROLLBACK" \
+        "$MANAGED_SLEEP_AUTHORITY" "$MANAGED_ACCEPTANCE_STATE" "$MANAGED_REBOOT_STATE" \
+        "$MANAGED_HEALTH_STATE" "$MANAGED_SUPPORT/crash-budget.json" "$MANAGED_TASK14_STATE" "$MANAGED_ROLLBACK" \
         "$MANAGED_STDOUT_LOG" "$MANAGED_STDERR_LOG"; do
         if [[ -e "$path" || -L "$path" ]]; then
             printf 'error: managed residual remains: %s\n' "$path" >&2
@@ -794,12 +798,26 @@ accept_task11() {
     printf 'accepted task=11 state=uninstalled label=%s\n' "$LAUNCHD_LABEL"
 }
 
+prepare_maintenance_disabled_state() {
+    require_root_for_system
+    verify_installed_set
+    set_managed_mode disabled
+    bootout_job
+    if [[ -z "$SYSTEM_ROOT" ]] && pgrep -f '^/Library/PrivilegedHelperTools/macbook-lid-monitor-daemon$' >/dev/null 2>&1; then
+        printf 'error: maintenance requires no resident daemon\n' >&2
+        return 70
+    fi
+    printf 'maintenance-state mode=disabled job=booted-out process-count=0\n'
+}
+
 backup_current_set() {
     verify_managed_set
     assert_regular_source "$MANAGED_BINARY"
     assert_regular_source "$MANAGED_PLIST"
     assert_regular_source "$MANAGED_CONFIG"
     assert_regular_source "$MANAGED_MANIFEST"
+    assert_managed_path_safe "$MANAGED_ROLLBACK"
+    [[ ! -L "$MANAGED_ROLLBACK" ]] || { printf 'error=rollback-set-invalid reason=symlink path=%s\n' "$MANAGED_ROLLBACK" >&2; return 74; }
     rm -rf -- "$MANAGED_ROLLBACK"
     mkdir -p -- "$MANAGED_ROLLBACK"
     cp -p -- "$MANAGED_BINARY" "$MANAGED_ROLLBACK/macbook-lid-monitor-daemon"
@@ -812,7 +830,25 @@ verify_managed_set() {
     verify_installed_set
 }
 
-restore_rollback_set() {
+activate_staged_set_disabled() {
+    verify_staged_payload
+    install -m 0755 "$STAGING_DIR/macbook-lid-monitor-daemon" "$MANAGED_BINARY.tmp"
+    install -m 0644 "$STAGING_DIR/com.crazydennies.macbook-lid-monitor.plist" "$MANAGED_PLIST.tmp"
+    install -m 0644 "$STAGING_DIR/config.plist" "$MANAGED_CONFIG.tmp"
+    install -m 0644 "$STAGING_DIR/manifest.plist" "$MANAGED_MANIFEST.tmp"
+    mv -f -- "$MANAGED_BINARY.tmp" "$MANAGED_BINARY"
+    mv -f -- "$MANAGED_PLIST.tmp" "$MANAGED_PLIST"
+    mv -f -- "$MANAGED_CONFIG.tmp" "$MANAGED_CONFIG"
+    mv -f -- "$MANAGED_MANIFEST.tmp" "$MANAGED_MANIFEST"
+    if [[ -z "$SYSTEM_ROOT" ]]; then
+        chown root:wheel "$MANAGED_BINARY" "$MANAGED_PLIST" "$MANAGED_CONFIG" "$MANAGED_MANIFEST"
+    fi
+    verify_managed_set
+    [[ "$(/usr/libexec/PlistBuddy -c 'Print :Mode' "$MANAGED_CONFIG")" == disabled ]]
+}
+
+restore_rollback_set_disabled() {
+    verify_rollback_set
     if [[ "${MLM_FAIL_UPGRADE_STAGE:-}" == "rollback-restore" ]]; then
         printf 'error: injected rollback restore failure\n' >&2
         return 70
@@ -825,6 +861,7 @@ restore_rollback_set() {
     install -m 0644 "$MANAGED_ROLLBACK/com.crazydennies.macbook-lid-monitor.plist" "$MANAGED_PLIST.tmp"
     install -m 0644 "$MANAGED_ROLLBACK/config.plist" "$MANAGED_CONFIG.tmp"
     install -m 0644 "$MANAGED_ROLLBACK/manifest.plist" "$MANAGED_MANIFEST.tmp"
+    /usr/libexec/PlistBuddy -c 'Set :Mode disabled' "$MANAGED_CONFIG.tmp"
     mv -f -- "$MANAGED_BINARY.tmp" "$MANAGED_BINARY"
     mv -f -- "$MANAGED_PLIST.tmp" "$MANAGED_PLIST"
     mv -f -- "$MANAGED_CONFIG.tmp" "$MANAGED_CONFIG"
@@ -838,11 +875,12 @@ restore_rollback_set() {
 rollback_upgrade_unlocked() {
     require_root_for_system
     verify_installed_set
-    bootout_job
-    restore_rollback_set
+    verify_rollback_set
+    prepare_maintenance_disabled_state
+    restore_rollback_set_disabled
     invalidate_deployment_acceptance rollback >/dev/null
     bootstrap_job
-    printf 'rolled-back label=%s\n' "$LAUNCHD_LABEL"
+    printf 'rolled-back mode=disabled label=%s\n' "$LAUNCHD_LABEL"
 }
 
 rollback_upgrade() { with_lifecycle_guard rollback_upgrade_unlocked; }
@@ -850,25 +888,23 @@ rollback_upgrade() { with_lifecycle_guard rollback_upgrade_unlocked; }
 upgrade_package_unlocked() {
     require_root_for_system
     verify_installed_set
+    verify_staged_payload
+    if staged_payload_matches_installed_identity; then
+        printf 'upgrade=no-op identity=unchanged acceptance=preserved\n'
+        return 0
+    fi
     verify_package
-    invalidate_deployment_acceptance upgrade >/dev/null
+    prepare_maintenance_disabled_state
     backup_current_set
-    bootout_job
+    invalidate_deployment_acceptance upgrade >/dev/null
     local failed=0
-    install -m 0755 "$STAGING_DIR/macbook-lid-monitor-daemon" "$MANAGED_BINARY.tmp"
-    install -m 0644 "$STAGING_DIR/com.crazydennies.macbook-lid-monitor.plist" "$MANAGED_PLIST.tmp"
-    install -m 0644 "$STAGING_DIR/config.plist" "$MANAGED_CONFIG.tmp"
-    install -m 0644 "$STAGING_DIR/manifest.plist" "$MANAGED_MANIFEST.tmp"
-    mv -f -- "$MANAGED_BINARY.tmp" "$MANAGED_BINARY"
-    mv -f -- "$MANAGED_PLIST.tmp" "$MANAGED_PLIST"
-    mv -f -- "$MANAGED_CONFIG.tmp" "$MANAGED_CONFIG"
-    mv -f -- "$MANAGED_MANIFEST.tmp" "$MANAGED_MANIFEST"
+    activate_staged_set_disabled || failed=1
     if [[ "${MLM_FAIL_UPGRADE_STAGE:-}" == "after-activation" || "${MLM_FAIL_UPGRADE_STAGE:-}" == "rollback-restore" ]]; then failed=1; fi
     if [[ "$failed" -eq 0 ]]; then
         bootstrap_job || failed=1
     fi
     if [[ "$failed" -ne 0 ]]; then
-        if ! restore_rollback_set; then
+        if ! restore_rollback_set_disabled; then
             printf 'error: rollback failed; job remains booted out\n' >&2
             return 71
         fi
@@ -879,7 +915,7 @@ upgrade_package_unlocked() {
         printf 'error: upgrade failed and rollback restored previous set\n' >&2
         return 70
     fi
-    printf 'upgraded label=%s\n' "$LAUNCHD_LABEL"
+    printf 'upgraded mode=disabled label=%s\n' "$LAUNCHD_LABEL"
 }
 
 upgrade_package() { with_lifecycle_guard upgrade_package_unlocked; }

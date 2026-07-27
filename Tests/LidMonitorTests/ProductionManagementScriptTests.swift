@@ -105,6 +105,8 @@ final class ProductionManagementScriptTests: XCTestCase {
             format: .xml,
             options: 0
         ).write(to: manifestURL)
+        let installedBinary = sandbox.appendingPathComponent("Library/PrivilegedHelperTools/macbook-lid-monitor-daemon")
+        try Data("task10-previous-payload".utf8).write(to: installedBinary)
         try synchronizeInstalledManifestChecksum(in: sandbox)
 
         try seedStaging()
@@ -237,6 +239,21 @@ final class ProductionManagementScriptTests: XCTestCase {
         for name in ["production.log", "production.log.1", "production-error.log.3"] {
             try Data("managed".utf8).write(to: logDir.appendingPathComponent(name))
         }
+        let support = sandbox.appendingPathComponent("Library/Application Support/MacBookLidMonitor")
+        let managedStateNames = [
+            "sleep-authority.lock",
+            "deployment-acceptance.plist",
+            "deployment-reboot.plist",
+            "health.plist",
+            "crash-budget.json",
+            "task14-reboot-state",
+        ]
+        for name in managedStateNames {
+            try Data("managed-state".utf8).write(to: support.appendingPathComponent(name))
+        }
+        let rollback = support.appendingPathComponent("rollback")
+        try FileManager.default.createDirectory(at: rollback, withIntermediateDirectories: true)
+        try Data("rollback".utf8).write(to: rollback.appendingPathComponent("manifest.plist"))
 
         try runScript("uninstall", environment: ["MLM_TEST_ROOT": sandbox.path])
 
@@ -246,6 +263,10 @@ final class ProductionManagementScriptTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: sandbox.appendingPathComponent("Library/Application Support/MacBookLidMonitor").path))
         XCTAssertFalse(FileManager.default.fileExists(atPath: logDir.appendingPathComponent("production.log.1").path))
         XCTAssertFalse(FileManager.default.fileExists(atPath: logDir.appendingPathComponent("production-error.log.3").path))
+        for name in managedStateNames {
+            XCTAssertFalse(FileManager.default.fileExists(atPath: support.appendingPathComponent(name).path), name)
+        }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: rollback.path))
     }
 
     func testUninstallRejectsManagedSymlink() throws {
@@ -273,9 +294,14 @@ final class ProductionManagementScriptTests: XCTestCase {
         try FileManager.default.createDirectory(at: target, withIntermediateDirectories: true)
         try FileManager.default.createSymbolicLink(at: rollback, withDestinationURL: target)
         let binary = sandbox.appendingPathComponent("Library/PrivilegedHelperTools/macbook-lid-monitor-daemon")
+        let config = support.appendingPathComponent("config.plist")
+        var enabled = try plistDictionary(at: config)
+        enabled["Mode"] = "enabled"
+        try PropertyListSerialization.data(fromPropertyList: enabled, format: .xml, options: 0).write(to: config)
 
         XCTAssertThrowsError(try runScript("uninstall", environment: ["MLM_TEST_ROOT": sandbox.path]))
         XCTAssertTrue(FileManager.default.fileExists(atPath: binary.path))
+        XCTAssertEqual(try ProductionConfigurationDecoder().decode(Data(contentsOf: config)).mode, .enabled)
     }
 
     func testAcceptTask11RotatesDiagnosesUninstallsAndLeavesNoManagedResidual() throws {
@@ -506,6 +532,9 @@ final class ProductionManagementScriptTests: XCTestCase {
             "/usr/libexec/PlistBuddy",
             ["-c", "Set :Version task14-previous-version", manifest.path]
         )
+        let installedBinary = sandbox.appendingPathComponent("Library/PrivilegedHelperTools/macbook-lid-monitor-daemon")
+        try Data("task14-previous-payload".utf8).write(to: installedBinary)
+        try synchronizeInstalledManifestChecksum(in: sandbox)
         try runScript("accept-task14-reboot-start", environment: [
             "MLM_TEST_ROOT": sandbox.path,
             "MLM_TEST_BOOT_EPOCH": "1700000000",
@@ -669,6 +698,88 @@ final class ProductionManagementScriptTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: sandbox.appendingPathComponent("Library/Application Support/MacBookLidMonitor/rollback/macbook-lid-monitor-daemon").path))
     }
 
+    func testMaintenanceTransactionsExposeExplicitDisabledBoundaries() throws {
+        let text = try String(
+            contentsOf: root.appendingPathComponent("scripts/manage-production-daemon.sh"),
+            encoding: .utf8
+        )
+        for interface in [
+            "prepare_maintenance_disabled_state()",
+            "backup_current_set()",
+            "activate_staged_set_disabled()",
+            "restore_rollback_set_disabled()",
+            "upgrade_package()",
+            "rollback_upgrade()",
+            "uninstall_package()",
+        ] {
+            XCTAssertTrue(text.contains(interface), interface)
+        }
+        XCTAssertTrue(text.contains("prepare_maintenance_disabled_state\n    backup_current_set"))
+        XCTAssertTrue(text.contains("prepare_maintenance_disabled_state\n    restore_rollback_set_disabled"))
+    }
+
+    func testUpgradeForcesDisabledAndInvalidatesAcceptanceWhenPayloadChanges() throws {
+        let sandbox = root.appendingPathComponent(".build/production-maintenance-upgrade-disabled-root")
+        try? FileManager.default.removeItem(at: sandbox)
+        defer { try? FileManager.default.removeItem(at: sandbox) }
+        try seedStaging()
+        try runScript("install", environment: ["MLM_TEST_ROOT": sandbox.path])
+        _ = try runDeploymentLibrary(
+            "record_deployment_acceptance deployment-dry-run pass",
+            sandbox: sandbox
+        )
+        let configURL = sandbox.appendingPathComponent("Library/Application Support/MacBookLidMonitor/config.plist")
+        var enabled = try plistDictionary(at: configURL)
+        enabled["Mode"] = "enabled"
+        try PropertyListSerialization.data(fromPropertyList: enabled, format: .xml, options: 0).write(to: configURL)
+        let installedBinary = sandbox.appendingPathComponent("Library/PrivilegedHelperTools/macbook-lid-monitor-daemon")
+        try Data("old-payload".utf8).write(to: installedBinary)
+        try synchronizeInstalledManifestChecksum(in: sandbox)
+
+        try seedStaging()
+        try runScript("upgrade", environment: ["MLM_TEST_ROOT": sandbox.path])
+
+        XCTAssertEqual(
+            try ProductionConfigurationDecoder().decode(Data(contentsOf: configURL)).mode,
+            .disabled
+        )
+        XCTAssertFalse(FileManager.default.fileExists(
+            atPath: sandbox.appendingPathComponent("Library/Application Support/MacBookLidMonitor/deployment-acceptance.plist").path
+        ))
+    }
+
+    func testEvidenceOnlyUpgradePreservesAcceptanceAndInstalledIdentity() throws {
+        let sandbox = root.appendingPathComponent(".build/production-maintenance-evidence-only-root")
+        try? FileManager.default.removeItem(at: sandbox)
+        defer { try? FileManager.default.removeItem(at: sandbox) }
+        try seedStaging()
+        try runScript("install", environment: ["MLM_TEST_ROOT": sandbox.path])
+        _ = try runDeploymentLibrary(
+            "record_deployment_acceptance deployment-dry-run pass",
+            sandbox: sandbox
+        )
+        let installedManifest = sandbox.appendingPathComponent("Library/Application Support/MacBookLidMonitor/manifest.plist")
+        let originalSourceCommit = try XCTUnwrap(try plistDictionary(at: installedManifest)["SourceCommit"] as? String)
+
+        try seedStaging()
+        let stagedManifest = root.appendingPathComponent(".build/production-package/manifest.plist")
+        var staged = try plistDictionary(at: stagedManifest)
+        staged["Version"] = "evidence-only"
+        staged["SourceCommit"] = String(repeating: "a", count: 40)
+        try PropertyListSerialization.data(fromPropertyList: staged, format: .xml, options: 0).write(to: stagedManifest)
+
+        let output = try runScriptOutput("upgrade", environment: ["MLM_TEST_ROOT": sandbox.path])
+
+        XCTAssertTrue(output.contains("upgrade=no-op identity=unchanged"), output)
+        XCTAssertTrue(FileManager.default.fileExists(
+            atPath: sandbox.appendingPathComponent("Library/Application Support/MacBookLidMonitor/deployment-acceptance.plist").path
+        ))
+        XCTAssertEqual(
+            try XCTUnwrap(try plistDictionary(at: installedManifest)["SourceCommit"] as? String),
+            originalSourceCommit
+        )
+    }
+
     func testUpgradeFailureAutomaticallyRestoresPreviousSet() throws {
         let sandbox = root.appendingPathComponent(".build/production-package-upgrade-failure-root")
         try? FileManager.default.removeItem(at: sandbox)
@@ -691,6 +802,62 @@ final class ProductionManagementScriptTests: XCTestCase {
             )
         )
         XCTAssertEqual(try Data(contentsOf: installedBinary), previous)
+        let configURL = sandbox.appendingPathComponent("Library/Application Support/MacBookLidMonitor/config.plist")
+        XCTAssertEqual(try ProductionConfigurationDecoder().decode(Data(contentsOf: configURL)).mode, .disabled)
+    }
+
+    func testExplicitRollbackRestoresPreviousSetDisabledAndInvalidatesAcceptance() throws {
+        let sandbox = root.appendingPathComponent(".build/production-maintenance-explicit-rollback-root")
+        try? FileManager.default.removeItem(at: sandbox)
+        defer { try? FileManager.default.removeItem(at: sandbox) }
+        try seedStaging()
+        try runScript("install", environment: ["MLM_TEST_ROOT": sandbox.path])
+        let installedBinary = sandbox.appendingPathComponent("Library/PrivilegedHelperTools/macbook-lid-monitor-daemon")
+        let previous = Data("rollback-previous".utf8)
+        try previous.write(to: installedBinary)
+        try synchronizeInstalledManifestChecksum(in: sandbox)
+        try seedStaging()
+        try runScript("upgrade", environment: ["MLM_TEST_ROOT": sandbox.path])
+        _ = try runDeploymentLibrary(
+            "record_deployment_acceptance deployment-dry-run pass",
+            sandbox: sandbox
+        )
+        let configURL = sandbox.appendingPathComponent("Library/Application Support/MacBookLidMonitor/config.plist")
+        var enabled = try plistDictionary(at: configURL)
+        enabled["Mode"] = "enabled"
+        try PropertyListSerialization.data(fromPropertyList: enabled, format: .xml, options: 0).write(to: configURL)
+
+        try runScript("rollback", environment: ["MLM_TEST_ROOT": sandbox.path])
+
+        XCTAssertEqual(try Data(contentsOf: installedBinary), previous)
+        XCTAssertEqual(try ProductionConfigurationDecoder().decode(Data(contentsOf: configURL)).mode, .disabled)
+        XCTAssertFalse(FileManager.default.fileExists(
+            atPath: sandbox.appendingPathComponent("Library/Application Support/MacBookLidMonitor/deployment-acceptance.plist").path
+        ))
+    }
+
+    func testExplicitRollbackRejectsTamperedSlotBeforeMaintenanceMutation() throws {
+        let sandbox = root.appendingPathComponent(".build/production-maintenance-tampered-rollback-root")
+        try? FileManager.default.removeItem(at: sandbox)
+        defer { try? FileManager.default.removeItem(at: sandbox) }
+        try seedStaging()
+        try runScript("install", environment: ["MLM_TEST_ROOT": sandbox.path])
+        let installedBinary = sandbox.appendingPathComponent("Library/PrivilegedHelperTools/macbook-lid-monitor-daemon")
+        try Data("rollback-original".utf8).write(to: installedBinary)
+        try synchronizeInstalledManifestChecksum(in: sandbox)
+        try seedStaging()
+        try runScript("upgrade", environment: ["MLM_TEST_ROOT": sandbox.path])
+        let support = sandbox.appendingPathComponent("Library/Application Support/MacBookLidMonitor")
+        try Data("tampered".utf8).write(to: support.appendingPathComponent("rollback/macbook-lid-monitor-daemon"))
+        let config = support.appendingPathComponent("config.plist")
+        var enabled = try plistDictionary(at: config)
+        enabled["Mode"] = "enabled"
+        try PropertyListSerialization.data(fromPropertyList: enabled, format: .xml, options: 0).write(to: config)
+
+        let failure = try runScriptFailure("rollback", environment: ["MLM_TEST_ROOT": sandbox.path])
+
+        XCTAssertTrue(failure.output.contains("rollback-set-invalid"), failure.output)
+        XCTAssertEqual(try ProductionConfigurationDecoder().decode(Data(contentsOf: config)).mode, .enabled)
     }
 
     func testUpgradeRejectsCorruptInstalledManifestBeforeActivation() throws {
@@ -715,17 +882,19 @@ final class ProductionManagementScriptTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: sandbox) }
         try seedStaging()
         try runScript("install", environment: ["MLM_TEST_ROOT": sandbox.path])
+        let installedBinary = sandbox.appendingPathComponent("Library/PrivilegedHelperTools/macbook-lid-monitor-daemon")
+        try Data("rollback-failure-old-payload".utf8).write(to: installedBinary)
+        try synchronizeInstalledManifestChecksum(in: sandbox)
         try seedStaging()
 
-        XCTAssertThrowsError(
-            try runScript(
-                "upgrade",
-                environment: [
-                    "MLM_TEST_ROOT": sandbox.path,
-                    "MLM_FAIL_UPGRADE_STAGE": "rollback-restore",
-                ]
-            )
+        let failure = try runScriptFailure(
+            "upgrade",
+            environment: [
+                "MLM_TEST_ROOT": sandbox.path,
+                "MLM_FAIL_UPGRADE_STAGE": "rollback-restore",
+            ]
         )
+        XCTAssertTrue(failure.output.contains("job remains booted out"), failure.output)
     }
 
     func testInstalledSetLibraryDefinesStableSharedInterfaces() throws {
@@ -1047,6 +1216,9 @@ final class ProductionManagementScriptTests: XCTestCase {
 
         _ = try runDeploymentLibrary("record_deployment_acceptance deployment-dry-run pass", sandbox: sandbox)
         XCTAssertTrue(FileManager.default.fileExists(atPath: acceptance.path))
+        let installedBinary = sandbox.appendingPathComponent("Library/PrivilegedHelperTools/macbook-lid-monitor-daemon")
+        try Data("lifecycle-previous-payload".utf8).write(to: installedBinary)
+        try synchronizeInstalledManifestChecksum(in: sandbox)
         try seedStaging()
         try runScript("upgrade", environment: ["MLM_TEST_ROOT": sandbox.path])
         XCTAssertFalse(FileManager.default.fileExists(atPath: acceptance.path))

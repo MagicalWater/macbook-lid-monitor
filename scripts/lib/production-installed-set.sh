@@ -72,6 +72,103 @@ manifest_value() {
     /usr/libexec/PlistBuddy -c "Print :$1" "$MANAGED_MANIFEST" 2>/dev/null
 }
 
+staged_manifest_value() {
+    /usr/libexec/PlistBuddy -c "Print :$1" "$STAGING_DIR/manifest.plist" 2>/dev/null
+}
+
+verify_staged_payload() {
+    local binary plist config manifest expected actual
+    binary="$STAGING_DIR/macbook-lid-monitor-daemon"
+    plist="$STAGING_DIR/com.crazydennies.macbook-lid-monitor.plist"
+    config="$STAGING_DIR/config.plist"
+    manifest="$STAGING_DIR/manifest.plist"
+    assert_regular_source "$binary" || return $?
+    assert_regular_source "$plist" || return $?
+    assert_regular_source "$config" || return $?
+    assert_regular_source "$manifest" || return $?
+    [[ -x "$binary" ]] || { installed_set_error staged-binary-mode "$binary"; return $?; }
+    plutil -lint "$plist" "$config" "$manifest" >/dev/null 2>&1 || {
+        installed_set_error staged-plist-lint "$manifest"; return $?
+    }
+    [[ "$(staged_manifest_value SchemaVersion)" == 1 ]] || { installed_set_error staged-schema "$manifest"; return $?; }
+    [[ "$(staged_manifest_value Product)" == macbook-lid-monitor-daemon ]] || { installed_set_error staged-product "$manifest"; return $?; }
+    [[ "$(staged_manifest_value BinaryPath)" == /Library/PrivilegedHelperTools/macbook-lid-monitor-daemon ]] || { installed_set_error staged-binary-path "$manifest"; return $?; }
+    [[ "$(staged_manifest_value PlistPath)" == /Library/LaunchDaemons/com.crazydennies.macbook-lid-monitor.plist ]] || { installed_set_error staged-plist-path "$manifest"; return $?; }
+    [[ "$(staged_manifest_value ConfigPath)" == '/Library/Application Support/MacBookLidMonitor/config.plist' ]] || { installed_set_error staged-config-path "$manifest"; return $?; }
+    [[ "$(staged_manifest_value SleepAuthorityPath)" == '/Library/Application Support/MacBookLidMonitor/sleep-authority.lock' ]] || { installed_set_error staged-sleep-authority-path "$manifest"; return $?; }
+    [[ "$(staged_manifest_value AcceptanceStatePath)" == '/Library/Application Support/MacBookLidMonitor/deployment-acceptance.plist' ]] || { installed_set_error staged-acceptance-path "$manifest"; return $?; }
+    [[ "$(staged_manifest_value HealthStatePath)" == '/Library/Application Support/MacBookLidMonitor/health.plist' ]] || { installed_set_error staged-health-path "$manifest"; return $?; }
+    [[ "$(staged_manifest_value HardwareProfileID)" == m1-pro-0x8104-report-id-1-v1 ]] || { installed_set_error staged-hardware-profile "$manifest"; return $?; }
+    [[ "$(staged_manifest_value SourceCommit)" =~ ^[0-9a-f]{40}$ ]] || { installed_set_error staged-source-commit "$manifest"; return $?; }
+    [[ "$(/usr/libexec/PlistBuddy -c 'Print :Mode' "$config" 2>/dev/null || true)" == disabled ]] || {
+        installed_set_error staged-mode "$config"; return $?
+    }
+    expected="$(staged_manifest_value BinarySHA256)"; actual="$(sha256_file "$binary")"
+    [[ "$expected" == "$actual" ]] || { installed_set_error staged-binary-checksum "$binary"; return $?; }
+    expected="$(staged_manifest_value PlistSHA256)"; actual="$(sha256_file "$plist")"
+    [[ "$expected" == "$actual" ]] || { installed_set_error staged-plist-checksum "$plist"; return $?; }
+    expected="$(staged_manifest_value DisabledConfigSHA256)"; actual="$(normalized_config_sha256 "$config")"
+    [[ "$expected" == "$actual" ]] || { installed_set_error staged-config-checksum "$config"; return $?; }
+    if /usr/libexec/PlistBuddy -c 'Print :EnvironmentVariables' "$plist" >/dev/null 2>&1; then
+        installed_set_error staged-prohibited-environment "$plist"
+        return $?
+    fi
+}
+
+staged_payload_matches_installed_identity() {
+    local key
+    verify_installed_set || return $?
+    verify_staged_payload || return $?
+    while IFS= read -r key; do
+        [[ "$(manifest_value "$key")" == "$(staged_manifest_value "$key")" ]] || return 1
+    done < <(deployment_payload_identity_keys)
+}
+
+rollback_set_error() {
+    local reason=$1 path=${2:-unavailable}
+    printf 'error=rollback-set-invalid reason=%s path=%s\n' "$reason" "$path" >&2
+    return 65
+}
+
+verify_rollback_set() {
+    local binary plist config manifest expected actual
+    [[ -d "$MANAGED_ROLLBACK" && ! -L "$MANAGED_ROLLBACK" ]] || {
+        rollback_set_error directory "$MANAGED_ROLLBACK"; return $?
+    }
+    assert_managed_path_safe "$MANAGED_ROLLBACK" || return $?
+    binary="$MANAGED_ROLLBACK/macbook-lid-monitor-daemon"
+    plist="$MANAGED_ROLLBACK/com.crazydennies.macbook-lid-monitor.plist"
+    config="$MANAGED_ROLLBACK/config.plist"
+    manifest="$MANAGED_ROLLBACK/manifest.plist"
+    verify_managed_metadata "$binary" regular "$(managed_expected_owner)" "$(managed_expected_group)" 755 1 >/dev/null 2>&1 || {
+        rollback_set_error metadata "$binary"; return $?
+    }
+    for path in "$plist" "$config" "$manifest"; do
+        verify_managed_metadata "$path" regular "$(managed_expected_owner)" "$(managed_expected_group)" 644 1 >/dev/null 2>&1 || {
+            rollback_set_error metadata "$path"; return $?
+        }
+    done
+    [[ "$(/usr/libexec/PlistBuddy -c 'Print :SchemaVersion' "$manifest" 2>/dev/null || true)" == 1 ]] || {
+        rollback_set_error schema "$manifest"; return $?
+    }
+    expected="$(/usr/libexec/PlistBuddy -c 'Print :BinarySHA256' "$manifest" 2>/dev/null || true)"
+    actual="$(sha256_file "$binary")"
+    [[ "$expected" == "$actual" ]] || { rollback_set_error binary-checksum "$binary"; return $?; }
+    expected="$(/usr/libexec/PlistBuddy -c 'Print :PlistSHA256' "$manifest" 2>/dev/null || true)"
+    actual="$(sha256_file "$plist")"
+    [[ "$expected" == "$actual" ]] || { rollback_set_error plist-checksum "$plist"; return $?; }
+    expected="$(/usr/libexec/PlistBuddy -c 'Print :DisabledConfigSHA256' "$manifest" 2>/dev/null || true)"
+    actual="$(normalized_config_sha256 "$config")"
+    [[ "$expected" == "$actual" ]] || { rollback_set_error config-checksum "$config"; return $?; }
+    [[ "$(/usr/libexec/PlistBuddy -c 'Print :Mode' "$config" 2>/dev/null || true)" == disabled ]] || {
+        rollback_set_error mode "$config"; return $?
+    }
+    if /usr/libexec/PlistBuddy -c 'Print :EnvironmentVariables' "$plist" >/dev/null 2>&1; then
+        rollback_set_error prohibited-environment "$plist"
+        return $?
+    fi
+}
+
 verify_installed_set() {
     local owner group expected actual
     owner="$(managed_expected_owner)"

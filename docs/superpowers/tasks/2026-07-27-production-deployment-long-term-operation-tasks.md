@@ -1,6 +1,6 @@
 # Milestone 16 Production Deployment and Long-term Operation Task Register
 
-Status: Tasks 1–11 and Stage A review complete. Task 12 is next. Tasks 15–21 remain approval-gated.
+Status: Tasks 1–12 and Stage A review complete. Task 13 is next. Tasks 15–21 remain approval-gated.
 
 ## Mandatory per-Task workflow
 
@@ -36,7 +36,7 @@ all Task reviews. Historical Milestone 1–15 evidence is context, not Milestone
 | 9 | Bounded runtime health persistence — complete | `ProductionHealthStore.swift`, daemon health/composition/tests | 29 focused tests; 249 full tests; release daemon build and diff check | none | revert commit; no system state |
 | 10 | Stable status, diagnostics, and baseline — complete | `production-observability.sh`, manager/tests | 69 focused tests; 254 full tests; static/package/release checks | none | revert commit; test-root only |
 | 11 | Online-safe log rotation — complete | observability lib, manager/tests | 72 focused tests; 257 full tests; writer inode/symlink/static/package checks | none | revert commit; test-root only |
-| 12 | Disabled upgrade/rollback and complete uninstall | manager, installed/deployment libs/tests | forced disabled, invalidation, rollback failure, complete scoped removal | none | revert commit; test-root only |
+| 12 | Disabled upgrade/rollback and complete uninstall — complete | manager, installed/deployment libs/tests | 12 focused tests; 77 management tests; 262 full tests; static/package/release checks | none | revert commit; test-root only |
 | 13 | Long-term operator runbook and docs synchronization | runbook, README, command/static tests | command/doc parity and state semantics | none | revert commit; no system state |
 | B | Stage B implementation review | review/evidence only | root mutation trace, full/static/package/clean snapshot | none | no system state |
 | 14 | Full automated clean-checkout release gate | implementation review and automated validation evidence | complete suite/build/static/package/clean snapshot/residual proof | none | no system state; production remains uninstalled |

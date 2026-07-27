@@ -651,14 +651,14 @@ behind.
 - Modify: `scripts/lib/production-deployment-state.sh`
 - Modify: `Tests/LidMonitorTests/ProductionManagementScriptTests.swift`
 
-- [ ] Add tests proving upgrade and explicit/automatic rollback require/force disabled,
+- [x] Add tests proving upgrade and explicit/automatic rollback require/force disabled,
   nonresident state and finish disabled.
-- [ ] Prove acceptance invalidation on artifact/policy change and safe preservation only for
+- [x] Prove acceptance invalidation on artifact/policy change and safe preservation only for
   evidence-only repository commits that do not change installed identity.
-- [ ] Extend uninstall tests to lease, acceptance, reboot state, health state, crash state, logs,
+- [x] Extend uninstall tests to lease, acceptance, reboot state, health state, crash state, logs,
   and rollback while preserving unrelated files.
-- [ ] Prove rollback failure leaves the job booted out and returns failure.
-- [ ] Preserve these explicit transaction boundaries:
+- [x] Prove rollback failure leaves the job booted out and returns failure.
+- [x] Preserve these explicit transaction boundaries:
 
 ```bash
 prepare_maintenance_disabled_state
@@ -670,7 +670,7 @@ rollback_upgrade
 uninstall_package
 ```
 
-- [ ] Verify, review, and commit `fix: make production maintenance activation-safe`.
+- [x] Verify, review, and commit `fix: make production maintenance activation-safe`.
 
 ### Task 13: Long-term operator runbook and repository synchronization
 

@@ -713,3 +713,81 @@ git diff --check: passed
 
 **Task 11 approved.** No Critical/P0/P1 finding remains. Task 12 may begin after the independent
 Task 11 commit.
+
+## Task 12 — Disabled upgrade, rollback, and complete uninstall semantics
+
+### RED evidence
+
+The initial Task 12 tests failed because the manager lacked explicit disabled maintenance
+transaction boundaries, evidence-only upgrades still attempted provenance replacement, and
+uninstall left lease, acceptance, reboot, and health state behind.
+
+### Implemented
+
+- Added explicit `prepare_maintenance_disabled_state`, `activate_staged_set_disabled`, and
+  `restore_rollback_set_disabled` transaction boundaries.
+- Upgrade and explicit/automatic rollback now enter disabled, booted-out, nonresident state before
+  replacing payloads and finish disabled after success.
+- Rollback failure returns nonzero and intentionally leaves the job booted out.
+- Added installed payload identity comparison that ignores repository-only version/source-commit
+  changes when binary, plist, normalized disabled config, and hardware policy are unchanged.
+- Evidence-only upgrades preserve the installed identity and matching deployment acceptance;
+  artifact or policy replacement invalidates acceptance and reboot evidence.
+- Added complete rollback-slot metadata, checksum, disabled-config, and plist-policy verification.
+- Uninstall now preflights and removes the authority lease, acceptance, reboot state, health state,
+  crash budget, Task 14 state, logs and generations, rollback slot, and core installed artifacts
+  while preserving unrelated files.
+
+### Immediate review findings
+
+#### T12-P1 — Unsafe rollback and uninstall paths were discovered after maintenance mutation
+
+The first GREEN implementation entered disabled/booted-out maintenance state before validating a
+rollback slot or every uninstall path. A tampered rollback slot could therefore modify the current
+set before checksum failure, and a rollback-directory symlink could change mode before rejection.
+
+**Resolution:** move complete rollback-slot verification and uninstall symlink preflight before any
+mode, process, launchd, or filesystem mutation. Regression tests prove rejection preserves the
+original enabled configuration and current payload.
+
+#### T12-P2 — Historical acceptance fixtures used repository-only identity drift
+
+Three historical tests changed only manifest version or reused an identical staged payload. Under
+the new identity contract these are correctly classified as evidence-only no-ops, so no rollback
+slot is created.
+
+**Resolution:** update those fixtures to use genuinely different installed binary payloads before
+testing upgrade, rollback, and reboot acceptance behavior.
+
+### Re-review
+
+- Upgrade forces disabled, booted-out, nonresident state before replacement: pass.
+- Successful upgrade leaves the new installed set disabled: pass.
+- Automatic rollback restores the previous set disabled: pass.
+- Explicit rollback restores the previous set disabled and invalidates acceptance: pass.
+- Tampered rollback state is rejected before maintenance mutation: pass.
+- Rollback restore failure returns failure and remains booted out: pass.
+- Evidence-only repository changes preserve installed identity and acceptance: pass.
+- Payload or policy replacement invalidates acceptance and reboot state: pass.
+- Uninstall removes every managed runtime/deployment state and preserves unrelated files: pass.
+- Uninstall symlink hazards are rejected before mode or filesystem mutation: pass.
+- No `/Library`, production launchd, sleep, reboot, merge, push, or worktree cleanup occurred: pass.
+
+### Verification
+
+```text
+RED: 5 focused tests produced 11 failures because transaction/no-op/cleanup semantics were absent
+focused Task 12: 12 tests, 0 failures
+management suite: 77 tests, 0 failures
+full XCTest: 262 tests, 0 failures
+bash -n: manager and sourced libraries passed
+shellcheck: passed with zero findings
+release daemon build: passed
+package prepare/verify: passed
+git diff --check: passed
+```
+
+### Decision
+
+**Task 12 approved.** No Critical/P0/P1 finding remains. Task 13 may begin after the independent
+Task 12 commit.
