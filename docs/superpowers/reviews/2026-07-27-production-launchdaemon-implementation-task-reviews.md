@@ -1297,6 +1297,33 @@ debounce, and requester-attempt path.
 **Corrected enabled acceptance command approved for a fresh separately authorized real cycle.**
 Recovery resleep remains separately gated.
 
+## Task 13 — Injected sleep-request failure real-system closure
+
+### Evidence
+
+- The operator ran the production injected-failure acceptance against installed version
+  `20c369b823d1`.
+- The real HID path reached one request attempt after candidate and debounce.
+- The injected requester produced exactly one failure and no real system sleep.
+- The state machine disarmed and produced no retry during the observation window.
+- The same production PID remained authoritative throughout the cycle.
+- The command removed the injected selector and returned the installed package to disabled.
+
+### Independent re-review
+
+- Production mode: disabled.
+- System job: loaded and not running.
+- Last exit code: zero.
+- Resident production PID: absent.
+- Installed version: `20c369b823d1`.
+- LaunchDaemon injection selector: absent.
+- Production stderr: empty according to command diagnostics.
+
+### Disposition
+
+**Task 13 approved and complete.** The complete bounded enabled matrix now includes one normal
+sleep, recovery resleep, and non-sleeping requester failure with no retry and fail-safe cleanup.
+
 ## Task 13 — Injected sleep-request failure acceptance
 
 ### Scope
