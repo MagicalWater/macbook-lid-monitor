@@ -1391,3 +1391,26 @@ The failed enabled acceptance is therefore not an angle-sensor, arming, threshol
 ### Disposition
 
 **Task 13 dry-run path approved and complete.** Do not repeat the old enabled acceptance contract unchanged; the next enabled command must judge pre-call attempt evidence separately from post-call return evidence.
+
+## Task 13 — Recovery resleep real-system closure
+
+### Evidence
+
+- The first low-angle debounce emitted one real sleep request.
+- The operator woke the machine while keeping the lid below the configured threshold.
+- After the bounded 15-second recovery interval, the daemon emitted exactly one recovery-resleep request.
+- The second wake occurred after moving the lid above the reopen threshold.
+- The command verified `attempt-count=2`, `return-count=2`, `recovery-count=1`, `wake-count=2`, and stable PID `83026`.
+- Final diagnostics reported loaded, disabled, `process-count=0`, empty production stderr, and root-only `0600` log permissions.
+
+### Independent re-review
+
+- Installed version: `de4553f7e82f`.
+- Production mode: disabled.
+- System job: loaded and not running.
+- Last exit code: zero.
+- Resident production PID: absent.
+
+### Disposition
+
+**Task 13 recovery-resleep scope approved and complete.** Remaining Task 13 work is limited to the non-sleeping injected sleep-request failure acceptance.
