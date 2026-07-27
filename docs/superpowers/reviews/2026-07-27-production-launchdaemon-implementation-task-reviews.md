@@ -340,3 +340,69 @@ non-restarting; only non-zero exits are eligible, with launchd throttle plus app
 ### Disposition
 
 **Task 7 approved and complete.**
+
+
+## Task 8 — Non-mutating prepare and verify
+
+### Implementation
+
+- Added `scripts/manage-production-daemon.sh` with only `prepare` and `verify` commands.
+- Added shared packaging helpers with one fixed repository-local staging directory.
+- `prepare` builds the production release product, rejects symlink sources, copies only allowlisted
+  package inputs, applies staging modes, and writes version/checksum values into the staged manifest.
+- `verify` checks regular files, executable mode, plist validity, binary checksum, and manifest
+  version consistency.
+- No root escalation, launchctl command, or `/Library` destination exists in the Task 8 scripts.
+
+### TDD evidence
+
+- RED: focused tests failed because both production management scripts were absent.
+- GREEN: three focused tests pass after the non-mutating commands and validation contracts were
+  implemented.
+
+### Immediate review findings
+
+#### P1 — XCTest child process could block while building
+
+The first integration-style test launched `prepare` from inside the active SwiftPM test process.
+The nested release build could contend with the parent build and the initial pipe handling could
+also block on buffered output.
+
+**Resolution:** Kept XCTest focused on static command/safety contracts and moved actual
+`prepare`/`verify` execution to the Task verification command after the test build completes.
+
+#### P2 — shellcheck treated sourced constants as unused
+
+The common library constants are consumed by the sourcing management script, but standalone
+shellcheck reported SC2034 warnings.
+
+**Resolution:** Exported the shared path constants, preserving one authority while producing a
+clean standalone shellcheck result.
+
+### Re-review
+
+- Command surface contains only `prepare` and `verify`: pass.
+- Source symlinks and missing sources are rejected: pass.
+- Staging location is fixed under `.build/production-package`: pass.
+- Prepared binary checksum matches the staged manifest: pass.
+- Staged manifest version matches the current Git commit: pass.
+- Plist/config/manifest lint successfully: pass.
+- No `sudo`, launchctl invocation, or `/Library` write exists or occurred: pass.
+
+### Verification
+
+- Focused management-script tests: 3 tests, 0 failures.
+- `bash -n`: passed.
+- `shellcheck`: passed with zero warnings/errors.
+- Real non-root `prepare`: passed.
+- Real non-root `verify`: passed; checksum and version matched.
+- Full suite: 147 tests, 0 failures.
+- Release production daemon: passed.
+- `git diff --check`: passed.
+- Production `/Library` binary, plist, and application-support directory: all absent.
+
+### Disposition
+
+**Task 8 approved and complete. Approval Gate C1 is now active.** Task 9 may be designed and
+reviewed further without mutation, but no install, bootstrap, `/Library` write, or launchd mutation
+may occur until the user explicitly approves that gate.

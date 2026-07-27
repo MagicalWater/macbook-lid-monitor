@@ -1,6 +1,6 @@
 # Production LaunchDaemon Task Register
 
-Status: Implementation in progress; Tasks 1–7 complete.
+Status: Implementation in progress; Tasks 1–8 complete; paused at Approval Gate C1.
 
 | Task | Purpose | Primary files | Verification | Approval gate | Rollback/safe stop |
 | ---: | --- | --- | --- | --- | --- |
@@ -13,7 +13,7 @@ Status: Implementation in progress; Tasks 1–7 complete.
 | 6 | Crash budget — complete | crash budget/application/tests | circuit/no-restart tests | none | revert commit |
 | B | Composition stage review | reviews only | clean test/build/products | none | no system state |
 | 7 | plist/config/manifest templates — complete | packaging files/tests | XCTest + plutil | none | revert commit |
-| 8 | prepare/verify scripts | management script/lib/tests | XCTest/bash/shellcheck | none; must not write `/Library` | delete build artifacts |
+| 8 | prepare/verify scripts — complete | management script/lib/tests | XCTest/bash/shellcheck | none; must not write `/Library` | delete build artifacts |
 | 9 | install/control lifecycle | script/docs/harness | controlled disabled/dry-run acceptance | **required before `/Library` or launchd mutation** | disable, stop, bootout, uninstall staged artifacts |
 | 10 | upgrade/rollback | script/fixtures/evidence | injected failure + rollback acceptance | **required before installed-version mutation** | automatic restore previous set |
 | 11 | logs/diagnostics/uninstall | script/docs/tests | rotation/privacy/residual-state | **required before installed-state mutation** | bootout and scoped removal |
