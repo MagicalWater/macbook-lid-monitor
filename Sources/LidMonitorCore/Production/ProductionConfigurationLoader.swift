@@ -1,32 +1,18 @@
-import Darwin
 import Foundation
-
-struct ProductionFileMetadata: Equatable, Sendable {
-    let ownerID: UInt32
-    let groupID: UInt32
-    let permissions: UInt16
-    let isRegularFile: Bool
-    let isSymbolicLink: Bool
-}
 
 protocol ProductionConfigurationReading: AnyObject, Sendable {
     func read(path: String) throws -> (Data, ProductionFileMetadata)
 }
 
 final class NativeProductionConfigurationReader: ProductionConfigurationReading, @unchecked Sendable {
+    private let inspector: ProductionFileSystemInspecting
+
+    init(inspector: ProductionFileSystemInspecting = NativeProductionFileSystemInspector()) {
+        self.inspector = inspector
+    }
+
     func read(path: String) throws -> (Data, ProductionFileMetadata) {
-        var info = stat()
-        guard lstat(path, &info) == 0 else {
-            throw POSIXError(.init(rawValue: errno) ?? .EIO)
-        }
-        let type = info.st_mode & S_IFMT
-        let metadata = ProductionFileMetadata(
-            ownerID: info.st_uid,
-            groupID: info.st_gid,
-            permissions: UInt16(info.st_mode & 0o7777),
-            isRegularFile: type == S_IFREG,
-            isSymbolicLink: type == S_IFLNK
-        )
+        let metadata = try inspector.metadata(at: path, followSymbolicLink: false)
         return (try Data(contentsOf: URL(fileURLWithPath: path)), metadata)
     }
 }

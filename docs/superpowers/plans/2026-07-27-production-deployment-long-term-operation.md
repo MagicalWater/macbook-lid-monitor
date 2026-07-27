@@ -101,7 +101,7 @@ or hard-linked sleep-authority inode.
 - Create: `Tests/LidMonitorTests/ProductionFileSystemTests.swift`
 - Modify: `Tests/LidMonitorTests/SleepAuthorityLeaseTests.swift`
 
-- [ ] **Step 1: Add failing metadata and lease tests**
+- [x] **Step 1: Add failing metadata and lease tests**
 
 Add tests named:
 
@@ -116,7 +116,7 @@ func testConfigurationLoaderUsesSharedMetadataContract()
 The replacement test must acquire inode A, unlink/recreate the path where permissions allow, and
 prove the managed policy rejects the unsafe setup rather than allowing a second independent lock.
 
-- [ ] **Step 2: Prove RED**
+- [x] **Step 2: Prove RED**
 
 Run:
 
@@ -127,7 +127,7 @@ swift test --filter 'ProductionFileSystemTests|SleepAuthorityLeaseTests|Producti
 Expected: FAIL because shared metadata and managed policy do not exist and current `/tmp` behavior
 does not enforce the required owner/parent/link contract.
 
-- [ ] **Step 3: Introduce shared metadata types**
+- [x] **Step 3: Introduce shared metadata types**
 
 Implement the following stable shape:
 
@@ -155,7 +155,7 @@ protocol ProductionFileSystemInspecting: Sendable {
 Use `lstat` for path identity and `fstat` after open. Configuration loading must preserve its
 existing stable errors while using the shared metadata representation.
 
-- [ ] **Step 4: Harden lease acquisition**
+- [x] **Step 4: Harden lease acquisition**
 
 `POSIXSleepAuthorityLease` must accept an explicit policy containing expected owner/group,
 permissions, link count, and parent-directory requirements. Managed acquisition must:
@@ -171,7 +171,7 @@ lstat parent and path
 
 Creation of the managed lease belongs to installation, not daemon startup.
 
-- [ ] **Step 5: Prove focused GREEN and full regression**
+- [x] **Step 5: Prove focused GREEN and full regression**
 
 Run:
 
@@ -182,7 +182,7 @@ swift test
 
 Expected: all focused tests and the complete suite pass.
 
-- [ ] **Step 6: Immediate Task 1 review and commit**
+- [x] **Step 6: Immediate Task 1 review and commit**
 
 Review TOCTOU boundaries, test-root seams, existing configuration errors, and absence of `/Library`
 mutation. Record review in the Milestone implementation review log, fix/re-review, then commit:
