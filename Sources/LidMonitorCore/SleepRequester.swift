@@ -93,3 +93,9 @@ struct IOKitSystemSleepOperation: SystemSleepOperating {
         }
     }
 }
+
+struct InjectedSleepFailureOperation: SystemSleepOperating {
+    func requestSleep() throws {
+        throw IOKitSystemSleepError.requestFailed(kIOReturnError)
+    }
+}

@@ -1297,6 +1297,48 @@ debounce, and requester-attempt path.
 **Corrected enabled acceptance command approved for a fresh separately authorized real cycle.**
 Recovery resleep remains separately gated.
 
+## Task 13 — Injected sleep-request failure acceptance
+
+### Scope
+
+Add one real-system acceptance that exercises the production HID, state-machine, and daemon
+composition while replacing only the final IOKit operation with a deterministic failure. The
+acceptance must never request real sleep.
+
+### Implementation
+
+- Added `InjectedSleepFailureOperation`, selected only when the root-owned LaunchDaemon environment
+  contains the exact value `MLM_SLEEP_OPERATION=injected-failure`.
+- Added `accept-task13-injected-failure` to upgrade the installed package, install the temporary
+  injection key, run in enabled mode, and wait for the operator to traverse the real lid-angle path.
+- The acceptance requires exactly one pre-call attempt, exactly one stable IOKit failure, at least
+  one disarmed transition, zero successful sleep-request return events, no retry, and stable PID.
+- The injection key is deleted before normal completion and from the EXIT fail-safe cleanup path.
+- The installed service is always returned to loaded, disabled state.
+
+### Security and failure review
+
+- Injection authority is unavailable from ordinary user environment variables because launchd
+  receives the value only from the root-owned system plist: pass.
+- The exact injection value is narrow and defaults to the real IOKit operation when absent: pass.
+- The failure occurs before any `IOPMSleepSystem` call, so the acceptance cannot sleep the machine: pass.
+- A failed assertion, timeout, interruption, or command error removes the injection and disables the job: pass.
+- Exactly-once attempt plus a post-observation delay proves no automatic retry: pass.
+
+### Fresh verification
+
+- Production management focused tests: 40 tests, 0 failures.
+- Full suite: 186 tests, 0 failures.
+- `bash -n`: passed.
+- `shellcheck -x`: passed.
+- Release production daemon: passed.
+- `git diff --check`: passed.
+
+### Disposition
+
+**Task 13 injected-failure command approved for real-system execution.** It requires a real lid
+angle transition but cannot issue a real system sleep request.
+
 ## Task 13 — Bounded recovery-resleep acceptance command
 
 ### Implementation
