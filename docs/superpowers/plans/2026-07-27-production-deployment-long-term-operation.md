@@ -726,12 +726,12 @@ uninstall_package
 
 **Purpose:** Ensure the real package is built from the exact approved formal-main release commit.
 
-- [ ] Present release candidate commit range, tests, findings disposition, and merge strategy.
-- [ ] After approval, integrate to formal `main` without rewriting unrelated history.
-- [ ] Verify formal `main == origin/main`, both clean, and exact release commit recorded.
-- [ ] Reopen/create the deployment worktree at the approved formal-main release commit if needed.
-- [ ] Run package `prepare` and `verify` from that exact commit.
-- [ ] Do not install in this Task.
+- [x] Present release candidate commit range, tests, findings disposition, and merge strategy.
+- [x] After approval, integrate to formal `main` without rewriting unrelated history.
+- [x] Verify formal `main == origin/main`, both clean, and exact release commit recorded.
+- [x] Reopen/create the deployment worktree at the approved formal-main release commit if needed.
+- [x] Run package `prepare` and `verify` from that exact commit.
+- [x] Do not install in this Task.
 
 ### Task 16: Disabled production installation
 

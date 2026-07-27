@@ -908,3 +908,45 @@ independent clean snapshot: bash/shellcheck/plist/package/diff/status passed
 
 **Stage B approved.** No Critical/P0/P1 finding remains. Task 14 may begin after the independent
 Stage B closure commit.
+
+## Task 15 — Formal-main integration and package provenance
+
+### Approval and integration scope
+
+- The user explicitly approved merge to formal `main`, push to `origin/main`, and worktree handling.
+- The approved release candidate was `f16ae1d81a17f8acbe6e09862b2bcec716a18195`.
+- Formal `main` and `origin/main` both started at
+  `e2b8afeac0bf8f7560d6a9d60b4da328d9650bd3`, with clean working trees and zero divergence.
+- The release candidate was a direct descendant of formal `main`, so integration used a
+  non-rewriting fast-forward merge.
+
+### Immediate review
+
+- Confirmed the detached implementation worktree was clean before integration.
+- Re-ran the complete suite before integration rather than borrowing Task 14 evidence.
+- Verified the formal repository was on `main`, clean, fetched, and equal to `origin/main` before
+  merge.
+- Verified `main` was an ancestor of the release candidate and rejected any history rewrite or
+  force-push path.
+- Re-ran the complete suite on the merged formal-main result before provenance closure.
+
+No Critical/P0/P1 finding was discovered during integration review.
+
+### Verification
+
+```text
+pre-integration release-candidate XCTest: 264 tests, 0 failures
+formal preflight: main == origin/main == e2b8afeac0bf8f7560d6a9d60b4da328d9650bd3
+formal preflight: clean status and ahead/behind 0/0
+integration: fast-forward only, no rewritten history
+merged formal-main XCTest: 264 tests, 0 failures
+exact formal release package prepare/verify: closure post-commit gate
+push and main/origin equality: closure post-commit gate
+production installation or launchd mutation: none
+```
+
+### Decision
+
+**Task 15 approved.** The closure commit containing this review is the formal release commit. Its
+post-commit gate must package that exact `HEAD`, push it without history rewriting, and prove
+`main == origin/main` before Task 16 may begin.
