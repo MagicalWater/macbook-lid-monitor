@@ -88,3 +88,49 @@ git diff --check: passed
 ### Decision
 
 **Task 1 approved.** No Critical/P0/P1 finding remains. Task 2 may begin after the Task 1 commit.
+
+## Task 2 — Shared authority path resolution for daemon and foreground CLI
+
+### Implemented
+
+- Added `SleepAuthorityPathResolver` and explicit production marker/result contracts.
+- Any production artifact, registered system job, or managed lease marker selects managed-or-fail-open.
+- Foreground fallback is available only when all production markers are absent.
+- Both foreground execute-sleep and production enabled composition use the resolver; dry-run remains lease-free.
+- Native marker collection checks binary, plist, manifest, managed lease, and the system launchd label.
+
+### TDD evidence
+
+The initial focused build failed because the resolver, marker, and result types did not exist. After
+the minimal resolver was added, resolver and composition tests passed.
+
+### Immediate review finding
+
+#### T2-P1 — Native marker collection initially omitted loaded-job detection
+
+The first GREEN implementation defaulted `jobRegistered=false`, which could have allowed fallback
+after artifacts were removed while the launchd job remained registered.
+
+**Resolution:** add a bounded `/bin/launchctl print system/com.crazydennies.macbook-lid-monitor`
+probe and a testable override. A loaded-job-without-files test now resolves to unsafe installed state.
+
+### Re-review
+
+- Installed daemon and foreground resolve the same managed path: pass.
+- Missing managed lease with any production marker fails open: pass.
+- Loaded job alone prohibits fallback: pass.
+- Dry-run does not resolve or acquire authority: pass.
+- Existing injected leasing tests remain valid: pass.
+- No system mutation occurred: pass.
+
+### Verification
+
+```text
+focused: 33 tests, 0 failures
+full XCTest: 215 tests, 0 failures
+release build: macbook-lid-monitor-daemon passed
+```
+
+### Decision
+
+**Task 2 approved.** No Critical/P0/P1 finding remains. Task 3 may begin.

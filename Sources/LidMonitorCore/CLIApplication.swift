@@ -15,13 +15,18 @@ private func autoSleepSignalHandler(_ signalNumber: Int32) {
 enum AutoSleepComposition {
     static func acquireSleepAuthority(
         for executionMode: AutoSleepExecutionMode,
-        leasing: SleepAuthorityLeasing = POSIXSleepAuthorityLease()
+        leasing: SleepAuthorityLeasing? = nil,
+        markers: ProductionInstallationMarkers? = nil,
+        resolver: SleepAuthorityPathResolver = SleepAuthorityPathResolver()
     ) throws -> SleepAuthorityHolding? {
         switch executionMode {
         case .dryRun:
             return nil
         case .executeSleep:
-            return try leasing.acquire()
+            let resolvedLease = try leasing ?? resolver.makeLease(
+                markers: markers ?? resolver.currentMarkers()
+            )
+            return try resolvedLease.acquire()
         }
     }
 

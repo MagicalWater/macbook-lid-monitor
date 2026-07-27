@@ -261,7 +261,13 @@ public enum LidMonitorProductionDaemonEntryPoint {
                     return DryRunSleepRequester { _ in }
                 }
             },
-            acquireSleepAuthority: { try POSIXSleepAuthorityLease().acquire() },
+            acquireSleepAuthority: {
+                let resolver = SleepAuthorityPathResolver()
+                let lease = try resolver.makeLease(
+                    markers: resolver.currentMarkers()
+                )
+                return try lease.acquire()
+            },
             eventSink: sink,
             now: Date.init
         )

@@ -1,6 +1,6 @@
 # Milestone 16 Production Deployment and Long-term Operation Task Register
 
-Status: Task 1 complete and reviewed; Task 2 is next. Tasks 15–21 remain approval-gated.
+Status: Tasks 1–2 complete and reviewed; Task 3 is next. Tasks 15–21 remain approval-gated.
 
 ## Mandatory per-Task workflow
 
@@ -25,7 +25,7 @@ all Task reviews. Historical Milestone 1–15 evidence is context, not Milestone
 | Task | Purpose | Primary files | Focused verification | Approval | Safe stop / rollback |
 | ---: | --- | --- | --- | --- | --- |
 | 1 | Shared filesystem metadata and non-replaceable managed lease primitive — complete | `ProductionFileSystem.swift`, `ProductionConfigurationLoader.swift`, `SleepAuthorityLease.swift`, filesystem/lease tests | 21 focused tests; 209 full tests; daemon release build | none | revert Task 1 commit; no system state |
-| 2 | Shared authority path resolution for daemon and foreground CLI | `SleepAuthorityPathResolver.swift`, daemon/CLI composition, integration tests | installed markers, same managed path, fallback absent-only, dry-run bypass | none | revert commit; no system state |
+| 2 | Shared authority path resolution for daemon and foreground CLI — complete | `SleepAuthorityPathResolver.swift`, daemon/CLI composition, integration tests | 33 focused tests; 215 full tests; daemon release build | none | revert commit; no system state |
 | 3 | Remove deployable requester environment override | daemon composition, management script/tests | source/plist prohibition and dependency-injected failure | none | revert commit; no system state |
 | 4 | Complete package manifest and staged identity | manifest template, package common, package tests | binary/plist/config/source/profile hashes and lint | none | delete staging; revert commit |
 | 5 | Runtime installed-set verification | `ProductionInstalledSetVerifier.swift`, daemon composition/tests | metadata/hash/config normalization/prohibited env/fail-open | none | revert commit; no system state |

@@ -196,7 +196,7 @@ git add Sources/LidMonitorCore/Production/ProductionFileSystem.swift \
 git commit -m "fix: harden production sleep authority inode"
 ```
 
-### Task 2: Shared authority path resolution for daemon and foreground CLI
+### Task 2: Shared authority path resolution for daemon and foreground CLI — complete
 
 **Purpose:** Ensure installed production and foreground `--execute-sleep` can never use different
 authority paths.
@@ -210,7 +210,7 @@ authority paths.
 - Modify: `Tests/LidMonitorTests/ProductionDaemonCompositionTests.swift`
 - Modify: `Tests/LidMonitorTests/SleepAuthorityLeaseTests.swift`
 
-- [ ] **Step 1: Add failing resolver/composition tests**
+- [x] **Step 1: Add failing resolver/composition tests**
 
 Cover:
 
@@ -222,13 +222,13 @@ func testMissingOrUnsafeManagedLeaseFailsOpenWhenProductionInstalled()
 func testDryRunDoesNotResolveOrAcquireRealSleepAuthority()
 ```
 
-- [ ] **Step 2: Prove RED**
+- [x] **Step 2: Prove RED**
 
 ```bash
 swift test --filter 'AutoSleepIntegrationTests|ProductionDaemonCompositionTests|SleepAuthorityLeaseTests'
 ```
 
-- [ ] **Step 3: Implement resolver**
+- [x] **Step 3: Implement resolver**
 
 Use a testable marker contract:
 
@@ -250,12 +250,12 @@ enum SleepAuthorityPathResolution: Equatable, Sendable {
 Any production marker selects managed-or-fail-open; fallback is allowed only when every marker is
 absent.
 
-- [ ] **Step 4: Wire both real-sleep compositions**
+- [x] **Step 4: Wire both real-sleep compositions**
 
 Production enabled and foreground execute-sleep use the resolver plus the same managed policy.
 Diagnostic and dry-run paths remain lease-free.
 
-- [ ] **Step 5: Run focused/full verification, review, and commit**
+- [x] **Step 5: Run focused/full verification, review, and commit**
 
 ```bash
 swift test --filter 'AutoSleepIntegrationTests|ProductionDaemonCompositionTests|SleepAuthorityLeaseTests'

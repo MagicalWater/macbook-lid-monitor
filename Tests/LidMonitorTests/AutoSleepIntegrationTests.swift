@@ -3,6 +3,12 @@ import XCTest
 @testable import LidMonitorCore
 
 final class AutoSleepIntegrationTests: XCTestCase {
+    func testDryRunDoesNotResolveOrAcquireRealSleepAuthority() throws {
+        let leasing = AutoSleepAuthorityLeasing()
+        let holding = try AutoSleepComposition.acquireSleepAuthority(for: .dryRun, leasing: leasing)
+        XCTAssertNil(holding)
+        XCTAssertEqual(leasing.acquireCount, 0)
+    }
     func testDryRunDoesNotAcquireRealSleepAuthority() throws {
         let leasing = AutoSleepAuthorityLeasing()
 
