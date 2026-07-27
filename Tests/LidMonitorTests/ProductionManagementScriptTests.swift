@@ -153,11 +153,16 @@ final class ProductionManagementScriptTests: XCTestCase {
     }
 
     func testDiagnosticsIsRedactedAndDoesNotPrintLogContents() throws {
-        let text = try String(
+        let manager = try String(
             contentsOf: root.appendingPathComponent("scripts/manage-production-daemon.sh"),
             encoding: .utf8
         )
-        XCTAssertTrue(text.contains("diagnostics label="))
+        let observability = try String(
+            contentsOf: root.appendingPathComponent("scripts/lib/production-observability.sh"),
+            encoding: .utf8
+        )
+        let text = manager + observability
+        XCTAssertTrue(observability.contains("diagnostics()"))
         XCTAssertFalse(text.contains("tail -"))
         XCTAssertFalse(text.contains("cat \"$MANAGED_STDOUT_LOG\""))
         XCTAssertTrue(text.contains("pgrep -f '^/Library/PrivilegedHelperTools/macbook-lid-monitor-daemon$' || true"))
@@ -1053,6 +1058,148 @@ final class ProductionManagementScriptTests: XCTestCase {
         XCTAssertTrue(deployment.contains("test-hook-production-disabled boot-epoch"))
     }
 
+    func testObservabilityLibraryDefinesStableReadOnlyInterfaces() throws {
+        let url = root.appendingPathComponent("scripts/lib/production-observability.sh")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: url.path))
+        let text = try String(contentsOf: url, encoding: .utf8)
+        for interface in [
+            "status_job()",
+            "diagnostics()",
+            "crash_budget_status_lines()",
+            "process_metric_lines()",
+            "health_status_lines()",
+            "log_status_lines()",
+            "operational_baseline()",
+        ] {
+            XCTAssertTrue(text.contains(interface), interface)
+        }
+        XCTAssertFalse(text.contains("tail "))
+        XCTAssertFalse(text.contains("cat \"$MANAGED_STDOUT_LOG\""))
+        XCTAssertFalse(text.contains("cat \"$MANAGED_STDERR_LOG\""))
+    }
+
+    func testStatusAndDiagnosticsEmitStableParserFriendlyFields() throws {
+        let sandbox = root.appendingPathComponent(".build/production-observability-status-root")
+        try? FileManager.default.removeItem(at: sandbox)
+        defer { try? FileManager.default.removeItem(at: sandbox) }
+        try seedStaging()
+        try runScript("install", environment: ["MLM_TEST_ROOT": sandbox.path])
+        let support = sandbox.appendingPathComponent("Library/Application Support/MacBookLidMonitor")
+        let logs = sandbox.appendingPathComponent("Library/Logs/MacBookLidMonitor")
+        try FileManager.default.createDirectory(at: logs, withIntermediateDirectories: true)
+        try Data("log-data".utf8).write(to: logs.appendingPathComponent("production.log"))
+        try Data("{\"unexpectedExitTimes\":[],\"circuitOpen\":false,\"runActive\":true}".utf8)
+            .write(to: support.appendingPathComponent("crash-budget.json"))
+        try writeHealthFixture(
+            at: support.appendingPathComponent("health.plist"),
+            state: "monitoring-armed"
+        )
+
+        let environment = [
+            "MLM_TEST_ROOT": sandbox.path,
+            "MLM_TEST_JOB_STATE": "loaded",
+            "MLM_TEST_PROCESS_IDS": "4242",
+            "MLM_TEST_PROCESS_METRICS": "elapsed=120 cpu=0.2 rss=4096 vsz=8192",
+        ]
+        let status = try runScriptOutput("status", environment: environment)
+        for key in [
+            "installed=true", "version=", "source_commit=", "mode=disabled", "job=loaded",
+            "process_count=1", "health_state=monitoring-armed", "hardware_model=MacBookPro18,1",
+            "hardware_chip=Apple M1 Pro", "integrity=valid", "crash_state=closed",
+            "acceptance_state=missing", "lease_state=missing",
+        ] {
+            XCTAssertTrue(status.contains(key), "\(key) in \(status)")
+        }
+        let diagnostics = try runScriptOutput("diagnostics", environment: environment)
+        for key in ["pid=4242", "elapsed=120", "cpu=0.2", "rss=4096", "vsz=8192", "log_path="] {
+            XCTAssertTrue(diagnostics.contains(key), "\(key) in \(diagnostics)")
+        }
+        XCTAssertFalse(diagnostics.contains("log-data"))
+    }
+
+    func testObservabilityReportsMissingAndCorruptStateStably() throws {
+        let sandbox = root.appendingPathComponent(".build/production-observability-corrupt-root")
+        try? FileManager.default.removeItem(at: sandbox)
+        defer { try? FileManager.default.removeItem(at: sandbox) }
+        try seedStaging()
+        try runScript("install", environment: ["MLM_TEST_ROOT": sandbox.path])
+        let support = sandbox.appendingPathComponent("Library/Application Support/MacBookLidMonitor")
+
+        let missing = try runScriptOutput("diagnostics", environment: ["MLM_TEST_ROOT": sandbox.path])
+        XCTAssertTrue(missing.contains("health_state=unavailable"), missing)
+        XCTAssertTrue(missing.contains("crash_state=unavailable"), missing)
+
+        try Data("not-json".utf8).write(to: support.appendingPathComponent("health.plist"))
+        try Data("not-json".utf8).write(to: support.appendingPathComponent("crash-budget.json"))
+        let corrupt = try runScriptOutput("diagnostics", environment: ["MLM_TEST_ROOT": sandbox.path])
+        XCTAssertTrue(corrupt.contains("health_state=corrupt"), corrupt)
+        XCTAssertTrue(corrupt.contains("crash_state=corrupt"), corrupt)
+    }
+
+    func testOperationalBaselineRequiresCompleteHealthyEnabledEvidence() throws {
+        let sandbox = root.appendingPathComponent(".build/production-operational-baseline-root")
+        try? FileManager.default.removeItem(at: sandbox)
+        defer { try? FileManager.default.removeItem(at: sandbox) }
+        try seedStaging()
+        try runScript("install", environment: ["MLM_TEST_ROOT": sandbox.path])
+        try runScript("bootstrap", environment: ["MLM_TEST_ROOT": sandbox.path])
+
+        let incomplete = try runScriptFailure("operational-baseline", environment: [
+            "MLM_TEST_ROOT": sandbox.path,
+            "MLM_TEST_JOB_STATE": "loaded",
+            "MLM_TEST_PROCESS_IDS": "4242",
+        ])
+        XCTAssertTrue(incomplete.output.contains("error=operational-baseline-invalid"), incomplete.output)
+
+        try runScript("deployment-dry-run", environment: ["MLM_TEST_ROOT": sandbox.path])
+        try runScript("deployment-enabled-once", environment: ["MLM_TEST_ROOT": sandbox.path])
+        try runScript("deployment-recovery-resleep", environment: ["MLM_TEST_ROOT": sandbox.path])
+        try runScript("activate", environment: ["MLM_TEST_ROOT": sandbox.path])
+        let health = sandbox.appendingPathComponent("Library/Application Support/MacBookLidMonitor/health.plist")
+        try writeHealthFixture(at: health, state: "monitoring-armed", mode: "enabled", pid: 4242)
+
+        let output = try runScriptOutput("operational-baseline", environment: [
+            "MLM_TEST_ROOT": sandbox.path,
+            "MLM_TEST_JOB_STATE": "loaded",
+            "MLM_TEST_PROCESS_IDS": "4242",
+            "MLM_TEST_PROCESS_METRICS": "elapsed=120 cpu=0.2 rss=4096 vsz=8192",
+        ])
+        XCTAssertTrue(output.contains("operational_baseline=pass"), output)
+    }
+
+    func testOperationalBaselineRejectsStaleOrUnsafeHealthSnapshot() throws {
+        let sandbox = root.appendingPathComponent(".build/production-operational-baseline-health-root")
+        try? FileManager.default.removeItem(at: sandbox)
+        defer { try? FileManager.default.removeItem(at: sandbox) }
+        try seedStaging()
+        try runScript("install", environment: ["MLM_TEST_ROOT": sandbox.path])
+        try runScript("bootstrap", environment: ["MLM_TEST_ROOT": sandbox.path])
+        for command in ["deployment-dry-run", "deployment-enabled-once", "deployment-recovery-resleep"] {
+            try runScript(command, environment: ["MLM_TEST_ROOT": sandbox.path])
+        }
+        try runScript("activate", environment: ["MLM_TEST_ROOT": sandbox.path])
+        let health = sandbox.appendingPathComponent("Library/Application Support/MacBookLidMonitor/health.plist")
+        try writeHealthFixture(
+            at: health,
+            state: "monitoring-armed",
+            mode: "enabled",
+            pid: 4242,
+            updatedAt: Date(timeIntervalSinceNow: -600)
+        )
+        let environment = [
+            "MLM_TEST_ROOT": sandbox.path,
+            "MLM_TEST_JOB_STATE": "loaded",
+            "MLM_TEST_PROCESS_IDS": "4242",
+        ]
+        let stale = try runScriptFailure("operational-baseline", environment: environment)
+        XCTAssertTrue(stale.output.contains("reason=health"), stale.output)
+
+        try writeHealthFixture(at: health, state: "monitoring-armed", mode: "enabled", pid: 4242)
+        try FileManager.default.setAttributes([.posixPermissions: 0o666], ofItemAtPath: health.path)
+        let unsafe = try runScriptFailure("operational-baseline", environment: environment)
+        XCTAssertTrue(unsafe.output.contains("reason=health"), unsafe.output)
+    }
+
     func testBoundedDeploymentCommandsRecordAcceptanceAndReturnDisabled() throws {
         let sandbox = root.appendingPathComponent(".build/production-bounded-deployment-root")
         try? FileManager.default.removeItem(at: sandbox)
@@ -1304,6 +1451,30 @@ final class ProductionManagementScriptTests: XCTestCase {
         object["Mode"] = "disabled"
         let canonical = try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])
         return ProductionSHA256Hasher().hash(canonical)
+    }
+
+    private func writeHealthFixture(
+        at url: URL,
+        state: String,
+        mode: String = "disabled",
+        pid: Int = 4242,
+        updatedAt: Date = Date()
+    ) throws {
+        let formatter = ISO8601DateFormatter()
+        let timestamp = formatter.string(from: updatedAt)
+        let value: [String: Any] = [
+            "schemaVersion": 1,
+            "version": "test",
+            "mode": mode,
+            "profileID": "m1-pro-0x8104-report-id-1-v1",
+            "state": state,
+            "pid": pid,
+            "lastTransitionTime": timestamp,
+            "lastValidSampleTime": timestamp,
+            "updatedAt": timestamp,
+        ]
+        try JSONSerialization.data(withJSONObject: value, options: [.sortedKeys]).write(to: url)
+        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
     }
 
     private func runScript(_ command: String, environment: [String: String] = [:]) throws {

@@ -8,9 +8,11 @@ source "$SCRIPT_DIR/lib/production-package-common.sh"
 source "$SCRIPT_DIR/lib/production-installed-set.sh"
 # shellcheck source=scripts/lib/production-deployment-state.sh
 source "$SCRIPT_DIR/lib/production-deployment-state.sh"
+# shellcheck source=scripts/lib/production-observability.sh
+source "$SCRIPT_DIR/lib/production-observability.sh"
 
 usage() {
-    printf '%s\n' 'usage: manage-production-daemon.sh prepare|verify|install|bootstrap|status|stop|bootout|disable|dry-run|deployment-dry-run|deployment-enabled-once|deployment-recovery-resleep|activate|upgrade|rollback|reset-crash-budget|rotate-logs|diagnostics|uninstall|accept-task9|accept-task10|accept-task11|accept-task12-logged-in|accept-task12-loginwindow-start|accept-task12-loginwindow-finish|accept-task12-sleep-wake|accept-task13-dry-run-path|accept-task13-enabled-once|accept-task13-recovery-resleep|accept-task14-reboot-start|accept-task14-reboot-finish' >&2
+    printf '%s\n' 'usage: manage-production-daemon.sh prepare|verify|install|bootstrap|status|stop|bootout|disable|dry-run|deployment-dry-run|deployment-enabled-once|deployment-recovery-resleep|activate|upgrade|rollback|reset-crash-budget|rotate-logs|diagnostics|operational-baseline|uninstall|accept-task9|accept-task10|accept-task11|accept-task12-logged-in|accept-task12-loginwindow-start|accept-task12-loginwindow-finish|accept-task12-sleep-wake|accept-task13-dry-run-path|accept-task13-enabled-once|accept-task13-recovery-resleep|accept-task14-reboot-start|accept-task14-reboot-finish' >&2
     exit 64
 }
 
@@ -60,15 +62,6 @@ bootstrap_job() {
     assert_regular_source "$MANAGED_PLIST"
     launchctl_system bootstrap system "$MANAGED_PLIST"
     printf 'bootstrapped label=%s\n' "$LAUNCHD_LABEL"
-}
-
-status_job() {
-    if [[ -n "$SYSTEM_ROOT" ]]; then
-        [[ -f "$MANAGED_BINARY" && -f "$MANAGED_PLIST" && -f "$MANAGED_CONFIG" ]] || return 69
-        printf 'status installed=true test-root=%s\n' "$SYSTEM_ROOT"
-    else
-        launchctl print "system/$LAUNCHD_LABEL"
-    fi
 }
 
 stop_job() {
@@ -671,29 +664,6 @@ rotate_logs() {
     printf 'rotated logs max-bytes=1048576 generations=3\n'
 }
 
-diagnostics() {
-    local mode version checksum job_state process_count
-    mode="$(/usr/libexec/PlistBuddy -c 'Print :Mode' "$MANAGED_CONFIG" 2>/dev/null || printf unavailable)"
-    version="$(/usr/libexec/PlistBuddy -c 'Print :Version' "$MANAGED_MANIFEST" 2>/dev/null || printf unavailable)"
-    checksum="$(sha256_file "$MANAGED_BINARY" 2>/dev/null || printf unavailable)"
-    if [[ -n "$SYSTEM_ROOT" ]]; then
-        job_state=test-double
-        process_count=0
-    else
-        if launchctl print "system/$LAUNCHD_LABEL" >/dev/null 2>&1; then job_state=loaded; else job_state=absent; fi
-        process_count="$({ pgrep -f '^/Library/PrivilegedHelperTools/macbook-lid-monitor-daemon$' || true; } | wc -l | tr -d ' ')"
-    fi
-    printf 'diagnostics label=%s job=%s mode=%s version=%s checksum=%s process-count=%s\n' \
-        "$LAUNCHD_LABEL" "$job_state" "$mode" "$version" "$checksum" "$process_count"
-    for path in "$MANAGED_STDOUT_LOG" "$MANAGED_STDERR_LOG"; do
-        if [[ -f "$path" && ! -L "$path" ]]; then
-            printf 'log path=%s bytes=%s mode=%s\n' "$path" "$(stat -f '%z' "$path")" "$(stat -f '%Lp' "$path")"
-        else
-            printf 'log path=%s absent\n' "$path"
-        fi
-    done
-}
-
 uninstall_package_unlocked() {
     require_root_for_system
     verify_installed_set
@@ -1137,6 +1107,7 @@ case "$1" in
     reset-crash-budget) reset_crash_budget ;;
     rotate-logs) rotate_logs ;;
     diagnostics) diagnostics ;;
+    operational-baseline) operational_baseline ;;
     uninstall) uninstall_package ;;
     accept-task9) accept_task9 ;;
     accept-task10) accept_task10 ;;

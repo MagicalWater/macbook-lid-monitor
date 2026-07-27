@@ -587,3 +587,70 @@ git diff --check: passed
 
 **Task 9 approved.** No Critical/P0/P1 finding remains. Task 10 may begin after the independent Task 9
 commit.
+
+## Task 10 — Stable status, diagnostics, and operational baseline
+
+### RED evidence
+
+Four focused tests failed because the observability library, parser-friendly fields, stable
+missing/corrupt classification, process metrics, and strict operational baseline did not exist.
+
+### Implemented
+
+- Added read-only `production-observability.sh` with stable status, diagnostics, crash-budget,
+  health, process metric, log metadata, and operational baseline interfaces.
+- Status reports installed identity, mode, launchd state, process count, health, target hardware,
+  integrity, crash state, acceptance state, and lease state as parser-friendly key/value fields.
+- Diagnostics adds PID elapsed/CPU/RSS/VSZ and log metadata without reading log contents.
+- Missing state reports `unavailable`; malformed or unsafe state reports `corrupt`.
+- Operational baseline requires a valid installed set, enabled mode, loaded job, exactly one PID,
+  fresh root-owned `0600` monitoring health matching that PID, and complete matching acceptance.
+- Sandbox process/job/metric hooks are rejected outside `MLM_TEST_ROOT`.
+
+### Immediate review findings
+
+#### T10-P1 — Baseline accepted stale or unsafe health evidence
+
+The first GREEN implementation checked the health state but not freshness or managed metadata.
+
+**Resolution:** health parsing now rejects unsafe metadata and classifies snapshots older than 180
+seconds as stale. Regression tests cover stale and mode `0666` health files.
+
+#### T10-P2 — Status compatibility and redaction static test drift
+
+The extracted library initially made `status` succeed while uninstalled, and a historical static
+test only inspected the manager file.
+
+**Resolution:** preserve nonzero uninstalled `status`, keep diagnostics tolerant through
+`status_job || true`, and update the static assertion to inspect the new library boundary.
+
+### Re-review
+
+- Status and diagnostics fields are stable and parser-friendly: pass.
+- Missing/corrupt health and crash state degrade deterministically: pass.
+- Diagnostics does not cat or tail logs: pass.
+- Process metrics are reported only for discovered PIDs: pass.
+- Health freshness, metadata, mode, state, and PID matching are enforced: pass.
+- Operational baseline rejects partial acceptance and unhealthy evidence: pass.
+- Production cannot enable observability test hooks: pass.
+- Existing uninstalled status behavior remains nonzero: pass.
+- No `/Library`, production launchd, sleep, reboot, merge, push, or worktree cleanup occurred: pass.
+
+### Verification
+
+```text
+RED: 4 focused tests failed because observability interfaces were absent
+focused Task 10: 5 tests, 0 failures
+management suite: 69 tests, 0 failures
+full XCTest: 254 tests, 0 failures
+bash -n: manager and sourced libraries passed
+shellcheck: passed with zero findings
+release daemon build: passed
+package prepare/verify: passed
+git diff --check: passed
+```
+
+### Decision
+
+**Task 10 approved.** No Critical/P0/P1 finding remains. Task 11 may begin after the independent
+Task 10 commit.

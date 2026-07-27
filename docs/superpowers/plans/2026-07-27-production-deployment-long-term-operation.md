@@ -593,11 +593,11 @@ unique identifiers.
 - Modify: `scripts/manage-production-daemon.sh`
 - Modify: `Tests/LidMonitorTests/ProductionManagementScriptTests.swift`
 
-- [ ] Add parser-friendly output tests for installed/version/commit/mode/job/PID/health/hardware,
+- [x] Add parser-friendly output tests for installed/version/commit/mode/job/PID/health/hardware,
   installed integrity, crash state, lease metadata/lock probe, acceptance state, checksums, process
   elapsed/CPU/RSS/VSZ, and logs.
-- [ ] Add corrupt/missing state tests and verify stable `unavailable`/`corrupt` values.
-- [ ] Implement read-only stable interfaces:
+- [x] Add corrupt/missing state tests and verify stable `unavailable`/`corrupt` values.
+- [x] Implement read-only stable interfaces:
 
 ```bash
 status_job
@@ -610,9 +610,9 @@ operational_baseline
 ```
 
 Diagnostics must not `cat` or `tail` logs.
-- [ ] Implement `operational-baseline` as a strict verifier that requires enabled, loaded, exactly
+- [x] Implement `operational-baseline` as a strict verifier that requires enabled, loaded, exactly
   one PID, healthy monitoring evidence, matching acceptance, and valid installed identity.
-- [ ] Verify, review, and commit `feat: add production operational baseline`.
+- [x] Verify, review, and commit `feat: add production operational baseline`.
 
 ### Task 11: Online-safe log rotation
 
