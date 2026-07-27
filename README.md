@@ -224,6 +224,9 @@ macOS 將第二次低功耗轉換記錄為 DarkWake，而不是與第一次完�
 
 ## Production LaunchDaemon
 
+Routine operation, failure recovery, upgrade/rollback semantics, command final modes, and emergency
+procedures are documented in [`docs/operations/production-daemon.md`](docs/operations/production-daemon.md).
+
 正式 daemon product 為：
 
 ```text

@@ -18,6 +18,37 @@ final class ProductionManagementScriptTests: XCTestCase {
         XCTAssertFalse(text.contains("sudo sh"))
     }
 
+    func testProductionRunbookDocumentsOnlyRealManagementCommandsAndStateSemantics() throws {
+        let runbookURL = root.appendingPathComponent("docs/operations/production-daemon.md")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: runbookURL.path))
+        let runbook = try String(contentsOf: runbookURL, encoding: .utf8)
+        let manager = try String(
+            contentsOf: root.appendingPathComponent("scripts/manage-production-daemon.sh"),
+            encoding: .utf8
+        )
+        let documentedCommands = [
+            "status", "diagnostics", "disable", "reset-crash-budget", "rotate-logs",
+            "upgrade", "rollback", "uninstall", "bootout", "operational-baseline",
+        ]
+        for command in documentedCommands {
+            XCTAssertTrue(runbook.contains("manage-production-daemon.sh \(command)"), command)
+            XCTAssertTrue(manager.contains("\(command))"), command)
+        }
+        for requiredText in [
+            "foreground real-sleep conflict",
+            "circuit-open recovery",
+            "integrity failure",
+            "emergency bootout",
+            "leaves enabled",
+            "forces disabled",
+            "real sleep warning",
+            "reboot warning",
+        ] {
+            XCTAssertTrue(runbook.contains(requiredText), requiredText)
+        }
+        XCTAssertFalse(runbook.contains("manage-production-daemon.sh enable"))
+    }
+
     func testPrepareAndVerifyEncodeVersionAndChecksumValidation() throws {
         let text = try String(
             contentsOf: root.appendingPathComponent("scripts/manage-production-daemon.sh"),

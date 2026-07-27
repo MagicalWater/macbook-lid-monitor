@@ -683,14 +683,14 @@ uninstall_package
 - Modify: relevant architecture/spec/plan/task status sections after implementation evidence exists
 - Modify: `Tests/LidMonitorTests/ProductionManagementScriptTests.swift`
 
-- [ ] Document status, diagnostics, disable, crash-budget reset, log rotation, upgrade, rollback,
+- [x] Document status, diagnostics, disable, crash-budget reset, log rotation, upgrade, rollback,
   uninstall, foreground real-sleep conflict, circuit-open recovery, integrity failure, and emergency
   bootout.
-- [ ] State which commands leave enabled and which force disabled.
-- [ ] Include exact expected state checks and warnings for real sleep/reboot.
-- [ ] Add a test or static review that every documented management command exists and no
+- [x] State which commands leave enabled and which force disabled.
+- [x] Include exact expected state checks and warnings for real sleep/reboot.
+- [x] Add a test or static review that every documented management command exists and no
   unrestricted enable command is documented.
-- [ ] Review docs against actual dispatcher/output and commit `docs: add production daemon runbook`.
+- [x] Review docs against actual dispatcher/output and commit `docs: add production daemon runbook`.
 
 ### Stage B implementation review
 

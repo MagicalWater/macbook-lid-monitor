@@ -791,3 +791,57 @@ git diff --check: passed
 
 **Task 12 approved.** No Critical/P0/P1 finding remains. Task 13 may begin after the independent
 Task 12 commit.
+
+## Task 13 — Long-term operator runbook and repository synchronization
+
+### RED evidence
+
+The command/document parity test failed because `docs/operations/production-daemon.md` did not
+exist.
+
+### Implemented
+
+- Added the supported production operator runbook and linked it from `README.md`.
+- Documented routine status, diagnostics, operational baseline, disable, emergency bootout,
+  crash-circuit recovery, online-safe rotation, upgrade, rollback, integrity failure, foreground
+  real-sleep lease conflict, uninstall, real-sleep warning, and reboot warning.
+- Recorded exact healthy/disabled/booted-out/residual expectations and which commands preserve the
+  current mode versus force disabled maintenance state.
+- Added a static parity regression proving every documented management command exists in the
+  dispatcher and no unrestricted enable command is documented.
+
+### Immediate review findings
+
+#### T13-P2 — Negative enable wording matched the prohibited command assertion
+
+The first runbook explicitly wrote the nonexistent unrestricted command inside a sentence saying it
+did not exist. The parity test correctly treated the literal command line as documentation of that
+interface.
+
+**Resolution:** describe the absence as “no unrestricted enable dispatcher” without presenting a
+copyable nonexistent command.
+
+### Re-review
+
+- Every runbook command has a matching dispatcher entry: pass.
+- No unrestricted enable command is documented: pass.
+- Routine and emergency paths include expected final state checks: pass.
+- Upgrade, rollback, and uninstall semantics match Task 12 implementation: pass.
+- Real-sleep and reboot operations carry explicit warnings: pass.
+- README links to the canonical runbook: pass.
+- No `/Library`, production launchd, sleep, reboot, merge, push, or worktree cleanup occurred: pass.
+
+### Verification
+
+```text
+RED: focused test failed because the production runbook was absent
+focused Task 13: 1 test, 0 failures
+management suite: 78 tests, 0 failures
+full XCTest: 263 tests, 0 failures
+git diff --check: passed
+```
+
+### Decision
+
+**Task 13 approved.** No Critical/P0/P1 finding remains. Stage B implementation review may begin
+after the independent Task 13 commit.
