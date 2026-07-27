@@ -3,6 +3,16 @@ import XCTest
 @testable import LidMonitorCore
 
 final class ProductionDaemonCompositionTests: XCTestCase {
+    func testDeployableProductionSourceContainsNoSleepOperationEnvironmentOverride() throws {
+        let root = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+        let source = try String(
+            contentsOf: root.appendingPathComponent("Sources/LidMonitorCore/Production/ProductionDaemonApplication.swift"),
+            encoding: .utf8
+        )
+        XCTAssertFalse(source.contains("MLM_SLEEP_OPERATION"))
+        XCTAssertFalse(source.contains("ProcessInfo.processInfo.environment"))
+        XCTAssertTrue(source.contains("operation: IOKitSystemSleepOperation()"))
+    }
     func testDisabledModeDoesNotEnumerateOrCreateRequester() throws {
         let fixture = Fixture(mode: .disabled, descriptors: [])
 

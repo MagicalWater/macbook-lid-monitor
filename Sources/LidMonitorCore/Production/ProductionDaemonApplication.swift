@@ -241,14 +241,8 @@ public enum LidMonitorProductionDaemonEntryPoint {
                         }
                     }
                 case .enabled:
-                    let operation: SystemSleepOperating
-                    if ProcessInfo.processInfo.environment["MLM_SLEEP_OPERATION"] == "injected-failure" {
-                        operation = InjectedSleepFailureOperation()
-                    } else {
-                        operation = IOKitSystemSleepOperation()
-                    }
                     return MacOSSleepRequester(
-                        operation: operation,
+                        operation: IOKitSystemSleepOperation(),
                         onEvent: { event in
                             if case .sleepRequested = event {
                                 sink.emit(.sleepRequested)

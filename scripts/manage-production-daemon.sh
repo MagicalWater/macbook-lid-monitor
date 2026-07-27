@@ -6,7 +6,7 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 source "$SCRIPT_DIR/lib/production-package-common.sh"
 
 usage() {
-    printf '%s\n' 'usage: manage-production-daemon.sh prepare|verify|install|bootstrap|status|stop|bootout|disable|dry-run|upgrade|rollback|reset-crash-budget|rotate-logs|diagnostics|uninstall|accept-task9|accept-task10|accept-task11|accept-task12-logged-in|accept-task12-loginwindow-start|accept-task12-loginwindow-finish|accept-task12-sleep-wake|accept-task13-dry-run-path|accept-task13-enabled-once|accept-task13-recovery-resleep|accept-task13-injected-failure|accept-task14-reboot-start|accept-task14-reboot-finish' >&2
+    printf '%s\n' 'usage: manage-production-daemon.sh prepare|verify|install|bootstrap|status|stop|bootout|disable|dry-run|upgrade|rollback|reset-crash-budget|rotate-logs|diagnostics|uninstall|accept-task9|accept-task10|accept-task11|accept-task12-logged-in|accept-task12-loginwindow-start|accept-task12-loginwindow-finish|accept-task12-sleep-wake|accept-task13-dry-run-path|accept-task13-enabled-once|accept-task13-recovery-resleep|accept-task14-reboot-start|accept-task14-reboot-finish' >&2
     exit 64
 }
 
@@ -499,73 +499,6 @@ accept_task13_recovery_resleep() {
     diagnostics
     trap - EXIT
     printf 'accepted task=13 scope=recovery-resleep final-mode=disabled label=%s\n' "$LAUNCHD_LABEL"
-}
-
-accept_task13_injected_failure() {
-    require_root_for_system
-    local mode before_pid process_count log_offset attempt_count failure_count disarmed_count return_count
-    mode="$(/usr/libexec/PlistBuddy -c 'Print :Mode' "$MANAGED_CONFIG")"
-    [[ "$mode" == "disabled" ]] || { printf 'error: expected disabled starting mode\n' >&2; return 65; }
-    cleanup_task13_injected_failure_to_disabled() {
-        if [[ -f "$MANAGED_PLIST" && ! -L "$MANAGED_PLIST" ]]; then
-            /usr/libexec/PlistBuddy -c 'Delete :EnvironmentVariables:MLM_SLEEP_OPERATION' "$MANAGED_PLIST" >/dev/null 2>&1 || true
-        fi
-        if [[ -f "$MANAGED_CONFIG" && ! -L "$MANAGED_CONFIG" ]]; then
-            disable_job >/dev/null 2>&1 || true
-            bootout_job >/dev/null 2>&1 || true
-            bootstrap_job >/dev/null 2>&1 || true
-        fi
-    }
-    trap cleanup_task13_injected_failure_to_disabled EXIT
-    prepare_as_invoking_user
-    verify_package
-    upgrade_package
-    /usr/libexec/PlistBuddy -c 'Add :EnvironmentVariables:MLM_SLEEP_OPERATION string injected-failure' "$MANAGED_PLIST"
-    set_enabled_mode
-    if [[ -n "$SYSTEM_ROOT" ]]; then
-        {
-            printf 'timestamp=test event=transition pid=1 name=sleep-request-attempted\n'
-            printf 'timestamp=test event=degraded pid=1 code=iokit-request-failed(-1)\n'
-            printf 'timestamp=test event=state-changed pid=1 state=monitoring-disarmed\n'
-        } >> "$MANAGED_STDOUT_LOG"
-        before_pid=1
-        log_offset=0
-    else
-        sleep 2
-        process_count="$({ pgrep -f '^/Library/PrivilegedHelperTools/macbook-lid-monitor-daemon$' || true; } | wc -l | tr -d ' ')"
-        [[ "$process_count" == 1 ]] || { printf 'error: expected one injected-failure daemon before lid action, got %s\n' "$process_count" >&2; return 70; }
-        before_pid="$(pgrep -f '^/Library/PrivilegedHelperTools/macbook-lid-monitor-daemon$')"
-        log_offset="$(stat -f '%z' "$MANAGED_STDOUT_LOG")"
-        printf 'armed task=13 scope=injected-failure pid=%s action=move-lid-below-68-degrees-and-hold-2-seconds-within-180-seconds no-real-sleep=true\n' "$before_pid"
-        for _ in {1..180}; do
-            failure_count="$(dd if="$MANAGED_STDOUT_LOG" bs=1 skip="$log_offset" 2>/dev/null | grep -c 'event=degraded.*code=iokit-request-failed' || true)"
-            disarmed_count="$(dd if="$MANAGED_STDOUT_LOG" bs=1 skip="$log_offset" 2>/dev/null | grep -c 'event=state-changed.*state=monitoring-disarmed' || true)"
-            [[ "$failure_count" -ge 1 && "$disarmed_count" -ge 1 ]] && break
-            sleep 1
-        done
-        sleep 3
-    fi
-    attempt_count="$(dd if="$MANAGED_STDOUT_LOG" bs=1 skip="$log_offset" 2>/dev/null | grep -c 'event=transition.*name=sleep-request-attempted' || true)"
-    failure_count="$(dd if="$MANAGED_STDOUT_LOG" bs=1 skip="$log_offset" 2>/dev/null | grep -c 'event=degraded.*code=iokit-request-failed' || true)"
-    disarmed_count="$(dd if="$MANAGED_STDOUT_LOG" bs=1 skip="$log_offset" 2>/dev/null | grep -c 'event=state-changed.*state=monitoring-disarmed' || true)"
-    return_count="$(dd if="$MANAGED_STDOUT_LOG" bs=1 skip="$log_offset" 2>/dev/null | grep -c 'event=sleep-requested' || true)"
-    [[ "$attempt_count" == 1 ]] || { printf 'error: expected exactly one injected sleep-request-attempted event, got %s\n' "$attempt_count" >&2; return 70; }
-    [[ "$failure_count" == 1 ]] || { printf 'error: expected exactly one injected sleep failure event, got %s\n' "$failure_count" >&2; return 70; }
-    [[ "$disarmed_count" -ge 1 ]] || { printf 'error: injected failure did not disarm monitoring\n' >&2; return 70; }
-    [[ "$return_count" == 0 ]] || { printf 'error: injected failure unexpectedly returned sleep-requested evidence\n' >&2; return 70; }
-    if [[ -z "$SYSTEM_ROOT" ]]; then
-        process_count="$({ pgrep -f '^/Library/PrivilegedHelperTools/macbook-lid-monitor-daemon$' || true; } | wc -l | tr -d ' ')"
-        [[ "$process_count" == 1 ]] || { printf 'error: expected one daemon after injected failure, got %s\n' "$process_count" >&2; return 70; }
-        [[ "$(pgrep -f '^/Library/PrivilegedHelperTools/macbook-lid-monitor-daemon$')" == "$before_pid" ]] || { printf 'error: daemon PID changed during injected failure acceptance\n' >&2; return 70; }
-    fi
-    printf 'verified task=13 scope=injected-failure attempt-count=1 failure-count=1 disarmed=true retry-count=0 pid-stable=true no-real-sleep=true\n'
-    /usr/libexec/PlistBuddy -c 'Delete :EnvironmentVariables:MLM_SLEEP_OPERATION' "$MANAGED_PLIST"
-    disable_job
-    bootout_job
-    bootstrap_job
-    diagnostics
-    trap - EXIT
-    printf 'accepted task=13 scope=injected-failure final-mode=disabled label=%s\n' "$LAUNCHD_LABEL"
 }
 
 accept_task13_dry_run_path() {
@@ -1092,7 +1025,6 @@ case "$1" in
     accept-task13-dry-run-path) accept_task13_dry_run_path ;;
     accept-task13-enabled-once) accept_task13_enabled_once ;;
     accept-task13-recovery-resleep) accept_task13_recovery_resleep ;;
-    accept-task13-injected-failure) accept_task13_injected_failure ;;
     accept-task14-reboot-start) accept_task14_reboot_start ;;
     accept-task14-reboot-finish) accept_task14_reboot_finish ;;
     *) usage ;;

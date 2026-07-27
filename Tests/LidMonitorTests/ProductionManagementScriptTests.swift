@@ -420,31 +420,11 @@ final class ProductionManagementScriptTests: XCTestCase {
         XCTAssertFalse(text.contains("read -s"))
     }
 
-    func testTask13InjectedFailureAcceptanceReturnsDisabledInSandbox() throws {
-        let sandbox = root.appendingPathComponent(".build/production-package-task13-injected-failure-root")
-        try? FileManager.default.removeItem(at: sandbox)
-        defer { try? FileManager.default.removeItem(at: sandbox) }
-
-        try seedStaging()
-        try runScript("install", environment: ["MLM_TEST_ROOT": sandbox.path])
-        try runScript("bootstrap", environment: ["MLM_TEST_ROOT": sandbox.path])
-        try runScript("accept-task13-injected-failure", environment: ["MLM_TEST_ROOT": sandbox.path])
-
-        let configURL = sandbox.appendingPathComponent("Library/Application Support/MacBookLidMonitor/config.plist")
-        let config = try ProductionConfigurationDecoder().decode(Data(contentsOf: configURL))
-        XCTAssertEqual(config.mode, .disabled)
-    }
-
-    func testTask13InjectedFailureCommandIsExactlyOnceNonSleepingAndFailSafe() throws {
+    func testDeployableProductionScriptContainsNoSleepOperationOverride() throws {
         let text = try String(contentsOf: root.appendingPathComponent("scripts/manage-production-daemon.sh"), encoding: .utf8)
-        XCTAssertTrue(text.contains("accept-task13-injected-failure)"))
-        XCTAssertTrue(text.contains("MLM_SLEEP_OPERATION string injected-failure"))
-        XCTAssertTrue(text.contains("expected exactly one injected sleep-request-attempted event"))
-        XCTAssertTrue(text.contains("expected exactly one injected sleep failure event"))
-        XCTAssertTrue(text.contains("retry-count=0"))
-        XCTAssertTrue(text.contains("no-real-sleep=true"))
-        XCTAssertTrue(text.contains("trap cleanup_task13_injected_failure_to_disabled EXIT"))
-        XCTAssertFalse(text.contains("sudo -S"))
+        XCTAssertFalse(text.contains("accept-task13-injected-failure"))
+        XCTAssertFalse(text.contains("MLM_SLEEP_OPERATION"))
+        XCTAssertFalse(text.contains("EnvironmentVariables"))
     }
 
     func testTask14RebootRollbackAndUninstallAcceptanceInSandbox() throws {

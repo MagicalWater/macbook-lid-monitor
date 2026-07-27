@@ -269,7 +269,7 @@ git add Sources/LidMonitorCore/Production/SleepAuthorityPathResolver.swift \
 git commit -m "fix: unify production sleep authority resolution"
 ```
 
-### Task 3: Remove deployable requester environment injection
+### Task 3: Remove deployable requester environment injection — complete
 
 **Purpose:** Make the production executable always compose the real requester in enabled mode while
 retaining dependency-injected failure tests.
@@ -281,7 +281,7 @@ retaining dependency-injected failure tests.
 - Modify: `Tests/LidMonitorTests/ProductionManagementScriptTests.swift`
 - Modify: `scripts/manage-production-daemon.sh`
 
-- [ ] **Step 1: Add failing source/package tests**
+- [x] **Step 1: Add failing source/package tests**
 
 ```swift
 func testDeployableProductionSourceContainsNoSleepOperationEnvironmentOverride()
@@ -289,13 +289,13 @@ func testProductionPlistAndManagedPlistRejectEnvironmentVariables()
 func testInjectedRequesterFailureRemainsCoveredThroughDependencies()
 ```
 
-- [ ] **Step 2: Prove RED**
+- [x] **Step 2: Prove RED**
 
 ```bash
 swift test --filter 'ProductionDaemonCompositionTests|ProductionManagementScriptTests'
 ```
 
-- [ ] **Step 3: Remove `ProcessInfo` requester selection**
+- [x] **Step 3: Remove `ProcessInfo` requester selection**
 
 Enabled composition becomes equivalent to:
 
@@ -310,7 +310,7 @@ Keep injected-failure coverage at the `requesterFactory` dependency seam. Remove
 old system-level acceptance command that edits LaunchDaemon `EnvironmentVariables`; do not replace
 it with another deployable override.
 
-- [ ] **Step 4: Verify and commit**
+- [x] **Step 4: Verify and commit**
 
 ```bash
 swift test --filter 'ProductionDaemonCompositionTests|ProductionManagementScriptTests'

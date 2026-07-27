@@ -134,3 +134,33 @@ release build: macbook-lid-monitor-daemon passed
 ### Decision
 
 **Task 2 approved.** No Critical/P0/P1 finding remains. Task 3 may begin.
+
+## Task 3 — Remove deployable requester environment injection
+
+### Implemented
+
+- Production enabled composition now always constructs `IOKitSystemSleepOperation`.
+- Removed `MLM_SLEEP_OPERATION` inspection from deployable Swift source.
+- Removed the management command that modified LaunchDaemon `EnvironmentVariables`.
+- Removed the dispatcher and usage entry for the retired injected-failure acceptance path.
+- Retained sleep failure coverage through existing dependency-injected requester tests.
+
+### Immediate review
+
+- Deployable source contains no environment requester override: pass.
+- Management script contains no `MLM_SLEEP_OPERATION` or `EnvironmentVariables`: pass.
+- Production plist is no longer mutated for failure injection: pass.
+- Existing requester failure/non-retry behavior remains covered at the dependency seam: pass.
+- No system mutation occurred: pass.
+
+### Verification
+
+```text
+focused: 52 tests, 0 failures
+full XCTest: 215 tests, 0 failures
+bash -n: passed
+```
+
+### Decision
+
+**Task 3 approved.** No Critical/P0/P1 finding remains. Task 4 may begin.
