@@ -1,8 +1,10 @@
 # macbook-lid-monitor
 
-`macbook-lid-monitor` 是一個 macOS 上蓋感測器診斷工具，也提供一個需要明確啟用的前景自動睡眠原型，用於處理原生闔蓋睡眠偵測不可靠的情況。
+`macbook-lid-monitor` 是一個 macOS 上蓋感測器診斷工具，也包含一個經實機驗收的 system-domain production LaunchDaemon，用於處理原生闔蓋睡眠偵測不可靠的情況。
 
-診斷模式只會讀取資料。自動睡眠必須明確選擇，且預設為只輸出 `would-sleep` 的 dry-run 模式；真正要求 macOS 睡眠時，還必須額外傳入 `--execute-sleep`。一般前景 CLI 不會修改持久電源設定、不會修改 NVRAM、不會安裝 LaunchAgent、不會要求系統管理員權限，也不會寫入 HID report。倉庫另保留一組已完成驗證、但不屬於正式部署的 LaunchDaemon feasibility tooling；只有明確執行管理腳本時才會使用管理員權限與 `/Library` 暫時路徑。
+診斷模式只會讀取資料。前景自動睡眠必須明確選擇，且預設為只輸出 `would-sleep` 的 dry-run 模式；真正要求 macOS 睡眠時，還必須額外傳入 `--execute-sleep`。一般前景 CLI 不會修改持久電源設定、不會修改 NVRAM、不會安裝 LaunchAgent、不會要求系統管理員權限，也不會寫入 HID report。
+
+Production LaunchDaemon 只有透過 `scripts/manage-production-daemon.sh` 的明確管理命令才會安裝或修改 `/Library`。安裝預設為 `disabled`，`dry-run` 與 `enabled` 必須分開切換；未知硬體、錯誤設定、過期感測器資料或睡眠 API 失敗均採 fail-open。2026-07-27 的完整驗收最後已執行 rollback 與 uninstall，目前系統上沒有已安裝的 production daemon 或 managed artifacts。
 
 ## 系統需求
 
@@ -216,11 +218,66 @@ Transport:  SPU
 
 macOS 將第二次低功耗轉換記錄為 DarkWake，而不是與第一次完全相同的完整 Sleep。這是平台層 power state 的差異，完整證據保留在 validation 文件中。
 
-真實睡眠始終需要操作者明確執行 `--auto-sleep --execute-sleep`。本專案目前沒有建立任何背景或持久部署。
+前景 CLI 的真實睡眠始終需要操作者明確執行 `--auto-sleep --execute-sleep`。Production LaunchDaemon 則只有在 root-owned 固定設定被切換為 `enabled` 時才具有真實睡眠權限；安裝與模式切換都必須透過管理腳本明確執行。
 
 驗收結果與感測器格式具有硬體相依性。其他 MacBook 型號或其他 report 格式，在使用真實睡眠功能前必須重新完成校準與 dry-run 驗證。
 
-## 移除方式
+## Production LaunchDaemon
+
+正式 daemon product 為：
+
+```text
+macbook-lid-monitor-daemon
+```
+
+管理入口：
+
+```bash
+sudo ./scripts/manage-production-daemon.sh prepare
+sudo ./scripts/manage-production-daemon.sh verify
+sudo ./scripts/manage-production-daemon.sh install
+sudo ./scripts/manage-production-daemon.sh bootstrap
+sudo ./scripts/manage-production-daemon.sh status
+```
+
+模式控制：
+
+```bash
+sudo ./scripts/manage-production-daemon.sh disable
+sudo ./scripts/manage-production-daemon.sh dry-run
+```
+
+`enabled` 只在受控 acceptance 命令中開放；一般操作沒有提供一個可不經驗收直接永久啟用真實睡眠的捷徑。
+
+固定 managed paths：
+
+```text
+/Library/PrivilegedHelperTools/macbook-lid-monitor-daemon
+/Library/LaunchDaemons/com.crazydennies.macbook-lid-monitor.plist
+/Library/Application Support/MacBookLidMonitor/
+/Library/Logs/MacBookLidMonitor/
+```
+
+Production 支援邊界目前只涵蓋已驗證的 M1 Pro exact hardware profile。其他 MacBook 型號必須先新增 exact profile、decoder 證據與完整 dry-run／enabled 驗收，不能依賴診斷候選排名自動取得 production 權限。
+
+完整 production 設計、計畫、Task、實機證據與 final review 位於：
+
+```text
+docs/superpowers/specs/2026-07-27-production-launchdaemon-design.md
+docs/superpowers/plans/2026-07-27-production-launchdaemon.md
+docs/superpowers/tasks/2026-07-27-production-launchdaemon-tasks.md
+docs/superpowers/reviews/2026-07-27-production-launchdaemon-final-review.md
+```
+
+### Production 移除方式
+
+```bash
+sudo ./scripts/manage-production-daemon.sh uninstall
+```
+
+解除安裝會停止並 bootout system job，移除 binary、plist、config、manifest、rollback slot、crash-budget state、production logs 與 Task acceptance state。可用 acceptance／review 中的 residual-state check 驗證零殘留。
+
+## 前景工具移除方式
 
 先停止正在執行的程序，再刪除專案目錄：
 
@@ -230,13 +287,13 @@ macOS 將第二次低功耗轉換記錄為 DarkWake，而不是與第一次完�
 
 診斷與前景自動睡眠流程不會安裝系統服務，也不會修改任何持久系統設定，因此不需要額外解除安裝步驟。
 
-## LaunchDaemon 可行性驗證
+## LaunchDaemon 可行性與歷史工具
 
-正式可用的功能目前仍是前景 CLI。系統層 `LaunchDaemon` feasibility phase 已完成，證明 M1 Pro 上的 system-domain daemon 可於登入前啟動、讀取 lid HID、接收 IOKit power notification，且 root/system context 可透過獨立 one-shot probe 成功呼叫 `IOPMSleepSystem`。
+系統層 `LaunchDaemon` feasibility phase 先證明 M1 Pro 上的 system-domain daemon 可於登入前啟動、讀取 lid HID、接收 IOKit power notification，且 root/system context 可透過獨立 one-shot probe 成功呼叫 `IOPMSleepSystem`。其後 production phase 已完成正式 composition、固定設定、exact hardware authorization、logging、crash budget、transactional install／upgrade／rollback／uninstall，以及完整硬體 acceptance。
 
-這不等於正式 production daemon 已完成或已安裝。Task 13 已移除所有暫時 system artifacts，目前沒有載入的 job、daemon process、installed binary、plist 或 feasibility log directory。
+2026-07-27 Task 14 最終驗收已執行 rollback 與 uninstall；目前沒有載入的 job、daemon process、installed binary、plist、support directory 或 production log directory。
 
-`macbook-lid-monitor-daemon-spike` 仍具有以下實驗限制：
+`macbook-lid-monitor-daemon-spike` 與 `macbook-lid-monitor-sleep-probe` 保留為歷史驗證與回歸工具，不屬於 production package，也不會被 production plist 安裝或啟動。Spike 仍具有以下實驗限制：
 
 - 永遠使用 dry-run，不包含切換為真實睡眠的參數。
 - 只用於驗證系統層 HID、IOKit power notification、程序生命週期與登入前執行環境。
@@ -260,4 +317,4 @@ docs/validation/2026-07-26-launchdaemon-feasibility-spike.md
 docs/superpowers/reviews/2026-07-26-launchdaemon-feasibility-spike-final-review.md
 ```
 
-最終 disposition：production daemon architecture 已解除可行性阻塞，可以進入正式設計；但 production packaging、持久 logging、升級／回滾與真實 sensor-driven sleep enablement 仍必須另立正式階段實作與驗收。
+最終 disposition：feasibility tooling 保留；production daemon 已完成設計、實作、實機驗收與最終 uninstall。若要再次部署，仍應從 `disabled` 安裝，依序執行 status／dry-run 驗證，再經明確批准進入 enabled acceptance。

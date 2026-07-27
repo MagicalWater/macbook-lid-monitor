@@ -1,6 +1,6 @@
 # Production LaunchDaemon Design Specification
 
-Status: Reviewed and ready for implementation approval  
+Status: Implemented and accepted on the validated M1 Pro; final system state uninstalled
 Baseline: `589dc7a`
 
 ## 1. Problem

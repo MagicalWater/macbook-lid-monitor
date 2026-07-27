@@ -1,6 +1,6 @@
 # Production LaunchDaemon Task Register
 
-Status: Implementation in progress; Tasks 1–14 complete. Task 15 documentation, tooling disposition, and holistic final review remain.
+Status: Complete; Tasks 1–15, all stage reviews, hardware acceptance, reboot/rollback/uninstall, and holistic final review are closed.
 
 | Task | Purpose | Primary files | Verification | Approval gate | Rollback/safe stop |
 | ---: | --- | --- | --- | --- | --- |
@@ -21,7 +21,7 @@ Status: Implementation in progress; Tasks 1–14 complete. Task 15 documentation
 | 12 | Production dry-run acceptance — complete | validation evidence | logged-in, loginwindow, and real sleep/wake dry-run acceptance complete | completed; separate reboot approval remains for Task 14 | automatic disable/bootout/bootstrap cleanup |
 | 13 | Enabled bounded acceptance — complete | validation evidence | dry-run path, first enabled sleep, bounded recovery-resleep, and non-sleeping injected failure all accepted on the real system | completed; no further Task 13 approval remains | automatic removal of injection plus disable/bootout/bootstrap cleanup |
 | 14 | Reboot/rollback/uninstall acceptance — complete | validation evidence | real reboot proof, disabled startup, rollback to `20c369b823d1`, uninstall, independently verified zero residual | completed | rollback and uninstall completed; no managed system state remains |
-| 15 | Docs, tooling disposition, final review | README/docs/tool moves | full clean validation + holistic review | approval if cleanup touches installed state | restore archived tooling from git |
+| 15 | Docs, tooling disposition, final review — complete | README, governance closures, final review | fresh full/clean/static/release validation + holistic review | no additional system mutation; Task 14 already left zero residual | revert Task 15 documentation commit |
 
 ## Per-task mandatory workflow
 

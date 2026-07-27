@@ -5,7 +5,7 @@ Baseline: `589dc7a docs: close launchdaemon feasibility spike`
 
 ## Audit scope
 
-This audit evaluates whether the completed feasibility implementation can become a long-lived system LaunchDaemon. It does not authorize installation, `/Library` mutation, bootstrap, reboot, logout, or real sensor-driven sleep.
+This audit originally evaluated whether the completed feasibility implementation could become a long-lived system LaunchDaemon. The production phase subsequently implemented and accepted that architecture. Installation, `/Library` mutation, bootstrap, reboot, logout, and real sensor-driven sleep remained separately approved throughout execution.
 
 The requested `AGENTS.md` is not present at baseline `589dc7a`. The repository-level rules available for this audit are therefore the user's explicit instructions, the existing superpowers documents, and the checked-in source and validation evidence.
 

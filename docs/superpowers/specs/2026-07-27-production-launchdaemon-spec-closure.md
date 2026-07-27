@@ -34,3 +34,11 @@ specification. No open finding remains at this gate.
 
 The next permitted document activity is Implementation Plan governance. Production code,
 `/Library` changes, service installation, bootstrap, and real sleep remain prohibited.
+
+## Post-implementation disposition
+
+The subsequently governed Plan and Task phases implemented this closed specification. Tasks 1–15,
+real-system dry-run/enabled/recovery/failure acceptance, reboot, rollback, uninstall, and holistic
+final review completed on 2026-07-27. The final system state is intentionally uninstalled with zero
+managed residual artifacts. This section records the later result without changing the original
+Spec-gate authorization boundary above.

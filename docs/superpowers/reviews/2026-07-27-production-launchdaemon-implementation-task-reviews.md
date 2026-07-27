@@ -1550,3 +1550,74 @@ boot has completed.
 ### Disposition
 
 **Task 14 approved and complete.** The real reboot, post-boot disabled state, rollback, uninstall, and zero-residual acceptance all passed. No production LaunchDaemon artifacts remain installed.
+
+## Task 15 — Documentation, tooling disposition, and holistic final review
+
+### Documentation synchronization
+
+- README now describes the production daemon as completed and accepted rather than a future design.
+- Production management commands, fixed paths, supported M1 Pro profile, fail-open boundaries, and
+  final uninstalled state are documented.
+- Spec, Plan, and Task status now reflect completed implementation while preserving the original
+  gate authorization history in their closure documents.
+- All 64 production Plan checklist items are marked complete.
+- Task 14 real-system reboot/rollback/uninstall evidence has a dedicated evidence document.
+- The holistic final review traces architecture invariants, lifecycle acceptance, tooling
+  disposition, and final residual state.
+
+### Tooling disposition
+
+- Keep `macbook-lid-monitor-daemon-spike` and `macbook-lid-monitor-sleep-probe` as historical
+  feasibility and regression products.
+- They remain excluded from the production manifest, production plist, install set, and production
+  composition.
+- No source removal or `Package.swift` change is needed; retaining the products preserves proven
+  system-context regression seams without granting production authority.
+
+### Immediate review findings
+
+- The README still claimed there was no persistent/background production implementation. Updated.
+- The production Spec still said “ready for implementation approval.” Updated to accepted and
+  uninstalled final state.
+- The production Plan had 52 completed steps left unchecked. All implemented steps are now checked.
+- The initial final verification found trailing whitespace in the revised Spec status line.
+  Corrected before rerunning the complete gate.
+- The historical Spec/Plan/Task closure decisions were intentionally retained; post-implementation
+  disposition sections were appended rather than rewriting past authorization boundaries.
+
+### Fresh verification
+
+Current checkout:
+
+- Full XCTest suite: 188 tests, 0 failures.
+- Release products: foreground CLI, production daemon, daemon spike, and sleep probe all built.
+- `bash -n`: passed for all scripts.
+- `shellcheck -x`: passed for all scripts.
+- Production and feasibility plist/config/manifest lint: passed.
+- Production package `prepare` and `verify`: passed.
+- `git diff --check`: passed.
+
+Clean snapshot created without the existing `.git` or `.build`, initialized as a new repository:
+
+- Full XCTest suite: 188 tests, 0 failures.
+- All four release products: passed.
+- Bash syntax and shellcheck: passed.
+- All plist/config/manifest lint: passed.
+- Production package `prepare` and `verify`: passed.
+- `git diff --check` and tracked working-tree cleanliness: passed.
+
+### Holistic re-review
+
+- Closed Spec safety invariants have implementation and real-system evidence: pass.
+- Plan ordering, approval gates, rollback paths, and stage reviews are traceable: pass.
+- Tasks 1–15 each have review and verification evidence: pass.
+- Production and experimental tooling boundaries are explicit: pass.
+- Supported hardware scope is exact and not generalized beyond the validated M1 Pro: pass.
+- Final system state is independently verified uninstalled with zero managed residual state: pass.
+- Repository remains detached and has not been merged or pushed without authorization: pass.
+
+### Disposition
+
+**Task 15 approved and complete.** The Production LaunchDaemon phase is holistically closed. The
+implementation is validated for the exact M1 Pro profile, and the intentional final system state is
+uninstalled. Integration of the detached HEAD remains a separate explicit decision.

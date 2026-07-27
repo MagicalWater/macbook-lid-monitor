@@ -1,6 +1,6 @@
 # Production LaunchDaemon Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Build and validate a fail-open production system LaunchDaemon around the proven lid-monitoring core, with exact hardware authorization and transactional lifecycle management.
 
@@ -42,10 +42,10 @@
 - Test: `Tests/LidMonitorTests/ProductionHardwareProfileTests.swift`
 
 **Steps:**
-- [ ] Write exact-match, transport mismatch, duplicate device, unknown format, and diagnostic-ranking-not-authoritative tests.
-- [ ] Confirm RED, implement the single accepted M1 Pro profile and profile-bound decoder factory.
-- [ ] Verify no generic/composite decoder can authorize enabled mode.
-- [ ] Run focused/full tests, review, document, and commit.
+- [x] Write exact-match, transport mismatch, duplicate device, unknown format, and diagnostic-ranking-not-authoritative tests.
+- [x] Confirm RED, implement the single accepted M1 Pro profile and profile-bound decoder factory.
+- [x] Verify no generic/composite decoder can authorize enabled mode.
+- [x] Run focused/full tests, review, document, and commit.
 
 **Completion:** Only the exact accepted profile can enter monitoring; all unknowns fail open.
 
@@ -61,20 +61,20 @@
 - Test: `Tests/LidMonitorTests/LidSleepCoordinatorTests.swift`
 
 **Steps:**
-- [ ] Extend schema-v1 configuration with required positive `SensorFreshnessSeconds` and regression coverage.
-- [ ] Add failing tests for stale close sample, stale recovery sample, pre-wake sample rejection, duplicate wake callback, duplicate timer callback, and exactly-one request per epoch.
-- [ ] Implement minimal freshness/epoch state.
-- [ ] Prove existing calibrated behavior remains unchanged for fresh data.
-- [ ] Run focused/full tests, review, document, and commit.
+- [x] Extend schema-v1 configuration with required positive `SensorFreshnessSeconds` and regression coverage.
+- [x] Add failing tests for stale close sample, stale recovery sample, pre-wake sample rejection, duplicate wake callback, duplicate timer callback, and exactly-one request per epoch.
+- [x] Implement minimal freshness/epoch state.
+- [x] Prove existing calibrated behavior remains unchanged for fresh data.
+- [x] Run focused/full tests, review, document, and commit.
 
 **Completion:** Unfresh or duplicate events cannot request sleep.
 
 ### Stage A review
 
-- [ ] Review all shared-core changes against safety invariants.
-- [ ] Run clean full tests and release build.
-- [ ] Confirm no package or system path changes.
-- [ ] Commit Stage A closure.
+- [x] Review all shared-core changes against safety invariants.
+- [x] Run clean full tests and release build.
+- [x] Confirm no package or system path changes.
+- [x] Commit Stage A closure.
 
 ## Stage B — Production daemon composition and observability
 
@@ -90,10 +90,10 @@
 - Test: `Tests/LidMonitorTests/DaemonHealthTests.swift`
 
 **Steps:**
-- [ ] Test lifecycle/error taxonomy, stable formatting, line atomicity, redaction, and prohibited raw report output.
-- [ ] Implement bounded transition logging and health snapshots.
-- [ ] Verify sensor values appear only in allowed transition events.
-- [ ] Run tests, review, document, and commit.
+- [x] Test lifecycle/error taxonomy, stable formatting, line atomicity, redaction, and prohibited raw report output.
+- [x] Implement bounded transition logging and health snapshots.
+- [x] Verify sensor values appear only in allowed transition events.
+- [x] Run tests, review, document, and commit.
 
 ### Task 5: Production application composition
 
@@ -106,10 +106,10 @@
 - Test: `Tests/LidMonitorTests/ProductionDaemonCompositionTests.swift`
 
 **Steps:**
-- [ ] Test disabled mode does not open HID; dry-run cannot construct real requester; enabled requires exact profile; startup failures become health/exit dispositions; signal shutdown is idempotent.
-- [ ] Confirm RED and implement the thin composition root.
-- [ ] Verify no CLI/environment production override.
-- [ ] Run focused/full tests and release build, review, document, and commit.
+- [x] Test disabled mode does not open HID; dry-run cannot construct real requester; enabled requires exact profile; startup failures become health/exit dispositions; signal shutdown is idempotent.
+- [x] Confirm RED and implement the thin composition root.
+- [x] Verify no CLI/environment production override.
+- [x] Run focused/full tests and release build, review, document, and commit.
 
 ### Task 6: Crash budget and bounded recovery
 
@@ -121,17 +121,17 @@
 - Test: `Tests/LidMonitorTests/CrashBudgetTests.swift`
 
 **Steps:**
-- [ ] Test rolling-window accounting, clean-exit exclusion, circuit open, explicit reset, corrupt state fail-open, and atomic persistence.
-- [ ] Implement with injectable storage/time.
-- [ ] Verify circuit-open mode never starts sensor-driven sleep.
-- [ ] Run tests, review, document, and commit.
+- [x] Test rolling-window accounting, clean-exit exclusion, circuit open, explicit reset, corrupt state fail-open, and atomic persistence.
+- [x] Implement with injectable storage/time.
+- [x] Verify circuit-open mode never starts sensor-driven sleep.
+- [x] Run tests, review, document, and commit.
 
 ### Stage B review
 
-- [ ] Review composition, privacy, exit, and restart boundaries.
-- [ ] Run clean full tests and all release products.
-- [ ] Confirm spike/probe behavior remains unchanged and excluded from production composition.
-- [ ] Commit Stage B closure.
+- [x] Review composition, privacy, exit, and restart boundaries.
+- [x] Run clean full tests and all release products.
+- [x] Confirm spike/probe behavior remains unchanged and excluded from production composition.
+- [x] Commit Stage B closure.
 
 ## Stage C — Packaging and operator lifecycle
 
@@ -146,9 +146,9 @@
 - Create: `Tests/LidMonitorTests/ProductionPackagingTests.swift`
 
 **Steps:**
-- [ ] Test label/path/product consistency, no LaunchAgent, no feasibility product, no unconditional KeepAlive, required throttle/restart fields, and file modes.
-- [ ] Add package templates and lint validation.
-- [ ] Run tests/plutil, review, document, and commit.
+- [x] Test label/path/product consistency, no LaunchAgent, no feasibility product, no unconditional KeepAlive, required throttle/restart fields, and file modes.
+- [x] Add package templates and lint validation.
+- [x] Run tests/plutil, review, document, and commit.
 
 ### Task 8: Non-mutating prepare and verify commands
 
@@ -160,9 +160,9 @@
 - Test: `Tests/LidMonitorTests/ProductionManagementScriptTests.swift`
 
 **Steps:**
-- [ ] Add tests for `prepare`/`verify`, source symlink rejection, checksum manifest, version consistency, script syntax, and zero `/Library` mutation.
-- [ ] Implement non-mutating commands only.
-- [ ] Run XCTest, `bash -n`, shellcheck, plist lint, review, and commit.
+- [x] Add tests for `prepare`/`verify`, source symlink rejection, checksum manifest, version consistency, script syntax, and zero `/Library` mutation.
+- [x] Implement non-mutating commands only.
+- [x] Run XCTest, `bash -n`, shellcheck, plist lint, review, and commit.
 
 ### Approval Gate C1
 
@@ -179,10 +179,10 @@ Explicit approval is required before Task 9 performs any `/Library` write or lau
 - Create: `docs/operations/production-daemon.md`
 
 **Steps:**
-- [ ] Implement tests/harness for staged atomic install, ownership/modes, symlink refusal, duplicate authority refusal, disabled default, bootstrap health verification, idempotent stop/bootout, and emergency disable.
-- [ ] After explicit approval, perform controlled install in `disabled`, then dry-run only.
-- [ ] Capture residual state before and after every mutation.
-- [ ] Review, fresh verification, evidence document, and commit.
+- [x] Implement tests/harness for staged atomic install, ownership/modes, symlink refusal, duplicate authority refusal, disabled default, bootstrap health verification, idempotent stop/bootout, and emergency disable.
+- [x] After explicit approval, perform controlled install in `disabled`, then dry-run only.
+- [x] Capture residual state before and after every mutation.
+- [x] Review, fresh verification, evidence document, and commit.
 
 ### Task 10: Upgrade and automatic rollback
 
@@ -195,10 +195,10 @@ Explicit approval is required before Task 9 performs any `/Library` write or lau
 - Create: `docs/validation/<date>-production-upgrade-rollback.md`
 
 **Steps:**
-- [ ] Test successful upgrade, failed preflight, failed bootstrap, failed health check, automatic rollback, rollback checksum/version verification, and rollback failure fail-open.
-- [ ] Implement one rollback slot and atomic activation.
-- [ ] After explicit approval, run controlled dry-run upgrade/rollback acceptance.
-- [ ] Review, verify, document, and commit.
+- [x] Test successful upgrade, failed preflight, failed bootstrap, failed health check, automatic rollback, rollback checksum/version verification, and rollback failure fail-open.
+- [x] Implement one rollback slot and atomic activation.
+- [x] After explicit approval, run controlled dry-run upgrade/rollback acceptance.
+- [x] Review, verify, document, and commit.
 
 ### Task 11: Logs, rotation, diagnostics, and uninstall
 
@@ -210,17 +210,17 @@ Explicit approval is required before Task 9 performs any `/Library` write or lau
 - Test: logging/diagnostic/uninstall fixtures.
 
 **Steps:**
-- [ ] Test log size rotation/retention, root-only permissions, redacted diagnostics, bounded sensor capture, uninstall scope, process/job checks, and unrelated-file preservation.
-- [ ] Implement commands and failure-safe cleanup.
-- [ ] After explicit approval, validate uninstall and zero managed residual state.
-- [ ] Review, verify, document, and commit.
+- [x] Test log size rotation/retention, root-only permissions, redacted diagnostics, bounded sensor capture, uninstall scope, process/job checks, and unrelated-file preservation.
+- [x] Implement commands and failure-safe cleanup.
+- [x] After explicit approval, validate uninstall and zero managed residual state.
+- [x] Review, verify, document, and commit.
 
 ### Stage C review
 
-- [ ] Holistically review every root mutation and rollback path.
-- [ ] Run package/script/static validations from a clean checkout.
-- [ ] Record current system residual state.
-- [ ] Commit Stage C closure.
+- [x] Holistically review every root mutation and rollback path.
+- [x] Run package/script/static validations from a clean checkout.
+- [x] Record current system residual state.
+- [x] Commit Stage C closure.
 
 ## Stage D — Hardware acceptance and closure
 
@@ -249,3 +249,12 @@ Perform separately approved reboot auto-start in dry-run, production upgrade/rol
 - Create final task reviews, validation evidence, and holistic review.
 
 **Completion:** All spec criteria have fresh evidence; documentation matches actual state; final disposition explicitly states installed/disabled/uninstalled state and supported hardware profile.
+
+### Task 15 closure
+
+- [x] Synchronize README production usage, safety boundaries, supported profile, and uninstall state.
+- [x] Retain spike/probe products as historical feasibility and regression tooling; keep them excluded from production packaging and launchd composition.
+- [x] Synchronize Spec, Plan, Task, architecture audit, acceptance evidence, and system residual state.
+- [x] Run fresh full tests, release builds for all products, Bash/static/plist/package validation, and clean-checkout validation.
+- [x] Perform holistic traceability review against every Spec safety invariant and planned acceptance gate.
+- [x] Record final disposition and commit Task 15 independently.
