@@ -967,3 +967,38 @@ A single foreground shell cannot safely span logout because its Terminal session
 ### Disposition
 
 **Loginwindow acceptance commands approved for the separately authorized logout test.** Real system evidence remains pending start/logout/login/finish execution.
+
+
+## Task 12 — Loginwindow acceptance incident and retry hardening
+
+### Real attempt finding
+
+The first real two-phase attempt did not establish valid loginwindow evidence. The finish command
+reported `_windowserver`, process count `0`, and system job `absent`. More importantly, finish
+returned before restoring the installed daemon to disabled, leaving the approved dry-run process
+running until the operator executed explicit disable/bootout/bootstrap recovery.
+
+### P0 fixes
+
+- `accept-task12-loginwindow-finish` now installs an EXIT fail-safe before reading or validating
+  evidence. Missing or invalid evidence always attempts disable, bootout, and disabled bootstrap.
+- The detached observer no longer records the first non-user console owner. It requires a non-user
+  console owner, loaded system job, and exactly one production PID for two consecutive samples.
+- Timeout evidence is explicit and remains invalid by construction.
+- Added a sandbox regression proving invalid evidence returns failure while final configuration is
+  disabled.
+
+### Verification
+
+- Focused management tests: 30 tests, 0 failures.
+- Full suite: 174 tests, 0 failures.
+- `bash -n`: passed.
+- `shellcheck`: passed.
+- Release production daemon: passed.
+- `git diff --check`: passed.
+
+### Current real system state
+
+After explicit operator recovery, configuration is disabled, the system job is loaded but not
+running, last exit code is zero, and no production daemon PID remains. Loginwindow acceptance must
+be retried from the start command; the prior evidence is not accepted.

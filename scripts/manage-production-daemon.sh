@@ -177,21 +177,31 @@ accept_task12_loginwindow_start() {
     cat > "$helper" <<EOF
 #!/usr/bin/env bash
 set -euo pipefail
+stable=0
 for _ in {1..180}; do
   owner="\$(stat -f %Su /dev/console 2>/dev/null || true)"
-  if [[ "\$owner" != "$invoking_user" && -n "\$owner" ]]; then
-    count="\$({ pgrep -f '^/Library/PrivilegedHelperTools/macbook-lid-monitor-daemon$' || true; } | wc -l | tr -d ' ')"
-    job=absent
-    launchctl print system/$LAUNCHD_LABEL >/dev/null 2>&1 && job=loaded
-    printf 'console-user=%s\nprocess-count=%s\nsystem-job=%s\n' "\$owner" "\$count" "\$job" > "$evidence.tmp"
-    chmod 0600 "$evidence.tmp"
-    chown root:wheel "$evidence.tmp"
-    mv -f "$evidence.tmp" "$evidence"
-    rm -f -- "$helper"
-    exit 0
+  count="\$({ pgrep -f '^/Library/PrivilegedHelperTools/macbook-lid-monitor-daemon$' || true; } | wc -l | tr -d ' ')"
+  job=absent
+  /bin/launchctl print system/$LAUNCHD_LABEL >/dev/null 2>&1 && job=loaded
+  if [[ "\$owner" != "$invoking_user" && -n "\$owner" && "\$count" == 1 && "\$job" == loaded ]]; then
+    stable=\$((stable + 1))
+    if [[ "\$stable" -ge 2 ]]; then
+      printf 'console-user=%s\nprocess-count=%s\nsystem-job=%s\n' "\$owner" "\$count" "\$job" > "$evidence.tmp"
+      chmod 0600 "$evidence.tmp"
+      chown root:wheel "$evidence.tmp"
+      mv -f "$evidence.tmp" "$evidence"
+      rm -f -- "$helper"
+      exit 0
+    fi
+  else
+    stable=0
   fi
   sleep 1
 done
+printf 'console-user=timeout\nprocess-count=0\nsystem-job=absent\n' > "$evidence.tmp"
+chmod 0600 "$evidence.tmp"
+chown root:wheel "$evidence.tmp"
+mv -f "$evidence.tmp" "$evidence"
 rm -f -- "$helper"
 exit 70
 EOF
@@ -206,6 +216,14 @@ accept_task12_loginwindow_finish() {
     require_root_for_system
     local evidence owner count job
     evidence="$(loginwindow_evidence_path)"
+    cleanup_task12_loginwindow_to_disabled() {
+        if [[ -f "$MANAGED_CONFIG" && ! -L "$MANAGED_CONFIG" ]]; then
+            disable_job >/dev/null 2>&1 || true
+            bootout_job >/dev/null 2>&1 || true
+            bootstrap_job >/dev/null 2>&1 || true
+        fi
+    }
+    trap cleanup_task12_loginwindow_to_disabled EXIT
     [[ -f "$evidence" && ! -L "$evidence" ]] || { printf 'error: loginwindow evidence missing\n' >&2; return 70; }
     owner="$(awk -F= '$1=="console-user" {print $2}' "$evidence")"
     count="$(awk -F= '$1=="process-count" {print $2}' "$evidence")"
@@ -219,6 +237,7 @@ accept_task12_loginwindow_finish() {
     bootstrap_job
     diagnostics
     rm -f -- "$evidence"
+    trap - EXIT
     printf 'accepted task=12 scope=loginwindow final-mode=disabled observed-console-user=%s label=%s\n' "$owner" "$LAUNCHD_LABEL"
 }
 

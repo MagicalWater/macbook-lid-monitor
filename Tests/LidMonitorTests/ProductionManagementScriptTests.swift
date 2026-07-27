@@ -304,8 +304,35 @@ final class ProductionManagementScriptTests: XCTestCase {
         XCTAssertTrue(text.contains("accept-task12-loginwindow-start)"))
         XCTAssertTrue(text.contains("accept-task12-loginwindow-finish)"))
         XCTAssertTrue(text.contains("launchctl bootout \"gui/$invoking_uid\""))
+        XCTAssertTrue(text.contains("trap cleanup_task12_loginwindow_to_disabled EXIT"))
+        XCTAssertTrue(text.contains("\\$count\" == 1"))
+        XCTAssertTrue(text.contains("\\$job\" == loaded"))
+        XCTAssertTrue(text.contains("stable=\\$((stable + 1))"))
         XCTAssertFalse(text.contains("sudo -S"))
         XCTAssertFalse(text.contains("read -s"))
+    }
+
+    func testTask12LoginwindowInvalidEvidenceStillReturnsDisabled() throws {
+        let sandbox = root.appendingPathComponent(".build/production-package-task12-loginwindow-invalid-root")
+        try? FileManager.default.removeItem(at: sandbox)
+        defer { try? FileManager.default.removeItem(at: sandbox) }
+
+        try seedStaging()
+        try runScript("install", environment: ["MLM_TEST_ROOT": sandbox.path])
+        try runScript("bootstrap", environment: ["MLM_TEST_ROOT": sandbox.path])
+        let configURL = sandbox.appendingPathComponent("Library/Application Support/MacBookLidMonitor/config.plist")
+        var plist = try plistDictionary(at: configURL)
+        plist["Mode"] = "dry-run"
+        try PropertyListSerialization.data(fromPropertyList: plist, format: .xml, options: 0).write(to: configURL)
+        let evidence = sandbox.appendingPathComponent("Library/Application Support/MacBookLidMonitor/task12-loginwindow-evidence.txt")
+        try Data("console-user=_windowserver\nprocess-count=0\nsystem-job=absent\n".utf8).write(to: evidence)
+
+        XCTAssertThrowsError(
+            try runScript("accept-task12-loginwindow-finish", environment: ["MLM_TEST_ROOT": sandbox.path, "SUDO_USER": "water"])
+        )
+
+        let config = try ProductionConfigurationDecoder().decode(Data(contentsOf: configURL))
+        XCTAssertEqual(config.mode, .disabled)
     }
 
     func testInstallRejectsManagedPathSymlink() throws {
