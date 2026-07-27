@@ -6,7 +6,7 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 source "$SCRIPT_DIR/lib/production-package-common.sh"
 
 usage() {
-    printf '%s\n' 'usage: manage-production-daemon.sh prepare|verify|install|bootstrap|status|stop|bootout|disable|dry-run|upgrade|rollback|rotate-logs|diagnostics|uninstall|accept-task9|accept-task10|accept-task11|accept-task12-logged-in|accept-task12-loginwindow-start|accept-task12-loginwindow-finish' >&2
+    printf '%s\n' 'usage: manage-production-daemon.sh prepare|verify|install|bootstrap|status|stop|bootout|disable|dry-run|upgrade|rollback|rotate-logs|diagnostics|uninstall|accept-task9|accept-task10|accept-task11|accept-task12-logged-in|accept-task12-loginwindow-start|accept-task12-loginwindow-finish|accept-task12-sleep-wake' >&2
     exit 64
 }
 
@@ -280,6 +280,56 @@ accept_task12_loginwindow_finish() {
     cleanup_loginwindow_observer
     trap - EXIT
     printf 'accepted task=12 scope=loginwindow final-mode=disabled observed-console-user=%s label=%s\n' "$owner" "$LAUNCHD_LABEL"
+}
+
+accept_task12_sleep_wake() {
+    require_root_for_system
+    local mode before_pid process_count log_offset evidence_found=0
+    mode="$(/usr/libexec/PlistBuddy -c 'Print :Mode' "$MANAGED_CONFIG")"
+    [[ "$mode" == "disabled" ]] || { printf 'error: expected disabled starting mode\n' >&2; return 65; }
+    cleanup_task12_sleep_wake_to_disabled() {
+        if [[ -f "$MANAGED_CONFIG" && ! -L "$MANAGED_CONFIG" ]]; then
+            disable_job >/dev/null 2>&1 || true
+            bootout_job >/dev/null 2>&1 || true
+            bootstrap_job >/dev/null 2>&1 || true
+        fi
+    }
+    trap cleanup_task12_sleep_wake_to_disabled EXIT
+    set_dry_run_mode
+    verify_logged_in_dry_run
+    if [[ -n "$SYSTEM_ROOT" ]]; then
+        printf 'timestamp=test event=state-changed pid=1 state=monitoring-disarmed\n' >> "$MANAGED_STDOUT_LOG"
+        evidence_found=1
+        before_pid=1
+    else
+        before_pid="$(pgrep -f '^/Library/PrivilegedHelperTools/macbook-lid-monitor-daemon$')"
+        log_offset="$(stat -f '%z' "$MANAGED_STDOUT_LOG")"
+        printf 'sleep-imminent task=12 scope=sleep-wake pid=%s\n' "$before_pid"
+        /usr/bin/pmset sleepnow
+        for _ in {1..30}; do
+            if dd if="$MANAGED_STDOUT_LOG" bs=1 skip="$log_offset" 2>/dev/null | grep -q 'event=state-changed.*state=monitoring-disarmed'; then
+                evidence_found=1
+                break
+            fi
+            sleep 1
+        done
+    fi
+    [[ "$evidence_found" -eq 1 ]] || { printf 'error: wake-recovery production evidence missing\n' >&2; return 70; }
+    process_count="$({ pgrep -f '^/Library/PrivilegedHelperTools/macbook-lid-monitor-daemon$' || true; } | wc -l | tr -d ' ')"
+    if [[ -z "$SYSTEM_ROOT" ]]; then
+        [[ "$process_count" == 1 ]] || { printf 'error: expected one daemon after wake, got %s\n' "$process_count" >&2; return 70; }
+        [[ "$(pgrep -f '^/Library/PrivilegedHelperTools/macbook-lid-monitor-daemon$')" == "$before_pid" ]] || {
+            printf 'error: daemon PID changed across sleep/wake\n' >&2
+            return 70
+        }
+    fi
+    printf 'verified task=12 scope=sleep-wake wake-evidence=true pid-stable=true\n'
+    disable_job
+    bootout_job
+    bootstrap_job
+    diagnostics
+    trap - EXIT
+    printf 'accepted task=12 scope=sleep-wake final-mode=disabled label=%s\n' "$LAUNCHD_LABEL"
 }
 
 rotate_one_log() {
@@ -665,5 +715,6 @@ case "$1" in
     accept-task12-logged-in) accept_task12_logged_in ;;
     accept-task12-loginwindow-start) accept_task12_loginwindow_start ;;
     accept-task12-loginwindow-finish) accept_task12_loginwindow_finish ;;
+    accept-task12-sleep-wake) accept_task12_sleep_wake ;;
     *) usage ;;
 esac

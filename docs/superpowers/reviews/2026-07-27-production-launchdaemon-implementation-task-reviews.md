@@ -1003,6 +1003,41 @@ After explicit operator recovery, configuration is disabled, the system job is l
 running, last exit code is zero, and no production daemon PID remains. Loginwindow acceptance must
 be retried from the start command; the prior evidence is not accepted.
 
+## Task 12 — Controlled sleep/wake dry-run acceptance
+
+### Implementation
+
+- Added a privacy-safe production transition event when the wake observer enters wake recovery.
+- Added `accept-task12-sleep-wake` as the single approved root command.
+- The command requires the installed daemon to begin disabled, switches to dry-run, verifies one
+  production PID, records the log byte offset, and invokes `/usr/bin/pmset sleepnow`.
+- After wake, it scans only the newly appended log region for the wake-recovery transition, proves
+  the same PID survived the cycle, and restores disabled mode through explicit bootout/bootstrap.
+- An EXIT trap performs the same disabled recovery after any failure.
+
+### Immediate review
+
+The first implementation used `tail -c` to inspect the new log region. That conflicted with the
+existing diagnostics privacy contract forbidding `tail` in the management script.
+
+**Resolution:** Replaced it with offset-bounded `dd` piped to a fixed event matcher. No log content
+is printed to the terminal.
+
+### Verification
+
+- Production composition focused tests: 6 tests, 0 failures.
+- Production management focused tests: 32 tests, 0 failures.
+- Full suite: 177 tests, 0 failures.
+- `bash -n`: passed.
+- `shellcheck -x`: passed.
+- Release production daemon: passed.
+- `git diff --check`: passed.
+
+### Disposition
+
+**Controlled sleep/wake acceptance command approved.** Real execution remains pending the one
+explicit sudo command already authorized by the user.
+
 ## Task 12 — Loginwindow real system acceptance closure
 
 ### Evidence

@@ -133,7 +133,7 @@ final class ProductionDaemonApplication {
             onTransitionEvent: { event in
                 switch event {
                 case .rearmed: sink.emit(.stateChanged(.monitoringArmed, sensorValue: nil))
-                case .disarmed, .recoverySensorUnavailable:
+                case .disarmed, .recoverySensorUnavailable, .wakeRecovery:
                     sink.emit(.stateChanged(.monitoringDisarmed, sensorValue: nil))
                 default: break
                 }

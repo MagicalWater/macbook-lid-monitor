@@ -32,6 +32,18 @@ final class ProductionDaemonCompositionTests: XCTestCase {
         XCTAssertEqual(fixture.stream.stopCount, 1)
     }
 
+    func testWakeTransitionEmitsProductionRecoveryEvidence() throws {
+        let fixture = Fixture(mode: .dryRun, descriptors: [Fixture.exactDescriptor])
+
+        let result = try fixture.application.start()
+        guard case let .running(session) = result else {
+            return XCTFail("expected running session")
+        }
+        fixture.wakeObserver.triggerWake(at: Date(timeIntervalSince1970: 1_001))
+        XCTAssertTrue(fixture.events.events.contains(.stateChanged(.monitoringDisarmed, sensorValue: nil)))
+        session.stop(reason: "test")
+    }
+
     func testEnabledUnknownHardwareFailsBeforeRealRequesterConstruction() {
         let fixture = Fixture(mode: .enabled, descriptors: [])
 
@@ -146,8 +158,10 @@ private final class CompositionStream: HIDReportStreaming, @unchecked Sendable {
 }
 
 private final class CompositionWakeObserver: SystemWakeObserving, @unchecked Sendable {
-    func start(onWake: @escaping @Sendable (Date) -> Void) throws {}
-    func stop() {}
+    private var onWake: (@Sendable (Date) -> Void)?
+    func start(onWake: @escaping @Sendable (Date) -> Void) throws { self.onWake = onWake }
+    func stop() { onWake = nil }
+    func triggerWake(at date: Date) { onWake?(date) }
 }
 
 private final class CompositionScheduler: OneShotScheduling, @unchecked Sendable {
