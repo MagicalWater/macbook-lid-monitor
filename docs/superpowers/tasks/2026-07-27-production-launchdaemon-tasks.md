@@ -19,7 +19,7 @@ Status: Implementation in progress; Tasks 1–11 and Stage C complete; Task 12 l
 | 11 | logs/diagnostics/uninstall — complete | script/docs/tests | rotation/privacy/residual-state | approved and completed | bootout and scoped removal |
 | C | Packaging stage review — complete | reviews/evidence | clean checkout + residual state | completed with zero installed residual | explicit uninstall |
 | 12 | Production dry-run acceptance — complete | validation evidence | logged-in, loginwindow, and real sleep/wake dry-run acceptance complete | completed; separate reboot approval remains for Task 14 | automatic disable/bootout/bootstrap cleanup |
-| 13 | Enabled bounded acceptance — corrected enabled retry ready | validation evidence | dry-run path complete; enabled acceptance now uses pre-call attempt plus wake/PID evidence | enabled retry approved; recovery resleep still requires separate approval | automatic disable/bootout/bootstrap cleanup |
+| 13 | Enabled bounded acceptance — first enabled sleep complete | validation evidence | dry-run path and one real enabled sensor-driven sleep complete; recovery resleep and injected failure remain | first enabled sleep completed; recovery resleep still requires separate approval | automatic disable/bootout/bootstrap cleanup |
 | 14 | Reboot/rollback/uninstall acceptance | validation evidence | boot, rollback, zero residual | **separate reboot and uninstall approvals** | rollback then uninstall |
 | 15 | Docs, tooling disposition, final review | README/docs/tool moves | full clean validation + holistic review | approval if cleanup touches installed state | restore archived tooling from git |
 

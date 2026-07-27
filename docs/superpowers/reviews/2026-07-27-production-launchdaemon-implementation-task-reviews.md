@@ -1297,6 +1297,29 @@ debounce, and requester-attempt path.
 **Corrected enabled acceptance command approved for a fresh separately authorized real cycle.**
 Recovery resleep remains separately gated.
 
+## Task 13 — First enabled real-system sleep closure
+
+### Evidence
+
+- The enabled production daemon armed with PID `74188`.
+- Exactly one pre-call sleep-request attempt was recorded.
+- The IOKit call returned once after the cycle.
+- Wake-recovery evidence was recorded and the same PID survived the sleep/wake cycle.
+- Cleanup restored loaded/disabled state with `process-count=0` and an empty error log.
+
+### Independent re-review
+
+- Mode: disabled.
+- System job: loaded, not running.
+- Last exit code: zero.
+- Production PID: absent.
+- Installed version: `63caafc60230`.
+
+### Disposition
+
+**Task 13 first enabled sensor-driven sleep approved and complete.** Recovery resleep and injected
+failure acceptance remain pending and separately gated.
+
 ## Task 13 — Real-system dry-run path closure
 
 ### Evidence
