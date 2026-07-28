@@ -35,7 +35,7 @@ struct SleepAuthorityLeasePolicy: Equatable, Sendable {
         createIfMissing: false,
         expectedFileOwnerID: 0,
         expectedFileGroupID: 0,
-        expectedFilePermissions: 0o666,
+        expectedFilePermissions: 0o600,
         expectedParentOwnerID: 0,
         expectedParentGroupID: 0,
         rejectsParentGroupOrWorldWrite: true,

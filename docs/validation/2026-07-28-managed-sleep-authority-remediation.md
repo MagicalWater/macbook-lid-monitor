@@ -66,3 +66,32 @@ the user-owned checkout. The fix uses `git -c safe.directory="$REPO_ROOT"` only 
 version and source-commit reads. It does not modify global or system Git configuration. The failed
 attempt left the old installed manifest, partial acceptance, secure lease, disabled mode, and zero
 resident PID unchanged.
+
+## Runtime permission follow-up
+
+The exact remediation deployment created the managed lease correctly as:
+
+```text
+owner=root:wheel
+mode=0600
+links=1
+type=regular file
+```
+
+However, the runtime managed-production policy still expected `0666`. A bounded enabled-once run
+therefore failed open before angle monitoring with `sleep-authority-unavailable`; no real sleep
+request occurred. The runtime contract is now corrected to `0600` and protected by a focused
+regression.
+
+```text
+focused RED: managed policy reported 0666 instead of installed 0600
+focused GREEN: passed
+lease suite: 12 tests, 0 failures
+daemon composition suite: 11 tests, 0 failures
+management suite: 84 tests, 0 failures
+full suite: 270 tests, 0 failures
+live state after rejected enabled-once: loaded, disabled, zero PID
+```
+
+Closure still requires an exact-commit disabled upgrade and a fresh Task 17 acceptance on that
+installed identity.

@@ -1189,3 +1189,55 @@ lease: root:wheel 0600, regular file, link count 1
 **Task 17 approved for the remediated identity.** Open P0 = 0 and Open P1 without disposition = 0.
 Production remains loaded/disabled with zero resident PID. Task 18 remains blocked until the user
 grants a fresh explicit approval for one bounded sensor-driven real-sleep request.
+
+## Task 18 Reopened — Managed lease permission contract mismatch
+
+### Trigger
+
+After remediated Task 17 passed on installed identity
+`7b400c2b3fc02664e7c3e2ada60a478d57038b9a`, the separately approved bounded enabled-once run
+failed before angle monitoring:
+
+```text
+verified deployment-dry-run acceptance
+mode=enabled
+daemon pid=705 started
+event=degraded code=sleep-authority-unavailable
+error: expected one enabled daemon before close, got 0
+cleanup restored disabled and zero PID
+```
+
+No sensor-driven sleep request occurred.
+
+### Root cause
+
+The installer and managed-file verifier correctly create and require
+`sleep-authority.lock` as `root:wheel 0600`, but
+`SleepAuthorityLeasePolicy.managedProduction` still expected `0666`. Enabled startup therefore
+classified the secure installed lease as `unsafeMetadata`, which the daemon deliberately collapsed
+to `sleep-authority-unavailable` and failed open.
+
+### Remediation
+
+- Change the managed production policy from `0666` to `0600`.
+- Add a regression that binds the runtime policy to the installed lease permission contract.
+- Preserve foreground fallback behavior; only the root-owned managed production lease changes.
+
+### TDD and verification
+
+```text
+managed permission contract RED: Optional(438) != Optional(384)
+managed permission contract GREEN: passed
+SleepAuthorityLeaseTests: 12 tests, 0 failures
+ProductionDaemonCompositionTests: 11 tests, 0 failures
+management suite: 84 tests, 0 failures
+full suite: 270 tests, 0 failures
+bash -n / shellcheck -x / git diff --check: passed
+live safety state: loaded, disabled, zero PID
+```
+
+### Current disposition
+
+The payload fix is implementation-complete but not yet installed. An exact-commit disabled upgrade
+is required. That upgrade must invalidate the current Task 17 acceptance, so Task 17 must be rerun
+on the new installed identity before Task 18 can receive another bounded real-sleep approval.

@@ -4,6 +4,10 @@ import XCTest
 @testable import LidMonitorCore
 
 final class SleepAuthorityLeaseTests: XCTestCase {
+    func testManagedProductionPolicyMatchesInstalledLeasePermissions() {
+        XCTAssertEqual(SleepAuthorityLeasePolicy.managedProduction.expectedFilePermissions, 0o600)
+    }
+
     func testSecondLeaseIsRejectedUntilFirstIsReleased() throws {
         let path = FileManager.default.temporaryDirectory
             .appendingPathComponent("macbook-lid-monitor-authority-\(UUID().uuidString)").path
