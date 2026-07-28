@@ -1131,3 +1131,45 @@ The repository fix is implementation-complete but Task 16 remains reopened until
 package is prepared and upgraded on the real Mac. That upgrade invalidates old deployment
 acceptance, so Task 17 must be rerun before Task 18 receives a fresh real-sleep approval. Live state
 after the rejected Task 18 attempt is loaded/disabled/zero PID with last exit code zero.
+
+## Task 17 Reopened — PID-bound readiness gate
+
+### Trigger
+
+After the remediated production identity was installed, repeated Task 17 dry-run attempts reached
+`monitoring-armed` but manual lid movement frequently occurred during startup cooldown or after the
+original 180-second interaction window had already expired. The management command printed
+`armed` immediately after process-count verification, before the daemon had emitted PID-specific
+`monitoring-armed` evidence.
+
+### Root cause
+
+The operator-facing readiness message and timeout were bound to daemon process existence rather
+than the state machine readiness transition. Graphical authorization, startup cooldown, and chat
+round trips consumed the interaction window even though the lid-angle HID path itself was healthy.
+Raw diagnostics independently proved 31 valid samples from 158° down to 63° and back to 157°.
+
+### Remediation
+
+- Capture the unique dry-run daemon PID.
+- Wait up to 60 seconds for that PID's `monitoring-armed` transition.
+- Fail safe with `monitoring-armed readiness missing` if readiness is not observed.
+- Record a fresh log offset only after readiness.
+- Print `ready`, not `armed`, and start the 180-second manual window from that point.
+- Bind candidate, debounce, request-attempt, and would-sleep evidence to the same PID.
+
+### TDD and verification
+
+```text
+readiness contract RED: 3 focused static assertions failed
+readiness contract GREEN: focused static test passed
+sandbox dry-run lifecycle: passed
+management suite: 84 tests, 0 failures
+full suite: 269 tests, 0 failures
+```
+
+### Current disposition
+
+This is a management-only change; the installed daemon payload and production identity remain
+`7b400c2b3fc02664e7c3e2ada60a478d57038b9a`. Production remains loaded/disabled/zero PID. Task 17
+must be rerun through the new PID-ready gate before Task 18 can resume.

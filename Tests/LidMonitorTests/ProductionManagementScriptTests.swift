@@ -679,6 +679,9 @@ final class ProductionManagementScriptTests: XCTestCase {
         XCTAssertTrue(text.contains("expected exactly one sleep-request-attempted event"))
         XCTAssertTrue(text.contains("expected exactly one would-sleep event"))
         XCTAssertTrue(text.contains("trap cleanup_task13_dry_run_path_to_disabled EXIT"))
+        XCTAssertTrue(text.contains("monitoring-armed readiness missing"))
+        XCTAssertTrue(text.contains("ready task=13 scope=dry-run-path"))
+        XCTAssertTrue(text.contains("event=transition.*pid=$daemon_pid.*name=monitoring-armed"))
     }
 
     func testInstallRejectsManagedPathSymlink() throws {

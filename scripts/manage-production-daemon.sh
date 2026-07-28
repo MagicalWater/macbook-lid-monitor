@@ -643,7 +643,7 @@ accept_task13_recovery_resleep() {
 
 accept_task13_dry_run_path() {
     require_root_for_system
-    local mode log_offset candidate_count debounce_count attempt_count would_sleep_count process_count
+    local mode startup_log_offset log_offset daemon_pid readiness_count candidate_count debounce_count attempt_count would_sleep_count process_count
     mode="$(/usr/libexec/PlistBuddy -c 'Print :Mode' "$MANAGED_CONFIG")"
     [[ "$mode" == "disabled" ]] || { printf 'error: expected disabled starting mode\n' >&2; return 65; }
     cleanup_task13_dry_run_path_to_disabled() {
@@ -659,32 +659,43 @@ accept_task13_dry_run_path() {
         verify_package
         upgrade_package
     fi
+    mkdir -p -- "$MANAGED_LOG_DIR"
+    touch "$MANAGED_STDOUT_LOG"
+    startup_log_offset="$(stat -f '%z' "$MANAGED_STDOUT_LOG")"
     set_dry_run_mode
     deployment_test_checkpoint dry-run
     verify_logged_in_dry_run
     if [[ -n "$SYSTEM_ROOT" ]]; then
-        mkdir -p -- "$MANAGED_LOG_DIR"
-        touch "$MANAGED_STDOUT_LOG"
+        daemon_pid=1
+        printf 'timestamp=test event=transition pid=%s name=monitoring-armed\n' "$daemon_pid" >> "$MANAGED_STDOUT_LOG"
+        readiness_count=1
         log_offset="$(stat -f '%z' "$MANAGED_STDOUT_LOG")"
         {
-            printf 'timestamp=test event=transition pid=1 name=candidate-started\n'
-            printf 'timestamp=test event=transition pid=1 name=debounce-elapsed\n'
-            printf 'timestamp=test event=transition pid=1 name=sleep-request-attempted\n'
-            printf 'timestamp=test event=transition pid=1 name=would-sleep\n'
+            printf 'timestamp=test event=transition pid=%s name=candidate-started\n' "$daemon_pid"
+            printf 'timestamp=test event=transition pid=%s name=debounce-elapsed\n' "$daemon_pid"
+            printf 'timestamp=test event=transition pid=%s name=sleep-request-attempted\n' "$daemon_pid"
+            printf 'timestamp=test event=transition pid=%s name=would-sleep\n' "$daemon_pid"
         } >> "$MANAGED_STDOUT_LOG"
     else
+        daemon_pid="$(pgrep -f '^/Library/PrivilegedHelperTools/macbook-lid-monitor-daemon$')"
+        for _ in {1..60}; do
+            readiness_count="$(dd if="$MANAGED_STDOUT_LOG" bs=1 skip="$startup_log_offset" 2>/dev/null | grep -c "event=transition.*pid=$daemon_pid.*name=monitoring-armed" || true)"
+            [[ "$readiness_count" -ge 1 ]] && break
+            sleep 1
+        done
+        [[ "$readiness_count" -ge 1 ]] || { printf 'error: monitoring-armed readiness missing\n' >&2; return 70; }
         log_offset="$(stat -f '%z' "$MANAGED_STDOUT_LOG")"
-        printf 'armed task=13 scope=dry-run-path action=move-lid-below-68-degrees-and-hold-2-seconds-within-180-seconds\n'
+        printf 'ready task=13 scope=dry-run-path pid=%s action=move-lid-below-68-degrees-and-hold-2-seconds-within-180-seconds\n' "$daemon_pid"
         for _ in {1..180}; do
-            would_sleep_count="$(dd if="$MANAGED_STDOUT_LOG" bs=1 skip="$log_offset" 2>/dev/null | grep -c 'event=transition.*name=would-sleep' || true)"
+            would_sleep_count="$(dd if="$MANAGED_STDOUT_LOG" bs=1 skip="$log_offset" 2>/dev/null | grep -c "event=transition.*pid=$daemon_pid.*name=would-sleep" || true)"
             [[ "$would_sleep_count" -ge 1 ]] && break
             sleep 1
         done
     fi
-    candidate_count="$(dd if="$MANAGED_STDOUT_LOG" bs=1 skip="$log_offset" 2>/dev/null | grep -c 'event=transition.*name=candidate-started' || true)"
-    debounce_count="$(dd if="$MANAGED_STDOUT_LOG" bs=1 skip="$log_offset" 2>/dev/null | grep -c 'event=transition.*name=debounce-elapsed' || true)"
-    attempt_count="$(dd if="$MANAGED_STDOUT_LOG" bs=1 skip="$log_offset" 2>/dev/null | grep -c 'event=transition.*name=sleep-request-attempted' || true)"
-    would_sleep_count="$(dd if="$MANAGED_STDOUT_LOG" bs=1 skip="$log_offset" 2>/dev/null | grep -c 'event=transition.*name=would-sleep' || true)"
+    candidate_count="$(dd if="$MANAGED_STDOUT_LOG" bs=1 skip="$log_offset" 2>/dev/null | grep -c "event=transition.*pid=$daemon_pid.*name=candidate-started" || true)"
+    debounce_count="$(dd if="$MANAGED_STDOUT_LOG" bs=1 skip="$log_offset" 2>/dev/null | grep -c "event=transition.*pid=$daemon_pid.*name=debounce-elapsed" || true)"
+    attempt_count="$(dd if="$MANAGED_STDOUT_LOG" bs=1 skip="$log_offset" 2>/dev/null | grep -c "event=transition.*pid=$daemon_pid.*name=sleep-request-attempted" || true)"
+    would_sleep_count="$(dd if="$MANAGED_STDOUT_LOG" bs=1 skip="$log_offset" 2>/dev/null | grep -c "event=transition.*pid=$daemon_pid.*name=would-sleep" || true)"
     [[ "$candidate_count" -ge 1 ]] || { printf 'error: candidate-started evidence missing\n' >&2; return 70; }
     [[ "$debounce_count" -ge 1 ]] || { printf 'error: debounce-elapsed evidence missing\n' >&2; return 70; }
     [[ "$attempt_count" == 1 ]] || { printf 'error: expected exactly one sleep-request-attempted event, got %s\n' "$attempt_count" >&2; return 70; }

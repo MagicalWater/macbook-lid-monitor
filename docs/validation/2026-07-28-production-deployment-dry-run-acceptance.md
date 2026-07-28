@@ -79,3 +79,32 @@ acceptance-state=partial
 lease-state=missing
 crash-state=closed
 ```
+
+## 2026-07-28 remediated-identity rerun note
+
+The production identity later changed to
+`7b400c2b3fc02664e7c3e2ada60a478d57038b9a` after managed lease and provenance remediation. The
+historical acceptance above no longer applies to that identity.
+
+Initial rerun attempts exposed an operator timing race: the command printed `armed` when the daemon
+process existed, not when its state machine had emitted PID-specific `monitoring-armed`. A separate
+raw diagnostic proved the hinge sensor remained healthy:
+
+```text
+samples=31
+minimum-angle=63°
+maximum-angle=158°
+returned-angle=157°
+```
+
+The stable gate now waits for the unique daemon PID's `monitoring-armed` transition, resets the log
+offset at readiness, then starts the 180-second interaction window. All acceptance evidence is
+filtered to that same PID.
+
+```text
+focused readiness regression: passed
+sandbox dry-run lifecycle: passed
+management suite: 84 tests, 0 failures
+full suite: 269 tests, 0 failures
+production before rerun: loaded, disabled, zero PID
+```
