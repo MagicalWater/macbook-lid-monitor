@@ -1238,6 +1238,40 @@ live safety state: loaded, disabled, zero PID
 
 ### Current disposition
 
-The payload fix is implementation-complete but not yet installed. An exact-commit disabled upgrade
-is required. That upgrade must invalidate the current Task 17 acceptance, so Task 17 must be rerun
-on the new installed identity before Task 18 can receive another bounded real-sleep approval.
+The payload fix was installed as identity
+`0885d54dbf133fdd8620d4a38379a8ed64819430`, which invalidated the previous acceptance. Task 17
+was rerun and passed against that identity before the user granted a new bounded real-sleep
+approval.
+
+### Final enabled-once acceptance evidence
+
+The approved sensor-driven run used daemon PID `93950` and completed the full installed path:
+
+```text
+monitoring-armed: observed
+candidate-started: observed
+debounce-elapsed: observed
+sleep-request-attempted: exactly 1
+sleep-requested: exactly 1
+wake evidence: true
+PID stable across sleep/wake: true
+deployment-enabled-once acceptance: pass
+```
+
+Cleanup then restored the production system to:
+
+```text
+mode=disabled
+job=loaded, not running
+process-count=0
+last exit code=0
+integrity=valid
+lease=root:wheel 0600, regular file, link count 1
+```
+
+### Decision
+
+**Task 18 approved.** Open P0 = 0 and Open P1 without disposition = 0. The bounded
+sensor-driven sleep request executed exactly once, wake continuity was observed on the same PID,
+acceptance was recorded for installed identity `0885d54dbf133fdd8620d4a38379a8ed64819430`, and
+production finished loaded/disabled with zero resident PID.

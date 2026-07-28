@@ -93,5 +93,31 @@ full suite: 270 tests, 0 failures
 live state after rejected enabled-once: loaded, disabled, zero PID
 ```
 
-Closure still requires an exact-commit disabled upgrade and a fresh Task 17 acceptance on that
-installed identity.
+The corrected payload was installed as:
+
+```text
+source commit: 0885d54dbf133fdd8620d4a38379a8ed64819430
+version: 0885d54dbf13
+lease: root:wheel 0600, regular file, link count 1
+post-upgrade state: loaded, disabled, zero PID
+```
+
+Task 17 was rerun against that identity and recorded `deployment-dry-run=pass`. A separately
+approved enabled-once run then acquired the managed lease, observed lid angle below the threshold,
+debounced for two seconds, issued exactly one real sleep request, and returned from sleep on the
+same daemon PID.
+
+```text
+daemon PID: 93950
+candidate-started: present
+debounce-elapsed: present
+sleep-request-attempted: 1
+sleep-requested: 1
+wake evidence: true
+PID stable: true
+recorded acceptance: deployment-enabled-once=pass
+final state: loaded, disabled, zero PID, last exit code 0
+```
+
+The managed sleep-authority incident is closed for the installed identity
+`0885d54dbf133fdd8620d4a38379a8ed64819430`.

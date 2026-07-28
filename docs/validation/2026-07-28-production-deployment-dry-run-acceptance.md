@@ -131,3 +131,23 @@ lease: root:wheel, 0600, regular file, link count 1
 This was dry-run only; no real sleep request was issued. Task 17 is accepted for the remediated
 identity. Task 18 still requires a separate fresh approval because it grants one bounded
 sensor-driven real-sleep request.
+
+## Runtime-policy identity rerun
+
+After the managed lease runtime permission policy was corrected and installed as
+`0885d54dbf133fdd8620d4a38379a8ed64819430`, the PID-ready dry-run acceptance was rerun with daemon
+PID `87847`.
+
+```text
+candidate-started: present
+debounce-elapsed: present
+sleep-request-attempted: exactly 1
+would-sleep: exactly 1
+recorded acceptance: deployment-dry-run=pass
+final mode: disabled
+final process-count: 0
+lease: root:wheel 0600, regular file, link count 1
+```
+
+This fresh acceptance satisfied the prerequisite for the later separately approved enabled-once
+real-sleep acceptance.
