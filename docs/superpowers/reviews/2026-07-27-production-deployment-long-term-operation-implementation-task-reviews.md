@@ -1275,3 +1275,54 @@ lease=root:wheel 0600, regular file, link count 1
 sensor-driven sleep request executed exactly once, wake continuity was observed on the same PID,
 acceptance was recorded for installed identity `0885d54dbf133fdd8620d4a38379a8ed64819430`, and
 production finished loaded/disabled with zero resident PID.
+
+
+## Task 19 — Bounded recovery-resleep acceptance
+
+### Approval and execution
+
+The user granted a fresh Task 19 approval. An initial run reached `monitoring-armed` but produced no
+close candidate or sleep attempt and was correctly rejected; cleanup returned production to
+loaded/disabled/zero PID. The user then granted a new explicit approval for the rerun.
+
+### Accepted evidence
+
+The accepted run used installed identity
+`0885d54dbf133fdd8620d4a38379a8ed64819430` and daemon PID `27454`:
+
+```text
+monitoring-armed: observed
+candidate-started: observed
+debounce-elapsed: observed
+sleep-request-attempted: exactly 2
+sleep-requested: exactly 2
+recovery-resleep: exactly 1
+wake evidence: 2 monitoring-disarmed transitions
+third sleep attempt: absent
+PID stable across both sleep/wake cycles: true
+deployment-recovery-resleep acceptance: pass
+```
+
+### Immediate review
+
+- Prerequisite Task 17 and Task 18 acceptance identity matched the installed set: pass.
+- The first sleep request followed the sensor candidate and two-second debounce: pass.
+- Wake below the reopen threshold produced exactly one bounded recovery transition: pass.
+- The recovery transition produced exactly one second sleep request: pass.
+- No third sleep request occurred before bounded cleanup: pass.
+- Both sleep/wake cycles retained PID `27454`: pass.
+- Command verification completed before acceptance recording: pass.
+- Cleanup restored loaded/disabled/zero PID with last exit code zero: pass.
+- No persistent activation, reboot, or push occurred: pass.
+
+### Evidence
+
+See `docs/validation/2026-07-28-production-recovery-resleep-acceptance.md`.
+
+### Decision
+
+**Task 19 approved.** Open P0 = 0 and Open P1 without disposition = 0. Exactly two total sleep
+attempts, exactly one recovery-resleep transition, no third attempt, and PID continuity were
+proved against installed identity `0885d54dbf133fdd8620d4a38379a8ed64819430`. Production remains
+loaded/disabled with zero resident PID. Task 20 requires a separate explicit approval because it
+will leave real sleep authority persistently enabled after the command exits.
