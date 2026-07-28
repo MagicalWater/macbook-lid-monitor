@@ -1377,3 +1377,43 @@ See `docs/validation/2026-07-28-production-persistent-activation.md`.
 active against installed identity `0885d54dbf133fdd8620d4a38379a8ed64819430`, with one armed daemon
 and complete acceptance evidence. Task 21 remains separately approval-gated because it prepares and
 verifies an enabled reboot and pre-login cycle. Production must remain enabled/running meanwhile.
+
+## Task 21 Prerequisite Remediation — Enabled reboot acceptance interface
+
+### Finding
+
+#### T21-P0 — Historical reboot commands contradicted final enabled-state authority
+
+The approved Task 21 preparation could not safely begin because the repository exposed only the
+historical Task 14 reboot flow, which requires disabled mode and finishes with rollback/uninstall.
+Running it would have violated the Milestone 16 Spec, Plan, Task register, and final product state.
+
+**Resolution:** add separately named `deployment-reboot-start` and
+`deployment-reboot-finish` commands with identity-bound reboot state, a temporary one-shot
+pre-login observer, changed-boot/PID/health verification, strict baseline, bounded observer cleanup,
+and a final enabled/running state. Historical Task 14 commands remain unchanged.
+
+### Re-review
+
+- New start rejects unhealthy/incomplete state before observer artifacts: pass.
+- New commands cannot upgrade, rollback, uninstall, disable, or reboot: pass.
+- Observer records fixed-path pre-login process, identity, mode, and health evidence: pass.
+- Finish requires changed boot, new one PID, armed matching health, and complete identity: pass.
+- Same-boot and logged-in-only evidence reject without disabling: pass.
+- Successful finish removes only temporary Task 21 artifacts and remains enabled: pass.
+- Live production remained enabled/running on PID `33458` throughout remediation: pass.
+
+### Verification
+
+```text
+focused Task 21: 6 tests, 0 failures
+management suite: 89 tests, 0 failures
+full suite: 275 tests, 0 failures
+bash -n / shellcheck -x / plist lint / git diff --check: pass
+live state: enabled, running, one PID 33458, monitoring-armed
+```
+
+### Decision
+
+**Task 21 prerequisite remediation approved.** No Critical/P0/P1 finding remains. Task 21 stays
+open but its real reboot preparation flow is now implementable through the new commands.
