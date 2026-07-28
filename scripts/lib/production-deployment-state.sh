@@ -233,3 +233,62 @@ verify_deployment_reboot_state() {
     }
     printf 'verified deployment-reboot-state boot-changed=true start=%s current=%s\n' "$start_boot" "$current_boot"
 }
+
+prepare_enabled_reboot_state() {
+    local boot_epoch=$1 prepared_pid=$2 prepared_at
+    prepared_at="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+    write_deployment_reboot_state "$boot_epoch"
+    /usr/libexec/PlistBuddy -c "Add :PreparedPID string $prepared_pid" "$MANAGED_REBOOT_STATE"
+    /usr/libexec/PlistBuddy -c "Add :PreparedAt string $prepared_at" "$MANAGED_REBOOT_STATE"
+    chmod 0600 "$MANAGED_REBOOT_STATE"
+    if [[ -z "$SYSTEM_ROOT" ]]; then chown root:wheel "$MANAGED_REBOOT_STATE"; fi
+}
+
+record_reboot_observer_evidence() {
+    local boot_epoch=$1 console_user=$2 job_state=$3 process_count=$4 pid=$5 mode=$6 health_state=$7 health_pid=$8 observed_at
+    observed_at="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+    atomic_write_deployment_plist "$MANAGED_REBOOT_OBSERVER_EVIDENCE" '
+import plistlib, sys
+(path, boot, console, job, count, pid, mode, health, health_pid, observed, commit, version, profile)=sys.argv[1:14]
+value={"SchemaVersion":1,"BootEpoch":int(boot),"ConsoleUser":console,"JobState":job,
+"ProcessCount":int(count),"PID":pid,"Mode":mode,"HealthState":health,"HealthPID":health_pid,
+"ObservedAt":observed,"SourceCommit":commit,"Version":version,"HardwareProfileID":profile}
+with open(path,"wb") as handle: plistlib.dump(value,handle,sort_keys=True)
+' "$boot_epoch" "$console_user" "$job_state" "$process_count" "$pid" "$mode" "$health_state" "$health_pid" "$observed_at" \
+        "$(deployment_identity_value SourceCommit)" "$(manifest_value Version)" "$(deployment_identity_value HardwareProfileID)"
+}
+
+verify_reboot_observer_evidence() {
+    verify_managed_metadata "$MANAGED_REBOOT_OBSERVER_EVIDENCE" regular "$(managed_expected_owner)" "$(managed_expected_group)" 600 1 >/dev/null 2>&1 || {
+        deployment_state_error deployment-reboot-invalid observer-metadata; return $?;
+    }
+    local boot current_boot console job count pid mode commit version profile health health_pid expected_prepared
+    boot="$(/usr/libexec/PlistBuddy -c 'Print :BootEpoch' "$MANAGED_REBOOT_OBSERVER_EVIDENCE" 2>/dev/null || true)"
+    current_boot="$(deployment_boot_epoch)" || return $?
+    console="$(/usr/libexec/PlistBuddy -c 'Print :ConsoleUser' "$MANAGED_REBOOT_OBSERVER_EVIDENCE" 2>/dev/null || true)"
+    job="$(/usr/libexec/PlistBuddy -c 'Print :JobState' "$MANAGED_REBOOT_OBSERVER_EVIDENCE" 2>/dev/null || true)"
+    count="$(/usr/libexec/PlistBuddy -c 'Print :ProcessCount' "$MANAGED_REBOOT_OBSERVER_EVIDENCE" 2>/dev/null || true)"
+    pid="$(/usr/libexec/PlistBuddy -c 'Print :PID' "$MANAGED_REBOOT_OBSERVER_EVIDENCE" 2>/dev/null || true)"
+    mode="$(/usr/libexec/PlistBuddy -c 'Print :Mode' "$MANAGED_REBOOT_OBSERVER_EVIDENCE" 2>/dev/null || true)"
+    commit="$(/usr/libexec/PlistBuddy -c 'Print :SourceCommit' "$MANAGED_REBOOT_OBSERVER_EVIDENCE" 2>/dev/null || true)"
+    version="$(/usr/libexec/PlistBuddy -c 'Print :Version' "$MANAGED_REBOOT_OBSERVER_EVIDENCE" 2>/dev/null || true)"
+    profile="$(/usr/libexec/PlistBuddy -c 'Print :HardwareProfileID' "$MANAGED_REBOOT_OBSERVER_EVIDENCE" 2>/dev/null || true)"
+    health="$(/usr/libexec/PlistBuddy -c 'Print :HealthState' "$MANAGED_REBOOT_OBSERVER_EVIDENCE" 2>/dev/null || true)"
+    health_pid="$(/usr/libexec/PlistBuddy -c 'Print :HealthPID' "$MANAGED_REBOOT_OBSERVER_EVIDENCE" 2>/dev/null || true)"
+    expected_prepared="$(/usr/libexec/PlistBuddy -c 'Print :PreparedPID' "$MANAGED_REBOOT_STATE" 2>/dev/null || true)"
+    [[ "$boot" == "$current_boot" ]] || { deployment_state_error deployment-reboot-invalid observer-boot; return $?; }
+    case "$console" in root|loginwindow|_mbsetupuser) ;; *) deployment_state_error deployment-reboot-invalid observer-not-prelogin; return $? ;; esac
+    [[ "$job" == loaded && "$count" == 1 && -n "$pid" && "$pid" != "$expected_prepared" ]] || { deployment_state_error deployment-reboot-invalid observer-process; return $?; }
+    [[ "$mode" == enabled ]] || { deployment_state_error deployment-reboot-invalid observer-mode; return $?; }
+    [[ "$commit" == "$(deployment_identity_value SourceCommit)" && "$version" == "$(manifest_value Version)" && "$profile" == "$(deployment_identity_value HardwareProfileID)" ]] || { deployment_state_error deployment-reboot-invalid observer-identity; return $?; }
+    [[ "$health" == monitoring-armed && "$health_pid" == "$pid" ]] || { deployment_state_error deployment-reboot-invalid observer-health; return $?; }
+    printf 'verified reboot-observer pre-login=true pid=%s boot-epoch=%s\n' "$pid" "$boot"
+}
+
+remove_enabled_reboot_artifacts() {
+    assert_managed_path_safe "$MANAGED_REBOOT_STATE"
+    assert_managed_path_safe "$MANAGED_REBOOT_OBSERVER_EVIDENCE"
+    assert_managed_path_safe "$MANAGED_REBOOT_OBSERVER"
+    assert_managed_path_safe "$MANAGED_REBOOT_OBSERVER_PLIST"
+    rm -f -- "$MANAGED_REBOOT_STATE" "$MANAGED_REBOOT_OBSERVER_EVIDENCE" "$MANAGED_REBOOT_OBSERVER" "$MANAGED_REBOOT_OBSERVER_PLIST"
+}

@@ -1751,8 +1751,10 @@ final class ProductionManagementScriptTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: support.appendingPathComponent("deployment-reboot.plist").path))
         XCTAssertTrue(FileManager.default.fileExists(atPath: support.appendingPathComponent("reboot-observer-evidence.plist").path))
 
+        try writeHealthFixture(at: health, state: "monitoring-armed", mode: "enabled", pid: 5252)
         var finish = base
         finish["MLM_TEST_BOOT_EPOCH"] = "200"
+        finish["MLM_TEST_PROCESS_IDS"] = "5252"
         finish["MLM_TEST_REBOOT_OBSERVER_CONSOLE_USER"] = "root"
         try runScript("deployment-reboot-finish", environment: finish)
 
@@ -1784,6 +1786,51 @@ final class ProductionManagementScriptTests: XCTestCase {
         try runScript("deployment-reboot-start", environment: environment)
         let failure = try runScriptFailure("deployment-reboot-finish", environment: environment)
         XCTAssertTrue(failure.output.contains("reboot-not-detected"), failure.output)
+        let config = sandbox.appendingPathComponent("Library/Application Support/MacBookLidMonitor/config.plist")
+        XCTAssertEqual(try ProductionConfigurationDecoder().decode(Data(contentsOf: config)).mode, .enabled)
+    }
+
+    func testDeploymentRebootObserverHasFixedOneShotPreLoginContract() throws {
+        let observer = try String(contentsOf: root.appendingPathComponent("scripts/lib/production-reboot-observer.sh"), encoding: .utf8)
+        let plist = try String(contentsOf: root.appendingPathComponent("packaging/launchd/com.crazydennies.macbook-lid-monitor.reboot-observer.plist"), encoding: .utf8)
+        XCTAssertTrue(observer.contains("/Library/Application Support/MacBookLidMonitor"))
+        XCTAssertTrue(observer.contains("reboot-observer-evidence.plist"))
+        XCTAssertTrue(observer.contains("health_state"))
+        XCTAssertTrue(observer.contains("console_user"))
+        XCTAssertTrue(plist.contains("RunAtLoad"))
+        XCTAssertFalse(plist.contains("KeepAlive"))
+        XCTAssertFalse(observer.contains("shutdown -r"))
+        XCTAssertFalse(observer.contains("/sbin/reboot"))
+        XCTAssertFalse(observer.contains("pmset"))
+    }
+
+    func testDeploymentRebootFinishRejectsLoggedInObserverWithoutDisabling() throws {
+        let sandbox = root.appendingPathComponent(".build/production-enabled-reboot-logged-in-root")
+        try? FileManager.default.removeItem(at: sandbox)
+        defer { try? FileManager.default.removeItem(at: sandbox) }
+        try seedStaging()
+        try runScript("install", environment: ["MLM_TEST_ROOT": sandbox.path])
+        try runScript("bootstrap", environment: ["MLM_TEST_ROOT": sandbox.path])
+        for command in ["deployment-dry-run", "deployment-enabled-once", "deployment-recovery-resleep"] {
+            try runScript(command, environment: ["MLM_TEST_ROOT": sandbox.path])
+        }
+        try runScript("activate", environment: ["MLM_TEST_ROOT": sandbox.path])
+        let health = sandbox.appendingPathComponent("Library/Application Support/MacBookLidMonitor/health.plist")
+        try writeHealthFixture(at: health, state: "monitoring-armed", mode: "enabled", pid: 4242)
+        let start = [
+            "MLM_TEST_ROOT": sandbox.path,
+            "MLM_TEST_JOB_STATE": "loaded",
+            "MLM_TEST_PROCESS_IDS": "4242",
+            "MLM_TEST_BOOT_EPOCH": "100",
+        ]
+        try runScript("deployment-reboot-start", environment: start)
+        try writeHealthFixture(at: health, state: "monitoring-armed", mode: "enabled", pid: 5252)
+        var finish = start
+        finish["MLM_TEST_BOOT_EPOCH"] = "200"
+        finish["MLM_TEST_PROCESS_IDS"] = "5252"
+        finish["MLM_TEST_REBOOT_OBSERVER_CONSOLE_USER"] = "water"
+        let failure = try runScriptFailure("deployment-reboot-finish", environment: finish)
+        XCTAssertTrue(failure.output.contains("observer-not-prelogin"), failure.output)
         let config = sandbox.appendingPathComponent("Library/Application Support/MacBookLidMonitor/config.plist")
         XCTAssertEqual(try ProductionConfigurationDecoder().decode(Data(contentsOf: config)).mode, .enabled)
     }

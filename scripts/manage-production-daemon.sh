@@ -12,7 +12,7 @@ source "$SCRIPT_DIR/lib/production-deployment-state.sh"
 source "$SCRIPT_DIR/lib/production-observability.sh"
 
 usage() {
-    printf '%s\n' 'usage: manage-production-daemon.sh prepare|verify|install|bootstrap|status|stop|bootout|disable|dry-run|deployment-dry-run|deployment-dry-run-reopen|deployment-dry-run-sleep-wake|deployment-enabled-once|deployment-recovery-resleep|activate|upgrade|rollback|reset-crash-budget|rotate-logs|diagnostics|operational-baseline|uninstall|accept-task9|accept-task10|accept-task11|accept-task12-logged-in|accept-task12-loginwindow-start|accept-task12-loginwindow-finish|accept-task12-sleep-wake|accept-task13-dry-run-path|accept-task13-enabled-once|accept-task13-recovery-resleep|accept-task14-reboot-start|accept-task14-reboot-finish' >&2
+    printf '%s\n' 'usage: manage-production-daemon.sh prepare|verify|install|bootstrap|status|stop|bootout|disable|dry-run|deployment-dry-run|deployment-dry-run-reopen|deployment-dry-run-sleep-wake|deployment-enabled-once|deployment-recovery-resleep|deployment-reboot-start|deployment-reboot-finish|activate|upgrade|rollback|reset-crash-budget|rotate-logs|diagnostics|operational-baseline|uninstall|accept-task9|accept-task10|accept-task11|accept-task12-logged-in|accept-task12-loginwindow-start|accept-task12-loginwindow-finish|accept-task12-sleep-wake|accept-task13-dry-run-path|accept-task13-enabled-once|accept-task13-recovery-resleep|accept-task14-reboot-start|accept-task14-reboot-finish' >&2
     exit 64
 }
 
@@ -735,6 +735,69 @@ deployment_recovery_resleep() {
     record_deployment_acceptance deployment-recovery-resleep pass
 }
 
+deployment_reboot_preflight() {
+    verify_installed_set
+    verify_target_hardware
+    verify_deployment_acceptance deployment-dry-run deployment-enabled-once deployment-recovery-resleep
+    local mode job pids health crash
+    mode="$(/usr/libexec/PlistBuddy -c 'Print :Mode' "$MANAGED_CONFIG")"
+    [[ "$mode" == enabled ]] || { printf 'error=deployment-reboot-invalid reason=mode\n' >&2; return 65; }
+    job="$(job_state_value)"
+    [[ "$job" == loaded ]] || { printf 'error=deployment-reboot-invalid reason=job\n' >&2; return 65; }
+    pids="$(process_id_lines)"
+    [[ "$(printf '%s\n' "$pids" | awk 'NF {count += 1} END {print count + 0}')" == 1 ]] || { printf 'error=deployment-reboot-invalid reason=process-count\n' >&2; return 65; }
+    health="$(health_status_lines)"
+    [[ "$health" == *'health_state=monitoring-armed'* && "$health" == *'health_mode=enabled'* && "$health" == *"health_pid=$pids"* ]] || { printf 'error=deployment-reboot-invalid reason=health\n' >&2; return 65; }
+    if [[ -n "$SYSTEM_ROOT" ]]; then
+        crash="crash_state=${MLM_TEST_CRASH_STATE:-closed}"
+    else
+        [[ -z "${MLM_TEST_CRASH_STATE:-}" ]] || { printf 'error=test-hook-production-disabled reason=reboot-crash\n' >&2; return 65; }
+        crash="$(crash_budget_status_lines)"
+    fi
+    [[ "$crash" == *'crash_state=closed'* ]] || { printf 'error=deployment-reboot-invalid reason=crash\n' >&2; return 65; }
+    verify_managed_sleep_authority
+}
+
+deployment_reboot_start() {
+    require_root_for_system
+    deployment_reboot_preflight
+    local boot_epoch pid
+    boot_epoch="$(deployment_boot_epoch)"
+    pid="$(process_id_lines)"
+    prepare_enabled_reboot_state "$boot_epoch" "$pid"
+    if [[ -n "$SYSTEM_ROOT" ]]; then
+        record_reboot_observer_evidence "$boot_epoch" "${MLM_TEST_REBOOT_OBSERVER_CONSOLE_USER:-root}" loaded 1 "$pid" enabled monitoring-armed "$pid"
+    else
+        assert_regular_source "$SOURCE_REBOOT_OBSERVER"
+        assert_regular_source "$SOURCE_REBOOT_OBSERVER_PLIST"
+        install -m 0700 "$SOURCE_REBOOT_OBSERVER" "$MANAGED_REBOOT_OBSERVER"
+        install -m 0644 "$SOURCE_REBOOT_OBSERVER_PLIST" "$MANAGED_REBOOT_OBSERVER_PLIST"
+        chown root:wheel "$MANAGED_REBOOT_OBSERVER" "$MANAGED_REBOOT_OBSERVER_PLIST"
+        launchctl bootout "system/$REBOOT_OBSERVER_LABEL" >/dev/null 2>&1 || true
+        launchctl bootstrap system "$MANAGED_REBOOT_OBSERVER_PLIST"
+    fi
+    deployment_reboot_preflight
+    printf 'armed deployment-reboot-start boot-epoch=%s pid=%s action=restart-mac-manually-and-remain-at-loginwindow\n' "$boot_epoch" "$pid"
+}
+
+deployment_reboot_finish() {
+    require_root_for_system
+    verify_deployment_reboot_state
+    if [[ -n "$SYSTEM_ROOT" ]]; then
+        local pid current_boot
+        pid="$(process_id_lines)"
+        current_boot="$(deployment_boot_epoch)"
+        record_reboot_observer_evidence "$current_boot" "${MLM_TEST_REBOOT_OBSERVER_CONSOLE_USER:-root}" loaded 1 "$pid" enabled monitoring-armed "$pid"
+    fi
+    verify_reboot_observer_evidence
+    deployment_reboot_preflight
+    operational_baseline
+    if [[ -z "$SYSTEM_ROOT" ]]; then launchctl bootout "system/$REBOOT_OBSERVER_LABEL" >/dev/null 2>&1 || true; fi
+    remove_enabled_reboot_artifacts
+    deployment_reboot_preflight
+    printf 'accepted deployment-reboot-finish boot-changed=true pre-login=true mode=enabled pid=%s\n' "$(process_id_lines)"
+}
+
 activate_deployment() {
     require_root_for_system
     if [[ -n "${MLM_TEST_ACTIVATION_BOOTSTRAP_FAIL:-}" && -z "$SYSTEM_ROOT" ]]; then
@@ -1242,6 +1305,8 @@ case "$1" in
     deployment-dry-run-sleep-wake) deployment_dry_run_sleep_wake ;;
     deployment-enabled-once) deployment_enabled_once ;;
     deployment-recovery-resleep) deployment_recovery_resleep ;;
+    deployment-reboot-start) deployment_reboot_start ;;
+    deployment-reboot-finish) deployment_reboot_finish ;;
     activate) activate_deployment ;;
     upgrade) upgrade_package ;;
     rollback) rollback_upgrade ;;
