@@ -1710,6 +1710,84 @@ final class ProductionManagementScriptTests: XCTestCase {
         XCTAssertTrue(text.contains("error=test-hook-production-disabled reason=deployment"))
     }
 
+    func testDeploymentRebootCommandsAreStableAndCannotUseHistoricalDestructiveFlow() throws {
+        let text = try String(
+            contentsOf: root.appendingPathComponent("scripts/manage-production-daemon.sh"),
+            encoding: .utf8
+        )
+        XCTAssertTrue(text.contains("deployment-reboot-start) deployment_reboot_start"))
+        XCTAssertTrue(text.contains("deployment-reboot-finish) deployment_reboot_finish"))
+        let start = try XCTUnwrap(text.range(of: "deployment_reboot_start()"))
+        let finish = try XCTUnwrap(text.range(of: "deployment_reboot_finish()"))
+        let end = try XCTUnwrap(text.range(of: "uninstall_package_unlocked()"))
+        let body = String(text[start.lowerBound..<end.lowerBound])
+        for prohibited in ["accept_task14_reboot", "upgrade_package", "rollback_upgrade", "uninstall_package", "disable_job", "pmset", "shutdown", "reboot -"] {
+            XCTAssertFalse(body.contains(prohibited), prohibited)
+        }
+        XCTAssertLessThan(start.lowerBound, finish.lowerBound)
+    }
+
+    func testDeploymentRebootStartFinishPreservesEnabledAndCleansTemporaryArtifacts() throws {
+        let sandbox = root.appendingPathComponent(".build/production-enabled-reboot-root")
+        try? FileManager.default.removeItem(at: sandbox)
+        defer { try? FileManager.default.removeItem(at: sandbox) }
+        try seedStaging()
+        try runScript("install", environment: ["MLM_TEST_ROOT": sandbox.path])
+        try runScript("bootstrap", environment: ["MLM_TEST_ROOT": sandbox.path])
+        for command in ["deployment-dry-run", "deployment-enabled-once", "deployment-recovery-resleep"] {
+            try runScript(command, environment: ["MLM_TEST_ROOT": sandbox.path])
+        }
+        try runScript("activate", environment: ["MLM_TEST_ROOT": sandbox.path])
+        let health = sandbox.appendingPathComponent("Library/Application Support/MacBookLidMonitor/health.plist")
+        try writeHealthFixture(at: health, state: "monitoring-armed", mode: "enabled", pid: 4242)
+        let base = [
+            "MLM_TEST_ROOT": sandbox.path,
+            "MLM_TEST_JOB_STATE": "loaded",
+            "MLM_TEST_PROCESS_IDS": "4242",
+            "MLM_TEST_BOOT_EPOCH": "100",
+        ]
+        try runScript("deployment-reboot-start", environment: base)
+        let support = sandbox.appendingPathComponent("Library/Application Support/MacBookLidMonitor")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: support.appendingPathComponent("deployment-reboot.plist").path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: support.appendingPathComponent("reboot-observer-evidence.plist").path))
+
+        var finish = base
+        finish["MLM_TEST_BOOT_EPOCH"] = "200"
+        finish["MLM_TEST_REBOOT_OBSERVER_CONSOLE_USER"] = "root"
+        try runScript("deployment-reboot-finish", environment: finish)
+
+        let config = sandbox.appendingPathComponent("Library/Application Support/MacBookLidMonitor/config.plist")
+        XCTAssertEqual(try ProductionConfigurationDecoder().decode(Data(contentsOf: config)).mode, .enabled)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: support.appendingPathComponent("deployment-reboot.plist").path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: support.appendingPathComponent("reboot-observer-evidence.plist").path))
+    }
+
+    func testDeploymentRebootFinishRejectsUnchangedBootWithoutDisabling() throws {
+        let sandbox = root.appendingPathComponent(".build/production-enabled-reboot-same-boot-root")
+        try? FileManager.default.removeItem(at: sandbox)
+        defer { try? FileManager.default.removeItem(at: sandbox) }
+        try seedStaging()
+        try runScript("install", environment: ["MLM_TEST_ROOT": sandbox.path])
+        try runScript("bootstrap", environment: ["MLM_TEST_ROOT": sandbox.path])
+        for command in ["deployment-dry-run", "deployment-enabled-once", "deployment-recovery-resleep"] {
+            try runScript(command, environment: ["MLM_TEST_ROOT": sandbox.path])
+        }
+        try runScript("activate", environment: ["MLM_TEST_ROOT": sandbox.path])
+        let health = sandbox.appendingPathComponent("Library/Application Support/MacBookLidMonitor/health.plist")
+        try writeHealthFixture(at: health, state: "monitoring-armed", mode: "enabled", pid: 4242)
+        let environment = [
+            "MLM_TEST_ROOT": sandbox.path,
+            "MLM_TEST_JOB_STATE": "loaded",
+            "MLM_TEST_PROCESS_IDS": "4242",
+            "MLM_TEST_BOOT_EPOCH": "100",
+        ]
+        try runScript("deployment-reboot-start", environment: environment)
+        let failure = try runScriptFailure("deployment-reboot-finish", environment: environment)
+        XCTAssertTrue(failure.output.contains("reboot-not-detected"), failure.output)
+        let config = sandbox.appendingPathComponent("Library/Application Support/MacBookLidMonitor/config.plist")
+        XCTAssertEqual(try ProductionConfigurationDecoder().decode(Data(contentsOf: config)).mode, .enabled)
+    }
+
     private func seedStaging() throws {
         let staging = root.appendingPathComponent(".build/production-package")
         try? FileManager.default.removeItem(at: staging)
