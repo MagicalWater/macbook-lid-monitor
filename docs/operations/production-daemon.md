@@ -14,6 +14,34 @@ an interactive `sudo`; the script never reads or stores a password.
 - There is no unrestricted enable dispatcher. Persistent real-sleep authority is available only
   through complete deployment evidence followed by `activate`.
 
+## Fresh installation and activation
+
+The supported installation path starts disabled. Build and verify the candidate as the logged-in
+repository user, then install and bootstrap it as root:
+
+```bash
+cd /Users/water/Developer/projects/macbook-lid-monitor
+./scripts/manage-production-daemon.sh prepare
+./scripts/manage-production-daemon.sh verify
+sudo ./scripts/manage-production-daemon.sh install
+sudo ./scripts/manage-production-daemon.sh bootstrap
+sudo ./scripts/manage-production-daemon.sh status
+```
+
+Expected post-install state is `mode=disabled`, `job=loaded`, and `process-count=0`. Installation does
+not grant real-sleep authority. A new or changed installed payload must complete the bounded
+`deployment-dry-run`, `deployment-enabled-once`, and `deployment-recovery-resleep` acceptance stages
+before the evidence-gated activation command is allowed:
+
+```bash
+sudo ./scripts/manage-production-daemon.sh activate
+sudo ./scripts/manage-production-daemon.sh operational-baseline
+```
+
+`activate` is not a general enable shortcut. It refuses missing, partial, stale, corrupt, or
+identity-mismatched acceptance evidence. A healthy final state is enabled, loaded, exactly one
+running PID, `monitoring-armed`, and `operational_baseline=pass`.
+
 ## Routine checks
 
 ```bash
@@ -134,7 +162,20 @@ sudo ./scripts/manage-production-daemon.sh uninstall
 Uninstall preflights every managed path, disables and bootouts the job, and removes the binary,
 plist, config, manifest, authority lease, acceptance/reboot/health/crash state, Task 14 state,
 rollback slot, and production logs while preserving unrelated files. Expected residual state is no
-loaded job, no daemon PID, and no managed support/log directory.
+loaded job, no daemon PID, and no managed support/log directory. The command itself runs the strict
+residual-state verifier and exits nonzero if any managed artifact remains. For a manual confirmation:
+
+```bash
+launchctl print system/com.crazydennies.macbook-lid-monitor 2>/dev/null || echo "job absent"
+pgrep -f '^/Library/PrivilegedHelperTools/macbook-lid-monitor-daemon$' || echo "daemon absent"
+test ! -e /Library/PrivilegedHelperTools/macbook-lid-monitor-daemon && echo "binary absent"
+test ! -e /Library/LaunchDaemons/com.crazydennies.macbook-lid-monitor.plist && echo "plist absent"
+test ! -e '/Library/Application Support/MacBookLidMonitor' && echo "support directory absent"
+test ! -e /Library/Logs/MacBookLidMonitor && echo "log directory absent"
+```
+
+Do not manually delete individual managed files as the primary uninstall method. Use `uninstall` so
+path safety, launchd cleanup, process shutdown, and residual verification remain transactional.
 
 ## Real sleep and reboot warnings
 
@@ -142,7 +183,9 @@ loaded job, no daemon PID, and no managed support/log directory.
 activated production daemon can invoke real system sleep. Run them only with explicit approval and
 with a cleanup path that returns to disabled when the acceptance command completes or fails.
 
-**reboot warning:** reboot acceptance is a two-phase operation. Record the pre-reboot state, perform
-the approved reboot manually, then verify that boot epoch changed before rollback/uninstall
-acceptance. Never substitute a same-boot test or automate an unapproved reboot.
+**reboot warning:** enabled reboot acceptance is a two-phase operation using
+`deployment-reboot-start` and `deployment-reboot-finish`. The user performs the approved reboot
+manually and remains at loginwindow for the observation window. Finish requires a changed boot epoch,
+pre-login evidence, one enabled daemon PID, a passing baseline, and cleanup of the temporary observer.
+Never substitute a same-boot test or automate an unapproved reboot.
 

@@ -4,7 +4,7 @@
 
 診斷模式只會讀取資料。前景自動睡眠必須明確選擇，且預設為只輸出 `would-sleep` 的 dry-run 模式；真正要求 macOS 睡眠時，還必須額外傳入 `--execute-sleep`。一般前景 CLI 不會修改持久電源設定、不會修改 NVRAM、不會安裝 LaunchAgent、不會要求系統管理員權限，也不會寫入 HID report。
 
-Production LaunchDaemon 只有透過 `scripts/manage-production-daemon.sh` 的明確管理命令才會安裝或修改 `/Library`。安裝預設為 `disabled`，`dry-run` 與 `enabled` 必須分開切換；未知硬體、錯誤設定、過期感測器資料或睡眠 API 失敗均採 fail-open。2026-07-27 的完整驗收最後已執行 rollback 與 uninstall，目前系統上沒有已安裝的 production daemon 或 managed artifacts。
+Production LaunchDaemon 只有透過 `scripts/manage-production-daemon.sh` 的明確管理命令才會安裝或修改 `/Library`。安裝預設為 `disabled`，`dry-run` 與 `enabled` 必須分開切換；未知硬體、錯誤設定、過期感測器資料或睡眠 API 失敗均採 fail-open。Milestone 16 已完成正式安裝、真實睡眠、recovery-resleep、持久啟用、重新開機與登入前啟動驗收；目前這台已驗證的 M1 Pro Mac 上，production daemon 以 system-domain LaunchDaemon 形式保持 `enabled` 並長期常駐。
 
 ## 系統需求
 
@@ -236,8 +236,8 @@ macbook-lid-monitor-daemon
 管理入口：
 
 ```bash
-sudo ./scripts/manage-production-daemon.sh prepare
-sudo ./scripts/manage-production-daemon.sh verify
+./scripts/manage-production-daemon.sh prepare
+./scripts/manage-production-daemon.sh verify
 sudo ./scripts/manage-production-daemon.sh install
 sudo ./scripts/manage-production-daemon.sh bootstrap
 sudo ./scripts/manage-production-daemon.sh status
@@ -272,11 +272,43 @@ docs/superpowers/tasks/2026-07-27-production-launchdaemon-tasks.md
 docs/superpowers/reviews/2026-07-27-production-launchdaemon-final-review.md
 ```
 
-### Production 移除方式
+### Production 安裝、啟用與移除
+
+全新安裝預設保持 `disabled`：
+
+```bash
+cd /Users/water/Developer/projects/macbook-lid-monitor
+./scripts/manage-production-daemon.sh prepare
+./scripts/manage-production-daemon.sh verify
+sudo ./scripts/manage-production-daemon.sh install
+sudo ./scripts/manage-production-daemon.sh bootstrap
+sudo ./scripts/manage-production-daemon.sh status
+```
+
+只有完成相同 installed identity 的 dry-run、單次真實睡眠與 recovery-resleep acceptance 後，
+才可執行持久啟用：
+
+```bash
+sudo ./scripts/manage-production-daemon.sh activate
+sudo ./scripts/manage-production-daemon.sh operational-baseline
+```
+
+安全停用：
+
+```bash
+sudo ./scripts/manage-production-daemon.sh disable
+```
+
+完整反安裝與乾淨移除：
 
 ```bash
 sudo ./scripts/manage-production-daemon.sh uninstall
 ```
+
+`uninstall` 會停止並 bootout system job，移除所有 managed binary、plist、config、manifest、
+lease、acceptance、health、crash、rollback 與 production logs，並執行 residual-state check。
+完整安裝、升級、回滾、緊急停止與零殘留驗證方式請以
+[`docs/operations/production-daemon.md`](docs/operations/production-daemon.md) 為正式操作依據。
 
 若 persistent crash budget 因連續未乾淨退出而開啟 circuit，daemon 會以成功碼停在
 fail-open 狀態，避免 `KeepAlive.SuccessfulExit=false` 再形成 restart storm。確認 package
@@ -308,7 +340,7 @@ dry-run 不取得這個 lease。
 
 系統層 `LaunchDaemon` feasibility phase 先證明 M1 Pro 上的 system-domain daemon 可於登入前啟動、讀取 lid HID、接收 IOKit power notification，且 root/system context 可透過獨立 one-shot probe 成功呼叫 `IOPMSleepSystem`。其後 production phase 已完成正式 composition、固定設定、exact hardware authorization、logging、crash budget、transactional install／upgrade／rollback／uninstall，以及完整硬體 acceptance。
 
-2026-07-27 Task 14 最終驗收已執行 rollback 與 uninstall；目前沒有載入的 job、daemon process、installed binary、plist、support directory 或 production log directory。
+歷史 Task 14 曾驗證 rollback 與 uninstall 的零殘留能力；後續 Milestone 16 已重新完成正式部署與持久啟用。目前 production LaunchDaemon 已安裝、開機自動載入，並在使用者登入前即可運行。
 
 `macbook-lid-monitor-daemon-spike` 與 `macbook-lid-monitor-sleep-probe` 保留為歷史驗證與回歸工具，不屬於 production package，也不會被 production plist 安裝或啟動。Spike 仍具有以下實驗限制：
 
@@ -334,4 +366,4 @@ docs/validation/2026-07-26-launchdaemon-feasibility-spike.md
 docs/superpowers/reviews/2026-07-26-launchdaemon-feasibility-spike-final-review.md
 ```
 
-最終 disposition：feasibility tooling 保留；production daemon 已完成設計、實作、實機驗收與最終 uninstall。若要再次部署，仍應從 `disabled` 安裝，依序執行 status／dry-run 驗證，再經明確批准進入 enabled acceptance。
+最終 disposition：feasibility tooling 保留作歷史驗證；production daemon 已完成設計、實作、實機驗收、正式安裝與持久啟用。未來若重新安裝或更換 payload，仍必須從 `disabled` 開始，重新完成 identity-bound acceptance 後才能 `activate`。
