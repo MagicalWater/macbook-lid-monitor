@@ -1,10 +1,43 @@
 # macbook-lid-monitor
 
-`macbook-lid-monitor` 是一個 macOS 上蓋感測器診斷工具，也包含一個經實機驗收的 system-domain production LaunchDaemon，用於處理原生闔蓋睡眠偵測不可靠的情況。
+`macbook-lid-monitor` 是一個已在 M1 Pro MacBook 完成實機驗收的 macOS system-domain 常駐服務，用於處理原生闔蓋睡眠偵測不可靠的情況。它能在開機與使用者登入前自動啟動，長期監控上蓋角度，並在符合安全條件時請求 macOS 睡眠。
 
-診斷模式只會讀取資料。前景自動睡眠必須明確選擇，且預設為只輸出 `would-sleep` 的 dry-run 模式；真正要求 macOS 睡眠時，還必須額外傳入 `--execute-sleep`。一般前景 CLI 不會修改持久電源設定、不會修改 NVRAM、不會安裝 LaunchAgent、不會要求系統管理員權限，也不會寫入 HID report。
+Production LaunchDaemon 只會透過 `scripts/manage-production-daemon.sh` 的明確管理命令修改 `/Library`。未知硬體、錯誤設定、過期感測器資料或睡眠 API 失敗均採 fail-open，不會猜測或放寬真實睡眠權限。
 
-Production LaunchDaemon 只有透過 `scripts/manage-production-daemon.sh` 的明確管理命令才會安裝或修改 `/Library`。安裝預設為 `disabled`，`dry-run` 與 `enabled` 必須分開切換；未知硬體、錯誤設定、過期感測器資料或睡眠 API 失敗均採 fail-open。Milestone 16 已完成正式安裝、真實睡眠、recovery-resleep、持久啟用、重新開機與登入前啟動驗收；目前這台已驗證的 M1 Pro Mac 上，production daemon 以 system-domain LaunchDaemon 形式保持 `enabled` 並長期常駐。
+## 目前正式狀態與快速操作
+
+目前這台已驗證的 M1 Pro Mac 已正式安裝並啟用 production LaunchDaemon。它會在開機時由 macOS 自動載入，且不依賴使用者登入；平常不需要開啟 Terminal、App、專案或 ChatGPT。
+
+日常使用方式：
+
+- 正常使用 Mac 即可；上蓋降低到已校準門檻並持續約 2 秒時，服務會請求 macOS 睡眠。
+- Mac 被意外喚醒但上蓋仍未重新打開時，服務會在 recovery window 後再次請求睡眠。
+- 上蓋重新打開後，服務會重新進入監控狀態。
+
+最常用管理命令：
+
+```bash
+cd /Users/water/Developer/projects/macbook-lid-monitor
+
+# 查看目前狀態
+sudo ./scripts/manage-production-daemon.sh status
+
+# 查看完整診斷與嚴格運作基準
+sudo ./scripts/manage-production-daemon.sh diagnostics
+sudo ./scripts/manage-production-daemon.sh operational-baseline
+
+# 安全停用
+sudo ./scripts/manage-production-daemon.sh disable
+
+# 完整反安裝並驗證零殘留
+sudo ./scripts/manage-production-daemon.sh uninstall
+```
+
+完整的安裝、正式啟用、停用、緊急停止、升級、回滾、異常恢復與乾淨移除流程，請直接閱讀：
+
+**[正式常駐服務操作手冊](docs/operations/production-daemon.md)**
+
+> `activate` 不是一般 enable 捷徑。新的或已更換的 installed payload 必須先完成 identity-bound acceptance，才能取得持久真實睡眠權限。
 
 ## 系統需求
 
@@ -14,7 +47,9 @@ Production LaunchDaemon 只有透過 `scripts/manage-production-daemon.sh` 的�
 
 第一台完成驗證的設備是搭載 M1 Pro、執行 macOS 26.5.2 的 MacBook。
 
-## 使用方式
+## 前景診斷與測試工具
+
+診斷模式只會讀取資料。前景自動睡眠必須明確選擇，且預設為只輸出 `would-sleep` 的 dry-run 模式；真正要求 macOS 睡眠時，還必須額外傳入 `--execute-sleep`。一般前景 CLI 不會修改持久電源設定、不會修改 NVRAM、不會安裝 LaunchAgent、不會要求系統管理員權限，也不會寫入 HID report。
 
 只列出並排序唯讀候選裝置，不開啟任何 HID 裝置：
 

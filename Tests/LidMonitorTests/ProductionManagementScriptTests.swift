@@ -49,6 +49,30 @@ final class ProductionManagementScriptTests: XCTestCase {
         XCTAssertFalse(runbook.contains("manage-production-daemon.sh enable"))
     }
 
+    func testReadmePresentsProductionQuickStartBeforeForegroundDetails() throws {
+        let readme = try String(
+            contentsOf: root.appendingPathComponent("README.md"),
+            encoding: .utf8
+        )
+        let quickStart = try XCTUnwrap(readme.range(of: "## 目前正式狀態與快速操作"))
+        let foreground = try XCTUnwrap(readme.range(of: "## 前景診斷與測試工具"))
+        XCTAssertLessThan(quickStart.lowerBound, foreground.lowerBound)
+
+        let firstHundredLines = readme.split(separator: "\n", omittingEmptySubsequences: false)
+            .prefix(100)
+            .joined(separator: "\n")
+        for requiredText in [
+            "目前已正式安裝並啟用",
+            "平常不需要開啟 Terminal",
+            "manage-production-daemon.sh status",
+            "manage-production-daemon.sh disable",
+            "manage-production-daemon.sh uninstall",
+            "docs/operations/production-daemon.md",
+        ] {
+            XCTAssertTrue(firstHundredLines.contains(requiredText), requiredText)
+        }
+    }
+
     func testPrepareAndVerifyEncodeVersionAndChecksumValidation() throws {
         let text = try String(
             contentsOf: root.appendingPathComponent("scripts/manage-production-daemon.sh"),
