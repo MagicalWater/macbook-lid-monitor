@@ -1326,3 +1326,54 @@ attempts, exactly one recovery-resleep transition, no third attempt, and PID con
 proved against installed identity `0885d54dbf133fdd8620d4a38379a8ed64819430`. Production remains
 loaded/disabled with zero resident PID. Task 20 requires a separate explicit approval because it
 will leave real sleep authority persistently enabled after the command exits.
+
+## Task 20 — Persistent production activation
+
+### Approval and execution
+
+The user granted a separate explicit Task 20 approval after Tasks 17–19 were closed against the
+same installed identity. The reviewed `activate` command verified all three deployment acceptance
+stages before changing managed mode, then booted out and bootstrapped the system LaunchDaemon.
+
+### Accepted evidence
+
+```text
+installed source commit: 0885d54dbf133fdd8620d4a38379a8ed64819430
+installed version: 0885d54dbf13
+acceptance state: complete
+mode: enabled
+launchd state: loaded and running
+daemon PID: 33458
+process count: 1
+health state: monitoring-armed
+health mode: enabled
+health PID: 33458
+crash circuit: closed
+managed lease: root:wheel 0600, regular file, link count 1
+operational baseline: pass
+```
+
+### Immediate review
+
+- `activate` verified dry-run, enabled-once, and recovery-resleep acceptance before mutation: pass.
+- Acceptance identity matched the exact installed source commit and version: pass.
+- Bootstrap completed successfully; the activation fail-safe did not need to restore disabled: pass.
+- Launchd retained exactly one running daemon PID: pass.
+- The daemon completed startup cooldown and emitted `monitoring-armed`: pass.
+- Root diagnostics reported complete acceptance, enabled health, matching PID, and closed crash
+  circuit: pass.
+- Managed authority remained root:wheel `0600`, regular, and single-link: pass.
+- Strict `operational-baseline` returned pass for PID `33458`: pass.
+- Production intentionally remains enabled/running after command exit: pass.
+- No reboot or push occurred: pass.
+
+### Evidence
+
+See `docs/validation/2026-07-28-production-persistent-activation.md`.
+
+### Decision
+
+**Task 20 approved.** Open P0 = 0 and Open P1 without disposition = 0. Persistent production is now
+active against installed identity `0885d54dbf133fdd8620d4a38379a8ed64819430`, with one armed daemon
+and complete acceptance evidence. Task 21 remains separately approval-gated because it prepares and
+verifies an enabled reboot and pre-login cycle. Production must remain enabled/running meanwhile.

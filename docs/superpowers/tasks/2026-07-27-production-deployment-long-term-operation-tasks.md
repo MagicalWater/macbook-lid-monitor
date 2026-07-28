@@ -1,10 +1,11 @@
 # Milestone 16 Production Deployment and Long-term Operation Task Register
 
-Status: Tasks 1–19 and Stage A/B reviews complete. Tasks 16–18 were reopened during live
+Status: Tasks 1–20 and Stage A/B reviews complete. Tasks 16–18 were reopened during live
 acceptance, remediated, redeployed, rerun, and reclosed against installed identity
-`0885d54dbf133fdd8620d4a38379a8ed64819430`. Task 19 then passed bounded recovery-resleep
-acceptance against the same identity. Production is intentionally loaded/disabled with zero
-resident PID. Tasks 20–21 and Stage C remain open and retain separate approvals.
+`0885d54dbf133fdd8620d4a38379a8ed64819430`. Tasks 19 and 20 then passed bounded recovery-resleep
+acceptance and persistent activation against the same identity. Production is intentionally
+enabled/running with exactly one armed daemon. Task 21 and Stage C remain open and retain their
+separate approval and review boundaries.
 
 ## Mandatory per-Task workflow
 
@@ -49,7 +50,7 @@ all Task reviews. Historical Milestone 1–15 evidence is context, not Milestone
 | 17 | Fresh installed dry-run acceptance — complete | deployment dry-run evidence | PID-bound readiness; candidate/debounce/one attempt/one `would-sleep`; acceptance recorded against `0885d54...`; cleanup disabled/zero PID | approved and completed | cleanup trap verified loaded/disabled/zero PID |
 | 18 | Bounded one-sleep acceptance — complete | enabled-once evidence | one candidate, one debounce, exactly one real sleep request, wake evidence, PID stable, acceptance recorded against `0885d54...` | approved and completed | cleanup verified loaded/disabled/zero PID |
 | 19 | Bounded recovery-resleep acceptance — complete | recovery evidence | exactly two attempts, exactly one recovery transition, no third request, PID stable, acceptance recorded against `0885d54...`, cleanup disabled/zero PID | approved and completed | cleanup verified loaded/disabled/zero PID |
-| 20 | Persistent production activation | activation evidence | complete acceptance identity, one PID, managed authority, healthy enabled | separate persistent activation approval | emergency disable/bootout; Milestone becomes incomplete until redeployed |
+| 20 | Persistent production activation — complete | activation evidence | complete acceptance identity, enabled/running one PID, managed authority, monitoring-armed health, operational baseline pass | approved and completed | production intentionally remains enabled/running; emergency disable/bootout only for incident response |
 | 21 | Enabled reboot, pre-login, baseline, and final closure | reboot/pre-login/baseline/final reviews | changed boot, auto-load, enabled one PID, profile/model, authority, final baseline | explicit reboot preparation; user restarts manually | emergency disable/bootout; safely redeploy before closure |
 | C | Stage C implementation review | system/repository holistic review | approvals, evidence chain, temporary cleanup, final live state | no new mutation; findings may require new approvals | final state must remain or be restored enabled/running |
 
