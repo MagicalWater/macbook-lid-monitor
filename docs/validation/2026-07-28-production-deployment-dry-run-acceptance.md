@@ -108,3 +108,26 @@ management suite: 84 tests, 0 failures
 full suite: 269 tests, 0 failures
 production before rerun: loaded, disabled, zero PID
 ```
+
+## Remediated identity acceptance result
+
+The PID-bound rerun completed successfully against the installed identity
+`7b400c2b3fc02664e7c3e2ada60a478d57038b9a` using daemon PID `94110`.
+
+```text
+ready: monitoring-armed
+candidate-started: present
+debounce-elapsed: present
+sleep-request-attempted: exactly 1
+would-sleep: exactly 1
+recorded acceptance: deployment-dry-run=pass
+final mode: disabled
+final job state: loaded, not running
+final process-count: 0
+last exit code: 0
+lease: root:wheel, 0600, regular file, link count 1
+```
+
+This was dry-run only; no real sleep request was issued. Task 17 is accepted for the remediated
+identity. Task 18 still requires a separate fresh approval because it grants one bounded
+sensor-driven real-sleep request.

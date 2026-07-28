@@ -1168,8 +1168,24 @@ management suite: 84 tests, 0 failures
 full suite: 269 tests, 0 failures
 ```
 
-### Current disposition
+### Final acceptance evidence
 
-This is a management-only change; the installed daemon payload and production identity remain
-`7b400c2b3fc02664e7c3e2ada60a478d57038b9a`. Production remains loaded/disabled/zero PID. Task 17
-must be rerun through the new PID-ready gate before Task 18 can resume.
+The PID-ready rerun completed against installed identity
+`7b400c2b3fc02664e7c3e2ada60a478d57038b9a` with daemon PID `94110`:
+
+```text
+monitoring-armed readiness: observed
+candidate-started: observed
+debounce-elapsed: observed
+sleep-request-attempted: exactly 1
+would-sleep: exactly 1
+deployment-dry-run acceptance: pass
+cleanup: loaded, disabled, zero PID, last exit code 0
+lease: root:wheel 0600, regular file, link count 1
+```
+
+### Decision
+
+**Task 17 approved for the remediated identity.** Open P0 = 0 and Open P1 without disposition = 0.
+Production remains loaded/disabled with zero resident PID. Task 18 remains blocked until the user
+grants a fresh explicit approval for one bounded sensor-driven real-sleep request.
