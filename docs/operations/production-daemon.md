@@ -1,23 +1,18 @@
-# Production daemon operator runbook
+# 正式常駐服務操作手冊
 
-This runbook is the supported operating interface for the system-domain MacBook Lid Monitor daemon.
-Run management commands from the repository root. Commands that mutate `/Library` or launchd require
-an interactive `sudo`; the script never reads or stores a password.
+本手冊是系統網域 MacBook 上蓋監控常駐程序的正式操作依據。
+所有管理命令都應從版本庫根目錄執行。會修改 `/Library` 或 launchd 的命令需要互動式 `sudo`；管理腳本不會讀取或儲存密碼。
 
-## Safety model
+## 安全模型
 
-- `install`, `upgrade`, `rollback`, `disable`, and bounded deployment acceptance force or finish in
-  `disabled` unless the command is the explicit evidence-gated `activate` command.
-- `status`, `diagnostics`, `rotate-logs`, and `operational-baseline` are read-only and leave the
-  current mode unchanged. When the daemon is already activated, these commands **leaves enabled**.
-- `disable`, `upgrade`, `rollback`, and maintenance failure paths **forces disabled**.
-- There is no unrestricted enable dispatcher. Persistent real-sleep authority is available only
-  through complete deployment evidence followed by `activate`.
+- `install`、`upgrade`、`rollback`、`disable` 與受限部署驗收命令，除非是明確受驗證證據保護的 `activate`，否則都會強制進入或最終停在 `disabled`。
+- `status`、`diagnostics`、`rotate-logs` 與 `operational-baseline` 都是唯讀命令，不會改變目前模式。常駐程序已正式啟用時，這些命令執行後仍會保持 `enabled`。
+- `disable`、`upgrade`、`rollback` 與維護失敗路徑都會強制回到 `disabled`。
+- 系統不存在可跳過驗收的無限制啟用命令。只有完整部署證據通過後，才能透過 `activate` 取得長期真實睡眠權限。
 
-## Fresh installation and activation
+## 全新安裝與正式啟用
 
-The supported installation path starts disabled. Build and verify the candidate as the logged-in
-repository user, then install and bootstrap it as root:
+正式安裝流程一定從 `disabled` 開始。先以目前登入的版本庫使用者建置並驗證候選版本，再以 root 權限安裝並載入：
 
 ```bash
 cd /Users/water/Developer/projects/macbook-lid-monitor
@@ -28,21 +23,44 @@ sudo ./scripts/manage-production-daemon.sh bootstrap
 sudo ./scripts/manage-production-daemon.sh status
 ```
 
-Expected post-install state is `mode=disabled`, `job=loaded`, and `process-count=0`. Installation does
-not grant real-sleep authority. A new or changed installed payload must complete the bounded
-`deployment-dry-run`, `deployment-enabled-once`, and `deployment-recovery-resleep` acceptance stages
-before the evidence-gated activation command is allowed:
+安裝完成後的預期狀態是：
+
+```text
+mode=disabled
+job=loaded
+process-count=0
+```
+
+安裝本身不會授予真實睡眠權限。
+
+新的或已更換的程式內容，必須先對同一已安裝版本識別完成以下三個受限驗收階段：
+
+```text
+deployment-dry-run
+deployment-enabled-once
+deployment-recovery-resleep
+```
+
+三個階段都通過後，才可執行受驗證證據保護的正式啟用：
 
 ```bash
 sudo ./scripts/manage-production-daemon.sh activate
 sudo ./scripts/manage-production-daemon.sh operational-baseline
 ```
 
-`activate` is not a general enable shortcut. It refuses missing, partial, stale, corrupt, or
-identity-mismatched acceptance evidence. A healthy final state is enabled, loaded, exactly one
-running PID, `monitoring-armed`, and `operational_baseline=pass`.
+`activate` 不是一般啟用捷徑。只要驗收證據缺失、不完整、過期、損壞，或版本識別不一致，就會拒絕啟用。
 
-## Routine checks
+健康的最終狀態應為：
+
+```text
+mode=enabled
+job=loaded
+process-count=1
+health_state=monitoring-armed
+operational_baseline=pass
+```
+
+## 日常狀態檢查
 
 ```bash
 sudo ./scripts/manage-production-daemon.sh status
@@ -50,23 +68,22 @@ sudo ./scripts/manage-production-daemon.sh diagnostics
 sudo ./scripts/manage-production-daemon.sh operational-baseline
 ```
 
-Expected healthy activated state includes `mode=enabled`, `job=loaded`, `process-count=1`, fresh
-monitoring health matching that PID, valid installed integrity, and complete matching acceptance.
-Missing state is reported as `unavailable`; malformed, unsafe, stale, or identity-mismatched state
-is rejected rather than guessed.
+健康的正式啟用狀態應包含：`mode=enabled`、`job=loaded`、`process-count=1`、與該 PID 相符且仍在有效時間內的監控健康狀態、有效的已安裝內容完整性，以及完整且版本識別一致的驗收紀錄。
 
-## Disable and emergency stop
+缺少的狀態會顯示為 `unavailable`；格式錯誤、不安全、過期或版本識別不一致的狀態會直接被拒絕，不會猜測或自動放行。
 
-Normal safe disable:
+## 安全停用與緊急停止
+
+正常安全停用：
 
 ```bash
 sudo ./scripts/manage-production-daemon.sh disable
 sudo ./scripts/manage-production-daemon.sh status
 ```
 
-Expected final state is `mode=disabled`; a loaded disabled job must have zero resident daemon PID.
+預期最終狀態為 `mode=disabled`。如果 disabled job 仍載入，常駐程序 PID 必須為零。
 
-For **emergency bootout** when the job must be removed from launchd immediately:
+當必須立即從 launchd 移除 job 時，使用緊急 `bootout`：
 
 ```bash
 sudo ./scripts/manage-production-daemon.sh disable
@@ -74,13 +91,13 @@ sudo ./scripts/manage-production-daemon.sh bootout
 sudo ./scripts/manage-production-daemon.sh status
 ```
 
-Expected state is disabled, job absent, and process count zero. Bootout does not grant authority and
-does not replace integrity repair or uninstall.
+預期狀態為：`disabled`、job 不存在、程序數量為零。
 
-## Crash circuit recovery
+`bootout` 不會授予任何權限，也不能取代完整性修復或完整反安裝。
 
-For **circuit-open recovery**, first prove the installed set is valid, mode is disabled, and no
-daemon process is resident. Then reset only the crash budget:
+## 異常退出保護機制恢復
+
+當異常退出保護機制為 `open` 時，先確認已安裝內容集合有效、模式已是 `disabled`，且沒有常駐程序，再只重置異常退出額度：
 
 ```bash
 sudo ./scripts/manage-production-daemon.sh status
@@ -91,21 +108,20 @@ sudo ./scripts/manage-production-daemon.sh bootstrap
 sudo ./scripts/manage-production-daemon.sh status
 ```
 
-The reset command refuses enabled mode, a resident daemon, unsafe metadata, and symlink state.
+`reset-crash-budget` 會拒絕 `enabled` 模式、仍存在的常駐程序、不安全的中繼資料與符號連結狀態。
 
-## Log rotation
+## 日誌輪替
 
 ```bash
 sudo ./scripts/manage-production-daemon.sh rotate-logs
 sudo ./scripts/manage-production-daemon.sh diagnostics
 ```
 
-Rotation preserves the active writer inode, snapshots logs only above 1 MiB, and keeps at most three
-generations. Unsafe generation paths are rejected before mutation.
+日誌輪替會保留目前寫入程序使用的 inode，只在日誌超過 1 MiB 時建立快照，並最多保留三代。若輪替路徑不安全，會在修改前拒絕執行。
 
-## Upgrade
+## 升級
 
-Prepare and verify the candidate as the logged-in repository user, then upgrade as root:
+先以目前登入的版本庫使用者執行 `prepare` 與 `verify`，再以 root 權限執行 `upgrade`：
 
 ```bash
 ./scripts/manage-production-daemon.sh prepare
@@ -114,27 +130,31 @@ sudo ./scripts/manage-production-daemon.sh upgrade
 sudo ./scripts/manage-production-daemon.sh status
 ```
 
-Upgrade enters disabled, booted-out, nonresident maintenance state. A changed payload creates one
-rollback slot, activates the candidate disabled, invalidates old acceptance, and finishes disabled.
-Repository-only evidence changes with identical installed payload identity are a no-op and preserve
-matching acceptance.
+升級會進入 `disabled`、已從 launchd 移除、沒有常駐程序的維護狀態。
 
-## Rollback
+- 程式內容有變更時：建立一個回滾槽位、以 `disabled` 啟用候選版本、使舊驗收紀錄失效，最後停在 `disabled`。
+- 只有版本庫證據改變、已安裝程式內容識別完全相同時：視為不需變更，並保留相符的驗收紀錄。
+
+## 回滾
 
 ```bash
 sudo ./scripts/manage-production-daemon.sh rollback
 sudo ./scripts/manage-production-daemon.sh status
 ```
 
-Rollback validates the complete slot before any mutation, restores the previous set disabled,
-invalidates acceptance, bootstraps the disabled job, and finishes with zero resident PID. If slot
-restore fails, the command returns failure and deliberately leaves the job booted out.
+回滾會在任何修改前先驗證完整回滾槽位，之後恢復前一個版本、設為 `disabled`、使驗收紀錄失效、重新載入 disabled job，並以零常駐 PID 結束。
 
-## Integrity failure
+如果回滾槽位恢復失敗，命令會回傳失敗，並刻意讓 job 保持從 launchd 移除的狀態。
 
-For an **integrity failure**, do not bypass the verifier and do not manually edit managed files.
-Capture read-only diagnostics, disable/bootout where possible, then repair through a verified package
-or uninstall:
+## 完整性驗證失敗處理
+
+發生完整性驗證失敗時：
+
+- 不要繞過驗證器。
+- 不要手動修改受管理檔案。
+- 先取得唯讀診斷資訊。
+- 能安全停用時先執行 `disable` 與 `bootout`。
+- 再透過已驗證套件修復，或執行完整反安裝。
 
 ```bash
 sudo ./scripts/manage-production-daemon.sh diagnostics
@@ -144,48 +164,83 @@ sudo ./scripts/manage-production-daemon.sh bootout
 sudo ./scripts/manage-production-daemon.sh upgrade
 ```
 
-If installed verification prevents safe repair, use the reviewed release procedure rather than
-deleting individual files by hand.
+如果已安裝內容驗證阻止安全修復，應使用經審查的發布程序，不應手動逐一刪除檔案。
 
-## Foreground conflict
+## 前景真實睡眠衝突
 
-A **foreground real-sleep conflict** occurs when the foreground CLI requests `--execute-sleep` while
-production owns the shared sleep-authority lease. Do not kill or replace the lease file. Disable and
-bootout production first, run the explicit foreground command, then bootstrap production disabled.
+當前景命令列工具要求 `--execute-sleep`，但正式常駐服務已持有共用睡眠權限鎖時，就會發生前景真實睡眠權限衝突。
 
-## Uninstall
+不要強制刪除或替換權限鎖檔案。應依序：
+
+1. 停用正式常駐服務。
+2. 將正式常駐服務從 launchd 移除。
+3. 執行明確批准的前景命令。
+4. 完成後再以 `disabled` 狀態重新載入正式常駐服務。
+
+## 完整反安裝與乾淨移除
 
 ```bash
 sudo ./scripts/manage-production-daemon.sh uninstall
 ```
 
-Uninstall preflights every managed path, disables and bootouts the job, and removes the binary,
-plist, config, manifest, authority lease, acceptance/reboot/health/crash state, Task 14 state,
-rollback slot, and production logs while preserving unrelated files. Expected residual state is no
-loaded job, no daemon PID, and no managed support/log directory. The command itself runs the strict
-residual-state verifier and exits nonzero if any managed artifact remains. For a manual confirmation:
+`uninstall` 會先對所有受管理路徑執行安全檢查，接著停用並從 launchd 移除 job，然後移除：
 
-```bash
-launchctl print system/com.crazydennies.macbook-lid-monitor 2>/dev/null || echo "job absent"
-pgrep -f '^/Library/PrivilegedHelperTools/macbook-lid-monitor-daemon$' || echo "daemon absent"
-test ! -e /Library/PrivilegedHelperTools/macbook-lid-monitor-daemon && echo "binary absent"
-test ! -e /Library/LaunchDaemons/com.crazydennies.macbook-lid-monitor.plist && echo "plist absent"
-test ! -e '/Library/Application Support/MacBookLidMonitor' && echo "support directory absent"
-test ! -e /Library/Logs/MacBookLidMonitor && echo "log directory absent"
+- 正式常駐程序執行檔
+- LaunchDaemon 設定檔
+- 設定檔
+- 版本清單
+- 睡眠權限鎖
+- 驗收狀態
+- 重新開機驗收狀態
+- 健康狀態
+- 異常退出狀態
+- Task 14 狀態
+- 回滾槽位
+- 正式服務日誌
+
+與本服務無關的檔案會保留。
+
+預期零殘留狀態為：
+
+```text
+loaded job: absent
+daemon PID: absent
+managed support directory: absent
+production log directory: absent
 ```
 
-Do not manually delete individual managed files as the primary uninstall method. Use `uninstall` so
-path safety, launchd cleanup, process shutdown, and residual verification remain transactional.
+`uninstall` 本身會執行嚴格的殘留狀態驗證。只要仍有任何受管理項目，命令就會以非零結束碼結束，不會錯誤宣告成功。
 
-## Real sleep and reboot warnings
+需要人工再次確認時，可執行：
 
-**real sleep warning:** `deployment-enabled-once`, `deployment-recovery-resleep`, `activate`, and an
-activated production daemon can invoke real system sleep. Run them only with explicit approval and
-with a cleanup path that returns to disabled when the acceptance command completes or fails.
+```bash
+launchctl print system/com.crazydennies.macbook-lid-monitor 2>/dev/null || echo "job 已不存在"
+pgrep -f '^/Library/PrivilegedHelperTools/macbook-lid-monitor-daemon$' || echo "常駐程序已不存在"
+test ! -e /Library/PrivilegedHelperTools/macbook-lid-monitor-daemon && echo "執行檔已不存在"
+test ! -e /Library/LaunchDaemons/com.crazydennies.macbook-lid-monitor.plist && echo "設定檔已不存在"
+test ! -e '/Library/Application Support/MacBookLidMonitor' && echo "支援目錄已不存在"
+test ! -e /Library/Logs/MacBookLidMonitor && echo "日誌目錄已不存在"
+```
 
-**reboot warning:** enabled reboot acceptance is a two-phase operation using
-`deployment-reboot-start` and `deployment-reboot-finish`. The user performs the approved reboot
-manually and remains at loginwindow for the observation window. Finish requires a changed boot epoch,
-pre-login evidence, one enabled daemon PID, a passing baseline, and cleanup of the temporary observer.
-Never substitute a same-boot test or automate an unapproved reboot.
+不要以手動逐一刪除受管理檔案作為主要卸載方式。應使用 `uninstall`，才能保留路徑安全檢查、launchd 清理、程序停止與殘留驗證的一致性。
 
+## 真實睡眠與重新開機警告
+
+**真實睡眠警告：** `deployment-enabled-once`、`deployment-recovery-resleep`、`activate`，以及已正式啟用的常駐程序，都可能呼叫真實系統睡眠。只有在已獲得明確批准，且具備失敗或完成後回到安全狀態的清理路徑時，才可執行受限驗收命令。
+
+**重新開機警告：** `enabled` 模式重新開機驗收是兩階段流程：
+
+```text
+deployment-reboot-start
+deployment-reboot-finish
+```
+
+由使用者手動執行已批准的重新開機，並在登入畫面停留指定觀察時間。完成階段必須驗證：
+
+- 開機時間戳已改變
+- 有登入前證據
+- 只有一個 `enabled` 模式常駐程序 PID
+- 運作基準驗證通過
+- 臨時觀察程序已清除
+
+不可用同一次開機測試替代真正重新開機，也不可自動執行未批准的重新開機。

@@ -35,14 +35,14 @@ final class ProductionManagementScriptTests: XCTestCase {
             XCTAssertTrue(manager.contains("\(command))"), command)
         }
         for requiredText in [
-            "foreground real-sleep conflict",
-            "circuit-open recovery",
-            "integrity failure",
-            "emergency bootout",
-            "leaves enabled",
-            "forces disabled",
-            "real sleep warning",
-            "reboot warning",
+            "前景真實睡眠衝突",
+            "異常退出保護機制恢復",
+            "完整性驗證失敗處理",
+            "緊急 `bootout`",
+            "仍會保持 `enabled`",
+            "強制回到 `disabled`",
+            "真實睡眠警告",
+            "重新開機警告",
         ] {
             XCTAssertTrue(runbook.contains(requiredText), requiredText)
         }
