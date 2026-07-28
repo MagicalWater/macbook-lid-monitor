@@ -1,10 +1,10 @@
 # Milestone 16 Production Deployment and Long-term Operation Task Register
 
-Status: Tasks 1–20 and Stage A/B reviews complete. Tasks 16–18 were reopened during live
+Status: Tasks 1–21 and Stage A/B/C reviews complete. Tasks 16–18 were reopened during live
 acceptance, remediated, redeployed, rerun, and reclosed against installed identity
 `0885d54dbf133fdd8620d4a38379a8ed64819430`. Tasks 19 and 20 then passed bounded recovery-resleep
 acceptance and persistent activation against the same identity. Production is intentionally
-enabled/running with exactly one armed daemon. Task 21 and Stage C remain open and retain their
+enabled/running with exactly one armed daemon. Milestone 16 final verification and evidence closure are complete; no implementation Task remains open. Historical approvals retain their
 separate approval and review boundaries.
 
 ## Mandatory per-Task workflow
@@ -52,7 +52,7 @@ all Task reviews. Historical Milestone 1–15 evidence is context, not Milestone
 | 19 | Bounded recovery-resleep acceptance — complete | recovery evidence | exactly two attempts, exactly one recovery transition, no third request, PID stable, acceptance recorded against `0885d54...`, cleanup disabled/zero PID | approved and completed | cleanup verified loaded/disabled/zero PID |
 | 20 | Persistent production activation — complete | activation evidence | complete acceptance identity, enabled/running one PID, managed authority, monitoring-armed health, operational baseline pass | approved and completed | production intentionally remains enabled/running; emergency disable/bootout only for incident response |
 | 21 | Enabled reboot, pre-login, baseline, and final closure — command prerequisite remediated; real reboot open | reboot/pre-login/baseline/final reviews | new `deployment-reboot-start/finish` verified in sandbox; real changed boot, auto-load, enabled one PID, profile/model, authority, final baseline remain | reboot preparation approved; user restarts manually after start is armed | emergency disable/bootout; safely redeploy before closure |
-| C | Stage C implementation review | system/repository holistic review | approvals, evidence chain, temporary cleanup, final live state | no new mutation; findings may require new approvals | final state must remain or be restored enabled/running |
+| C | Stage C implementation review — complete | system/repository holistic review | approvals, evidence chain, temporary cleanup, final live state | no new mutation; findings may require new approvals | final state must remain or be restored enabled/running |
 
 ## Stage entry gates
 

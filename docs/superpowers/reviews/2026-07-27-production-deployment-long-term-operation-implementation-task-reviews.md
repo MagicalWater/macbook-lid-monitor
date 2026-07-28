@@ -1417,3 +1417,40 @@ live state: enabled, running, one PID 33458, monitoring-armed
 
 **Task 21 prerequisite remediation approved.** No Critical/P0/P1 finding remains. Task 21 stays
 open but its real reboot preparation flow is now implementable through the new commands.
+
+## Task 21 — Enabled reboot, pre-login operation, baseline, and holistic closure
+
+### Accepted evidence
+
+- Reboot start boot epoch: `1785132458`; pre-reboot PID: `33458`.
+- Post-reboot boot epoch: `1785226628`; auto-started daemon PID: `283`.
+- Installed mode remained `enabled`; exactly one production daemon was resident.
+- The temporary root LaunchDaemon observer recorded `pre-login=true` for PID `283` before console login.
+- The daemon reached `monitoring-armed` on the exact installed hardware profile.
+- Complete deployment acceptance remained identity-bound and valid.
+- `operational_baseline=pass pid=283`.
+- Reboot state, observer evidence, observer script, observer plist, and observer launchd job were removed.
+- Production remained installed, loaded, enabled, and running after cleanup.
+
+### Immediate review
+
+- Boot epoch changed and the pre-reboot PID was replaced: pass.
+- LaunchDaemon auto-start occurred without login-session dependency: pass.
+- Pre-login observer evidence was root-owned, identity-bound, and captured before login: pass.
+- Exactly one production PID and one managed authority remained: pass.
+- Temporary observer artifacts were completely removed: pass.
+- No disable, bootout, rollback, uninstall, merge, push, or worktree cleanup occurred: pass.
+
+### Decision
+
+**Task 21 approved.** Open P0 = 0 and Open P1 without disposition = 0. Enabled reboot,
+pre-login operation, single authority, health, and operational baseline were proved while preserving
+the final production state. Stage C holistic review may close after final repository and verification
+gates pass.
+
+## Stage C — Holistic implementation review
+
+The approval chain, installed identity, bounded acceptance records, persistent activation, enabled
+reboot proof, pre-login evidence, cleanup boundaries, and final enabled live state were reviewed as
+one system. No P0/P1 finding remains open. Final verification results are recorded in the Task 21
+validation evidence.
