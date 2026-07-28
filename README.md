@@ -6,7 +6,7 @@ Production LaunchDaemon 只會透過 `scripts/manage-production-daemon.sh` 的�
 
 ## 目前正式狀態與快速操作
 
-目前這台已驗證的 M1 Pro Mac 已正式安裝並啟用 production LaunchDaemon。它會在開機時由 macOS 自動載入，且不依賴使用者登入；平常不需要開啟 Terminal、App、專案或 ChatGPT。
+目前已正式安裝並啟用在這台已驗證的 M1 Pro Mac 上的 production LaunchDaemon。它會在開機時由 macOS 自動載入，且不依賴使用者登入；平常不需要開啟 Terminal、App、專案或 ChatGPT。
 
 日常使用方式：
 

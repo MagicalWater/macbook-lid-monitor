@@ -45,3 +45,40 @@
 ### Decision
 
 **Task 2 approved.** Open P0 = 0；Open P1 without disposition = 0。
+
+## Task 3 — Holistic review 與 closure
+
+### Closure finding and re-review
+
+- P1：第一次完整 management suite 發現 README 文案修正後不再包含穩定契約片段「目前已正式安裝並啟用」，造成 90 tests 中 1 failure。已改寫為「目前已正式安裝並啟用在這台已驗證的 M1 Pro Mac 上的 production LaunchDaemon」，focused test 與完整 90-test suite 重新執行後通過。
+- P2：第一次 live gate 使用 `sudo -n`，因授權快取過期而失敗。該檢查本質為唯讀，改用可公開讀取的 root-owned config、`pgrep` 與 `launchctl print`，不要求 mutation 或新授權。Re-review：通過。
+
+### Holistic review
+
+- README 第一段現在以正式常駐服務為主，而非診斷工具：通過。
+- README 前 100 行包含目前部署狀態、日常使用、常用命令、停用、卸載與正式 runbook 連結：通過。
+- 前景 CLI 詳細說明保留但下移至獨立章節：通過。
+- 正式 runbook 全文為繁體中文，必要命令與固定欄位保留原文：通過。
+- `6c3f445` 與 `5c774a6` 的治理缺口已由本 Spec／Plan／Task／review／validation chain 補正：通過。
+- Runtime、package 與 live system 未修改：通過。
+
+### Verification
+
+```text
+README RED test: failed on old information architecture as expected
+README focused GREEN: 1 test, 0 failures
+runbook focused: 1 test, 0 failures
+ProductionManagementScriptTests final rerun: 90 tests, 0 failures
+README first 100 lines gate: pass
+bash -n: pass
+shellcheck -x: pass
+git diff --check: pass
+live mode: enabled
+live process count: 1
+live PID: 283
+launchd state: running
+```
+
+### Decision
+
+**Task 3 and holistic review approved.** Open P0 = 0；Open P1 without disposition = 0。Post-closure documentation remediation 可正式 closure 並推送。
