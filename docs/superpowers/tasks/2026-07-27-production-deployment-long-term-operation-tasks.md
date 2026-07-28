@@ -1,8 +1,9 @@
 # Milestone 16 Production Deployment and Long-term Operation Task Register
 
-Status: Tasks 1–15 and Stage A/B reviews complete. Task 16 is reopened for managed
-sleep-authority remediation. Task 17 passed on the superseded installed identity and must be rerun
-after redeployment. Task 18 is blocked; Tasks 19–21 retain their own later approvals.
+Status: Tasks 1–18 and Stage A/B reviews complete. Tasks 16–18 were reopened during live
+acceptance, remediated, redeployed, rerun, and reclosed against installed identity
+`0885d54dbf133fdd8620d4a38379a8ed64819430`. Production is intentionally loaded/disabled with
+zero resident PID. Tasks 19–21 and Stage C remain open and retain separate approvals.
 
 ## Mandatory per-Task workflow
 
@@ -43,9 +44,9 @@ all Task reviews. Historical Milestone 1–15 evidence is context, not Milestone
 | B | Stage B implementation review — complete | review/evidence only | 264 full tests; four release products; static/package/clean-snapshot gate | none | no system state |
 | 14 | Full automated clean-checkout release gate — complete | implementation review and automated validation evidence | 264 tests in main and clean snapshot; four release products; static/package/residual gates | none | no system state; production remains uninstalled |
 | 15 | Formal-main integration and package provenance — complete | Git and package evidence | pre/post integration 264-test suites; fast-forward main; exact release package; main/origin equality | approved | no install occurred; release remains safely uninstalled |
-| 16 | Disabled production installation — reopened | manager, install/upgrade repair, deployment evidence | install creates root-owned `0600` single-link lease; legacy no-op upgrade repairs missing lease; 269-test full suite; exact-commit redeployment pending | approved remediation; system upgrade still requires privileged authorization | remain loaded/disabled/zero PID |
-| 17 | Fresh installed dry-run acceptance — rerun required after remediation | deployment dry-run evidence | prior old-identity evidence remains historical only; repeat acceptance after exact-commit redeployment | prior approval covered dry-run only | cleanup trap to loaded/disabled/zero PID |
-| 18 | Bounded one-sleep acceptance — blocked by reopened Task 16 | enabled-once evidence | first attempt rejected before angle monitoring because lease was missing; no real sleep occurred | prior approval consumed no valid sleep attempt; obtain fresh approval after Tasks 16–17 reclose | cleanup verified loaded/disabled/zero PID |
+| 16 | Disabled production installation — complete after remediation | manager, install/upgrade repair, deployment evidence | secure managed lease creation/repair; provenance-only upgrade semantics; privileged Git trust scoping; runtime lease policy aligned to `0600`; 270-test full suite; exact identity `0885d54...` installed | approved and completed | loaded/disabled/zero PID |
+| 17 | Fresh installed dry-run acceptance — complete | deployment dry-run evidence | PID-bound readiness; candidate/debounce/one attempt/one `would-sleep`; acceptance recorded against `0885d54...`; cleanup disabled/zero PID | approved and completed | cleanup trap verified loaded/disabled/zero PID |
+| 18 | Bounded one-sleep acceptance — complete | enabled-once evidence | one candidate, one debounce, exactly one real sleep request, wake evidence, PID stable, acceptance recorded against `0885d54...` | approved and completed | cleanup verified loaded/disabled/zero PID |
 | 19 | Bounded recovery-resleep acceptance | recovery evidence | two attempts, one recovery transition, no third, return disabled | separate recovery-resleep approval | cleanup trap to loaded/disabled/zero PID |
 | 20 | Persistent production activation | activation evidence | complete acceptance identity, one PID, managed authority, healthy enabled | separate persistent activation approval | emergency disable/bootout; Milestone becomes incomplete until redeployed |
 | 21 | Enabled reboot, pre-login, baseline, and final closure | reboot/pre-login/baseline/final reviews | changed boot, auto-load, enabled one PID, profile/model, authority, final baseline | explicit reboot preparation; user restarts manually | emergency disable/bootout; safely redeploy before closure |
