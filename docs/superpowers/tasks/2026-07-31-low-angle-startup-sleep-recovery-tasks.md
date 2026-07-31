@@ -1,16 +1,16 @@
 # Milestone 17 — 低角度啟動睡眠恢復 Task Register
 
 日期：2026-07-31
-狀態：Governance approved；Tasks 1–5 可在 isolated worktree 進行。Tasks 6–7 保留逐步 production approval gates。
+狀態：Tasks 1–4 complete；Task 5 repository holistic gate in progress。Tasks 6–7 保留逐步 production approval gates。
 
 ## Task register
 
 | Task | Purpose | Primary evidence | Approval | Safe stop / rollback |
 | ---: | --- | --- | --- | --- |
-| 1 | Startup-closed RED contract | state-machine/coordinator failing tests | repository work approved by Milestone design | abandon worktree; live production unchanged |
-| 2 | Shared startup closed state machine | focused GREEN tests and immediate review | none beyond repository implementation | revert Task 2 commit; live production unchanged |
-| 3 | Shared composition equivalence | foreground/production integration tests | none beyond repository implementation | revert Task 3 commit |
-| 4 | README/runbook/event authority sync | docs/event focused tests | none beyond repository implementation | revert Task 4 commit |
+| 1 | Startup-closed RED contract — complete | state-machine/coordinator failing tests | repository work approved by Milestone design | abandon worktree; live production unchanged |
+| 2 | Shared startup closed state machine — complete | focused GREEN tests and immediate review | none beyond repository implementation | revert Task 2 commit; live production unchanged |
+| 3 | Shared composition equivalence — complete | foreground/production integration tests | none beyond repository implementation | revert Task 3 commit |
+| 4 | README/runbook/event authority sync — complete | docs/event focused tests | none beyond repository implementation | revert Task 4 commit |
 | 5 | Repository holistic release gate | full suite, release, package, clean snapshot, live read-only gate | separate approval required for push or production mutation | candidate remains local; current production unchanged |
 | 6 | Upgrade and bounded acceptance for new identity | upgrade, dry-run, enabled-once, recovery-resleep evidence | each mutation/real-sleep stage separately approved | reviewed rollback package; disabled/nonresident safe stops |
 | 7 | Persistent activation and low-angle reboot/loginwindow proof | activation, changed boot, pre-login startup sleep, cleanup, baseline | activate/reboot start/manual reboot/finish separately approved | emergency disable/bootout; rollback only with approval |

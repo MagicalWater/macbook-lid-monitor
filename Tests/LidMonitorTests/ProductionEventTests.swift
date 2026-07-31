@@ -25,6 +25,19 @@ final class ProductionEventTests: XCTestCase {
             formatter.line(for: .transition(name: "candidate-started"), at: Date()),
             "timestamp=2026-07-27T00:00:00Z event=transition pid=42 name=candidate-started"
         )
+        for name in [
+            "startup-closed-candidate",
+            "startup-closed-cancelled",
+            "startup-closed-debounce-elapsed",
+        ] {
+            let line = formatter.line(for: .transition(name: name), at: Date())
+            XCTAssertEqual(
+                line,
+                "timestamp=2026-07-27T00:00:00Z event=transition pid=42 name=\(name)"
+            )
+            XCTAssertFalse(line.contains("sensor="))
+            XCTAssertFalse(line.contains("raw="))
+        }
     }
 
     func testSensorValueAppearsOnlyOnAllowedTransitionEvent() {

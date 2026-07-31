@@ -60,6 +60,53 @@ health_state=monitoring-armed
 operational_baseline=pass
 ```
 
+## 低角度啟動與重新開機
+
+Milestone 17 候選版本修正了以下情境：Mac 在上蓋完全關閉或角度 `<=68` 時冷開機、重新啟動，
+或正式常駐程序重新啟動後，舊版本會在 startup cooldown 結束時停在 `disarmed`，直到上蓋先
+打開一次。
+
+新的共用 auto-sleep 規則為：
+
+```text
+啟動後等待 5 秒 startup cooldown
+
+最新新鮮角度 >=75
+→ monitoring-armed
+
+最新新鮮角度 <=68
+→ startup-closed-candidate
+→ 再等待 2 秒 close debounce
+→ 角度仍 <=68 且資料仍新鮮
+→ 請求一次睡眠
+
+角度 69...74、沒有資料、資料過期或資料無效
+→ fail-open，保持 monitoring-disarmed
+```
+
+Startup candidate 期間：
+
+- 打開到 `>=75`：取消 candidate 並重新 armed。
+- 只升到 `69...74`：取消 candidate 並回到 disarmed。
+- 資料無效或過期：取消 candidate 並回到 disarmed。
+- 睡眠要求失敗：不自動重試，回到 disarmed，必須重新打開至 `>=75` 才能 rearm。
+
+這套規則同時適用於前景 auto-sleep dry-run、前景 execute-sleep、production dry-run 與
+production enabled；差異只在 dry-run 輸出 `would-sleep`，真實模式呼叫系統睡眠。純診斷
+`--list`、`--watch`、`--watch --raw` 不建立 auto-sleep coordinator，因此不受影響。
+
+### 尚未完成 production 部署時
+
+Repository 中存在 Milestone 17 候選程式不代表目前已安裝 binary 已更新。必須完成：
+
+1. 新 package `upgrade`；
+2. 新 identity 的 dry-run、enabled-once、recovery-resleep acceptance；
+3. evidence-gated `activate`；
+4. 上蓋 `<=68` 的登入前 reboot 真實驗收；
+
+上述流程 closure 前，仍應將目前 live production 視為舊 startup 規則。暫時作法是開機後先把
+上蓋打開到 `>=75`，確認已 armed，再降低到 `<=68`。
+
 ## 日常狀態檢查
 
 ```bash

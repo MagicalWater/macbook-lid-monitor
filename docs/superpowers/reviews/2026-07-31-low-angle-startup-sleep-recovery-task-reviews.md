@@ -138,3 +138,36 @@ Diagnostic-focused suites: 6 tests, 0 failures
 
 **Task 3 approved.** Open P0 = 0；Open P1 without disposition = 0。可進入 Task 4
 documentation/event authority synchronization。
+
+## Task 4 — Documentation and event authority synchronization
+
+### RED evidence
+
+```text
+Production event privacy contract: passed immediately, generic formatter already preserves names
+Runbook contract: failed on missing「低角度啟動與重新開機」
+README-first contract: failed on missing Milestone 17 candidate/deployment warning
+```
+
+### GREEN verification
+
+```text
+ProductionEventTests: 3 tests, 0 failures
+Production runbook contract: 1 test, 0 failures
+README-first contract: 1 test, 0 failures
+```
+
+### Immediate review
+
+- README 前 100 行揭露漏洞修復候選與「尚未部署」狀態：通過。
+- README 新 startup policy 取代舊「低角度永遠 disarmed」說明：通過。
+- 中文 runbook 說明 `<=68`、`69...74`、`>=75`、freshness 與 failure boundaries：通過。
+- 文件未宣稱目前 installed binary 已包含 Milestone 17：通過。
+- 新 production transition 保持 stable、redacted、無 raw/sensor leakage：通過。
+- Pure diagnostic boundary 與 hardware support boundary 保留：通過。
+- Live production mutation：none。
+
+### Decision
+
+**Task 4 approved.** Open P0 = 0；Open P1 without disposition = 0。可進入 Task 5
+repository holistic release gate。

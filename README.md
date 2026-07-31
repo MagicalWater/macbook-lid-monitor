@@ -14,6 +14,11 @@ Production LaunchDaemon 只會透過 `scripts/manage-production-daemon.sh` 的�
 - Mac 被意外喚醒但上蓋仍未重新打開時，服務會在 recovery window 後再次請求睡眠。
 - 上蓋重新打開後，服務會重新進入監控狀態。
 
+> **部署狀態提醒：** Milestone 17 候選版本已在 repository 修正「上蓋 `<=68` 時冷開機或
+> 重新啟動後不會自動睡眠」的漏洞，但尚未部署到目前正式常駐服務。完成新版本 upgrade、
+> identity-bound acceptance、activate 與低角度登入前 reboot 驗收後，這項規則才會在 live
+> production 生效。部署前的暫時作法是開機後先把上蓋打開到 `>=75`，再降低到 `<=68`。
+
 最常用管理命令：
 
 ```bash
@@ -107,13 +112,20 @@ dry-run 不會向 macOS 發出真正的睡眠要求。
 
 啟動與睡眠後喚醒採用不同的安全規則：
 
-- 程式啟動後先等待 5 秒，且不會因啟動時已處於低角度就立即睡眠。
-- 啟動等待結束時，如果沒有取得新的 `>=75` 角度，程式會保持 `disarmed`，直到上蓋重新打開。
+- 所有 auto-sleep 模式共用同一套啟動 state-machine policy；純診斷 `--list`／`--watch` 不進入此流程。
+- 程式啟動後先等待 5 秒 startup cooldown，不會在 daemon 剛啟動時立刻睡眠。
+- Startup cooldown 結束時，若最新有效且未過期的角度 `>=75`，會進入正常 `armed` 狀態。
+- Startup cooldown 結束時，若最新有效且未過期的角度 `<=68`，會建立 `startup-closed-candidate`；再保持約 2 秒且資料仍新鮮、角度仍 `<=68` 時，dry-run 輸出 `would-sleep`，真實模式請求睡眠。
+- Startup cooldown 結束時若角度為 `69...74`，或沒有新鮮有效資料，會 fail-open 保持 `disarmed`。
+- Startup candidate 期間打開到 `>=75` 會取消 candidate 並 rearm；只升到 `69...74`、資料無效或資料過期會取消並回到 `disarmed`。
 - 真實睡眠後收到喚醒通知時，程式會清除睡眠前的舊角度資料，並進入 15 秒 `wake-recovery`。
 - recovery 到期時，若最新有效角度仍 `<75`，代表上蓋尚未真正重新打開，程式會再次要求睡眠。
 - `69...74` 屬於遲滯區間，不視為重新開蓋。
 - recovery 期間只要取得新的 `>=75` 角度，就會立即取消待執行的再次睡眠並重新啟用自動睡眠。
 - recovery 期間若沒有新的有效資料，或資料格式無效，程式會採用 fail-open：不要求睡眠並進入 `disarmed`。
+
+在預設 `5` 秒 startup cooldown 與 `2` 秒 close debounce 下，低角度啟動從 daemon 開始運行到
+提出睡眠要求約需 7 秒；實際時間仍受 HID 新鮮資料與系統排程影響。
 
 目前支援的時間參數為：
 

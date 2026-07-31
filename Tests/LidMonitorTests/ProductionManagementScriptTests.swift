@@ -43,6 +43,7 @@ final class ProductionManagementScriptTests: XCTestCase {
             "強制回到 `disabled`",
             "真實睡眠警告",
             "重新開機警告",
+            "低角度啟動與重新開機",
         ] {
             XCTAssertTrue(runbook.contains(requiredText), requiredText)
         }
@@ -68,6 +69,8 @@ final class ProductionManagementScriptTests: XCTestCase {
             "manage-production-daemon.sh disable",
             "manage-production-daemon.sh uninstall",
             "docs/operations/production-daemon.md",
+            "Milestone 17 候選版本",
+            "尚未部署到目前正式常駐服務",
         ] {
             XCTAssertTrue(firstHundredLines.contains(requiredText), requiredText)
         }
