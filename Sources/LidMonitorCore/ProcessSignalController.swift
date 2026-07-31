@@ -82,10 +82,12 @@ final class ProcessSignalController: @unchecked Sendable {
             return result
         }
         guard let resources else { return }
-        signal(SIGTERM, SIG_DFL)
-        signal(SIGINT, SIG_DFL)
+        signal(SIGTERM, SIG_IGN)
+        signal(SIGINT, SIG_IGN)
         resources.0?.cancel()
         resources.3?()
+        signal(SIGTERM, SIG_DFL)
+        signal(SIGINT, SIG_DFL)
     }
 
     deinit { stop() }
