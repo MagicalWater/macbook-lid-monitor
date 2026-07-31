@@ -21,6 +21,9 @@ enum AutoSleepTransitionEvent: Equatable, Sendable {
     case rearmed
     case candidateStarted
     case candidateCancelled
+    case startupClosedCandidateStarted
+    case startupClosedCandidateCancelled
+    case startupClosedDebounceElapsed
     case triggered
     case disarmed
     case startupCooldown

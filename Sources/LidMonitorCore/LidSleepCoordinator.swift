@@ -177,19 +177,29 @@ final class LidSleepCoordinator: @unchecked Sendable {
                 case .open:
                     if case .closingCandidate = previousState {
                         onTransitionEvent(.candidateCancelled)
+                    } else if case .startupClosedCandidate = previousState {
+                        onTransitionEvent(.startupClosedCandidateCancelled)
+                        onTransitionEvent(.rearmed)
                     } else {
                         onTransitionEvent(.rearmed)
                     }
                 case .closingCandidate: onTransitionEvent(.candidateStarted)
+                case .startupClosedCandidate:
+                    onTransitionEvent(.startupClosedCandidateStarted)
                 case .triggered:
                     if case .wakeRecovery = previousState {
                         onTransitionEvent(.recoveryResleep)
+                    } else if case .startupClosedCandidate = previousState {
+                        onTransitionEvent(.startupClosedDebounceElapsed)
                     } else {
                         onTransitionEvent(.triggered)
                     }
                 case .disarmed:
                     if case .wakeRecovery = previousState {
                         onTransitionEvent(.recoverySensorUnavailable)
+                    } else if case .startupClosedCandidate = previousState {
+                        onTransitionEvent(.startupClosedCandidateCancelled)
+                        onTransitionEvent(.disarmed)
                     } else {
                         onTransitionEvent(.disarmed)
                     }

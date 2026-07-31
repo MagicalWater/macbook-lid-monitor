@@ -90,6 +90,30 @@ final class ProductionDaemonCompositionTests: XCTestCase {
         session.stop(reason: "test")
     }
 
+    func testDryRunClosedStartupEmitsStartupTransitions() throws {
+        let fixture = Fixture(mode: .dryRun, descriptors: [Fixture.exactDescriptor])
+
+        let result = try fixture.application.start()
+        guard case let .running(session) = result else {
+            return XCTFail("expected running session")
+        }
+
+        fixture.stream.emit(report: [1, 60, 0], at: Date(timeIntervalSince1970: 1_001))
+        fixture.scheduler.runAll()
+        fixture.stream.emit(report: [1, 60, 0], at: Date(timeIntervalSince1970: 1_006))
+        fixture.scheduler.runAll()
+
+        XCTAssertTrue(
+            fixture.events.events.contains(.transition(name: "startup-closed-candidate"))
+        )
+        XCTAssertTrue(
+            fixture.events.events.contains(.transition(name: "startup-closed-debounce-elapsed"))
+        )
+        XCTAssertTrue(fixture.events.events.contains(.transition(name: "sleep-request-attempted")))
+        XCTAssertTrue(fixture.events.events.contains(.transition(name: "would-sleep")))
+        session.stop(reason: "test")
+    }
+
     func testOnlyValidDecodedReportsRecordHealthSamples() throws {
         let fixture = Fixture(mode: .dryRun, descriptors: [Fixture.exactDescriptor])
         let result = try fixture.application.start()

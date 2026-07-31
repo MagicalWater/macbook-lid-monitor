@@ -186,6 +186,12 @@ final class ProductionDaemonApplication {
                 case .triggered: sink.emit(.transition(name: "debounce-elapsed"))
                 case .recoveryResleep: sink.emit(.transition(name: "recovery-resleep"))
                 case .startupCooldown: sink.emit(.transition(name: "startup-cooldown"))
+                case .startupClosedCandidateStarted:
+                    sink.emit(.transition(name: "startup-closed-candidate"))
+                case .startupClosedCandidateCancelled:
+                    sink.emit(.transition(name: "startup-closed-cancelled"))
+                case .startupClosedDebounceElapsed:
+                    sink.emit(.transition(name: "startup-closed-debounce-elapsed"))
                 }
             },
             onValidSample: dependencies.recordValidSample

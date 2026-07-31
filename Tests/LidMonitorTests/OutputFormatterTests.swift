@@ -50,6 +50,18 @@ final class OutputFormatterTests: XCTestCase {
             formatter.autoSleepTransitionLine(.recoverySensorUnavailable),
             "auto-sleep: recovery-sensor-unavailable"
         )
+        XCTAssertEqual(
+            formatter.autoSleepTransitionLine(.startupClosedCandidateStarted),
+            "auto-sleep: startup-closed-candidate"
+        )
+        XCTAssertEqual(
+            formatter.autoSleepTransitionLine(.startupClosedCandidateCancelled),
+            "auto-sleep: startup-closed-cancelled"
+        )
+        XCTAssertEqual(
+            formatter.autoSleepTransitionLine(.startupClosedDebounceElapsed),
+            "auto-sleep: startup-closed-debounce-elapsed"
+        )
     }
 
     func testAutoSleepConfigurationLineReportsEffectivePolicy() throws {

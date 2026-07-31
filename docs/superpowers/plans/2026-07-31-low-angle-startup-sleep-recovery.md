@@ -76,8 +76,12 @@ git commit -m "test: define low-angle startup sleep contract"
 - Modify: `Sources/LidMonitorCore/LidSleepStateMachine.swift`
 - Modify: `Sources/LidMonitorCore/LidSleepCoordinator.swift`
 - Modify: `Sources/LidMonitorCore/SleepRequester.swift`
+- Modify: `Sources/LidMonitorCore/OutputFormatter.swift`
+- Modify: `Sources/LidMonitorCore/Production/ProductionDaemonApplication.swift`
 - Test: `Tests/LidMonitorTests/LidSleepStateMachineTests.swift`
 - Test: `Tests/LidMonitorTests/LidSleepCoordinatorTests.swift`
+- Test: `Tests/LidMonitorTests/OutputFormatterTests.swift`
+- Test: `Tests/LidMonitorTests/ProductionDaemonCompositionTests.swift`
 
 **Interfaces:**
 - Consumes: Task 1 failing contract；既有 `scheduleCloseDebounce(deadline:)` 與 `cancelCloseDebounce` effects。
