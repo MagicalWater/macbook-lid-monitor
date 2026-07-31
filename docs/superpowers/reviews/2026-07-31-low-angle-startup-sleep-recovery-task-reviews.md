@@ -128,6 +128,48 @@ git diff --check: pass
 **Task 6R2-2 approved.** Open P0 = 0；Open P1 without disposition = 0。可進入 holistic
 repository gate；Task 6 enabled-once 仍 blocked。
 
+### Holistic repository gate
+
+```text
+ProductionManagementScriptTests: 97 tests, 0 failures
+Swift full suite: 296 tests, 0 failures
+release macbook-lid-monitor: pass
+release macbook-lid-monitor-daemon: pass
+bash -n: pass
+shellcheck -x: pass
+package prepare/verify: pass
+git diff --check: pass
+implementation candidate: 04b35acf94c2e2a098112d889295f1e1a9603906
+```
+
+### Live read-only gate
+
+```text
+installed identity: 93d9881ecddb / 93d9881ecddb0256c8cce97a360e55187902b4cb
+mode/job/process: disabled / loaded-not-running / 0
+crash budget: count 1 / closed / runActive false
+acceptance metadata: root:wheel / 600 / 1103 bytes / mtime unchanged
+main working tree: clean
+production mutation: none
+```
+
+### Holistic scope review
+
+- Changed production file只有 management script：通過。
+- Three Task 13 paths共用 ordered handoff：通過。
+- Task 12／Task 17 untouched：通過。
+- No force-kill、reset、sleep、activation、reboot addition：通過。
+- Timeout no-bootstrap/no-acceptance：通過。
+- Candidate package自驗證：通過。
+- Reviewer subagent unavailable；使用 independent checklist + diff review + executable/full gates：
+  已記錄 disposition。
+
+### Decision
+
+**Task 6R2 repository candidate approved.** Open P0 = 0；Open P1 without disposition = 0。
+可執行 local-main ff-only integration；不得 push 或執行 production mutation。Integration 後必須
+從 final main fresh tree重新測試與 prepare/verify package。
+
 ## Task 1 — Startup-closed RED contract
 
 ### Baseline

@@ -301,7 +301,7 @@ docs/superpowers/plans/2026-07-31-maintenance-bootout-bounded-exit-recovery.md
 
 ### Task 6R2: Acceptance clean-exit handoff recovery
 
-**Status:** in progress；由 Task 6 deployment-dry-run pass 後的 crash-budget cleanup race 觸發。
+**Status:** repository candidate complete；holistic gates pass，local-main integration pending。
 
 **Authority:**
 
@@ -310,9 +310,10 @@ docs/superpowers/specs/2026-07-31-acceptance-clean-exit-handoff-recovery-design.
 docs/superpowers/plans/2026-07-31-acceptance-clean-exit-handoff-recovery.md
 ```
 
-Task 6R2 只允許 repository-only TDD。Production 必須維持 installed identity
+Task 6R2 repository-only TDD 已完成。Production 維持 installed identity
 `93d9881ecddb`、loaded／disabled／zero PID、dry-run pass、crash count 1 closed；不得 reset、
-重跑 acceptance 或執行真實睡眠。
+重跑 acceptance 或執行真實睡眠。Integration 後仍必須重新建立 final-main package，所有
+production mutation繼續分開批准。
 
 Task 6 enabled-once 在 Task 6R2 repository closure、local-main integration、new package
 deployment、crash-budget reset 與 dry-run revalidation 各自獲得批准前保持 blocked。現有

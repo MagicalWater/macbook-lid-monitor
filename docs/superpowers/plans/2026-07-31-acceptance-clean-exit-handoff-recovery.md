@@ -284,7 +284,7 @@ git commit -m "fix: wait for acceptance clean-exit handoff"
 - Consumes: Task 6R2 RED/GREEN commits and current production read-only evidence。
 - Produces: final repository candidate、new package identity、separate approval boundary for production upgrade/reset/revalidation；不執行任何 production mutation。
 
-- [ ] **Step 1: 執行 holistic management and Swift gates**
+- [x] **Step 1: 執行 holistic management and Swift gates**
 
 ```bash
 swift test --filter ProductionManagementScriptTests
@@ -293,7 +293,7 @@ swift build -c release --product macbook-lid-monitor
 swift build -c release --product macbook-lid-monitor-daemon
 ```
 
-- [ ] **Step 2: 執行 static and package gates**
+- [x] **Step 2: 執行 static and package gates**
 
 ```bash
 bash -n scripts/manage-production-daemon.sh scripts/lib/*.sh
@@ -303,7 +303,7 @@ shellcheck -x scripts/manage-production-daemon.sh scripts/lib/*.sh
 git diff --check
 ```
 
-- [ ] **Step 3: Live production read-only verification**
+- [x] **Step 3: Live production read-only verification**
 
 確認：
 
@@ -320,13 +320,13 @@ runActive=false
 
 不得 sudo mutation 或 reset。
 
-- [ ] **Step 4: Holistic review and validation authority**
+- [x] **Step 4: Holistic review and validation authority**
 
 記錄 baseline、RED/GREEN、timeout、crash-count preservation、full suites、release/static/package、
 production unchanged。Task 6 enabled-once 仍 blocked，直到新的 final-main package 經 separate
 upgrade、crash-budget reset 與 dry-run revalidation approvals。
 
-- [ ] **Step 5: Commit Task 6R2 closure**
+- [x] **Step 5: Commit Task 6R2 closure**
 
 ```bash
 git add docs/superpowers docs/validation
