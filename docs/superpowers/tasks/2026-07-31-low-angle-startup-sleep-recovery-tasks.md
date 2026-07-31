@@ -1,7 +1,7 @@
 # Milestone 17 — 低角度啟動睡眠恢復 Task Register
 
 日期：2026-07-31
-狀態：Stage A／B 與 Tasks 1–5 complete，候選已 fast-forward 整合回本機 `main`。Stage C／Tasks 6–7 尚未開始，保留逐步 production approval gates；目前 installed production 仍是舊 identity 與舊 startup behavior。
+狀態：Stage A／B 與 Tasks 1–5 complete。Task 6 第一次 upgrade 在 payload replacement 前因 maintenance bootout 退出競態安全停止；Task 6R in progress，Task 6 blocked。Installed production 為舊 identity、disabled、job absent、zero PID。
 
 ## Task register
 
@@ -13,6 +13,7 @@
 | 4 | README/runbook/event authority sync — complete | docs/event focused tests | none beyond repository implementation | revert Task 4 commit |
 | 5 | Repository holistic release gate — complete | 289 tests in current/clean clone; release/static/package gates; live old identity unchanged | separate approval required for push or production mutation | candidate remains local; current production unchanged |
 | 6 | Upgrade and bounded acceptance for new identity | upgrade, dry-run, enabled-once, recovery-resleep evidence | each mutation/real-sleep stage separately approved | reviewed rollback package; disabled/nonresident safe stops |
+| 6R | Repair maintenance bootout resident-process race | delayed-exit RED/GREEN, timeout-before-replacement evidence, full repository gate | repository-only TDD approved; new approval required before upgrade retry | old identity remains disabled, booted out, zero PID |
 | 7 | Persistent activation and low-angle reboot/loginwindow proof | activation, changed boot, pre-login startup sleep, cleanup, baseline | activate/reboot start/manual reboot/finish separately approved | emergency disable/bootout; rollback only with approval |
 
 ## Stage gates
@@ -27,8 +28,10 @@ Task 5 已通過 current checkout 與 valid clean clone 的 289-test、release�
 
 ### Stage C — Production deployment — open
 
-Tasks 6–7 尚未開始。每次 upgrade、真實睡眠、activate、reboot 都是新的批准 gate，不能沿用前一 Task
-批准。新 payload identity 必須重新建立全部 acceptance。
+Task 6 第一次 upgrade 已在 `bootout` 後、payload replacement 前 exit 70。Task 6R 必須先修復
+bounded daemon-exit synchronization 並形成新的 final-main package。每次 upgrade、真實睡眠、
+activate、reboot 都是新的批准 gate，不能沿用前一批准；新 payload identity 必須重新建立全部
+acceptance。
 
 ## Completion rule
 

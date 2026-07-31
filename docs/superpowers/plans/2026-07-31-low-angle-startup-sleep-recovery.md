@@ -287,6 +287,21 @@ Upgrade 必須結束於 loaded/disabled/zero PID；舊 acceptance 因 payload id
 
 每個 acceptance identity 必須與新 installed source commit/version 完全一致。
 
+### Task 6R: Maintenance bootout bounded-exit recovery
+
+**Status:** in progress；由 Task 6 第一次 upgrade 的 exit-code 70 safe stop 觸發。
+
+**Authority:**
+
+```text
+docs/superpowers/specs/2026-07-31-maintenance-bootout-bounded-exit-recovery-design.md
+docs/superpowers/plans/2026-07-31-maintenance-bootout-bounded-exit-recovery.md
+```
+
+Task 6 在 Task 6R repository closure、local-main integration、final-main package 重新
+`prepare`／`verify` 與新的 production upgrade 批准前保持 blocked。不得重用 package
+`72a274e6ef29` 作為 final authority。
+
 ### Task 7: Persistent activation 與低角度 reboot/loginwindow acceptance
 
 **Approval:** `activate`、reboot preparation、使用者手動 reboot、finish 各自獨立批准。

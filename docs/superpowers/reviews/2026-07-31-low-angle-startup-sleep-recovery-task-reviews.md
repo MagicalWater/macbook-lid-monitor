@@ -321,3 +321,50 @@ live production、remaining Tasks、read order 與獨立批准邊界。Finding c
 **Task 5 integration and handoff closure approved.** Open P0 = 0；Open P1 without disposition = 0。
 Milestone 17 可安全切換至新對話，從 Task 6 read-only baseline audit 開始；Milestone 17 本身仍未
 complete，因 Tasks 6–7／Stage C 尚未執行。
+
+## Task 6 — First upgrade attempt safe stop
+
+### Approved package and command
+
+```text
+repository main: 72a274e6ef2924213c1b43840bff6db34370d356
+staged version: 72a274e6ef29
+staged binary SHA-256: 0376080dcdc0bfa58b945658da85966a5a4df1abfe691502cc7999e47926d935
+command: sudo ./scripts/manage-production-daemon.sh upgrade
+```
+
+### Failure evidence
+
+```text
+booted-out label=com.crazydennies.macbook-lid-monitor
+error: maintenance requires no resident daemon
+exit_code=70
+```
+
+Immediate post-failure evidence：
+
+```text
+installed version: 0885d54dbf13
+installed source commit: 0885d54dbf133fdd8620d4a38379a8ed64819430
+mode: disabled
+job: absent
+process count: 0
+payload replacement: none
+```
+
+### Root-cause review
+
+`prepare_maintenance_disabled_state` 在 `launchctl bootout` 返回後立即 `pgrep`。真實 daemon
+仍可能短暫處於退出過程，造成正常 termination latency 被誤判為 resident failure。現有
+`MLM_TEST_ROOT` tests 跳過 real process probe，未覆蓋該競態。
+
+### Decision
+
+Task 6 upgrade **not complete**。Safe stop 有效，但 Task 6 blocked by Task 6R。不得直接重試、
+bootstrap、dry-run 或真實睡眠。
+
+## Task 6R — Governance initialization
+
+Spec、task-level Spec review、holistic Spec review、Implementation Plan、task-level Plan review 與
+holistic Plan review 已建立。Recovery scope 僅限 bounded daemon-exit synchronization；production
+必須維持 old identity／disabled／job absent／zero PID。
