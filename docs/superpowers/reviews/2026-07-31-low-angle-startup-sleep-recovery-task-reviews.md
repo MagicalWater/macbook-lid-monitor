@@ -823,3 +823,50 @@ push: not executed
 
 **Task 6 and Task 6R3 production acceptance approved and complete.** Open P0 = 0；Open P1 without
 disposition = 0。Task 7 remains the only open Stage C scope.
+
+## Task 7 Step 1 — Persistent activation review
+
+### Approval and preflight
+
+Step 1 was explicitly started as a bounded activation-only operation. The operation excluded reboot
+observer preparation, manual reboot, finish, rollback and push. Preflight confirmed:
+
+```text
+repository head: 5d0769556cbf0a49800c1af9b740cb398a3c7353
+installed version: 7bf98ff6ceae
+installed source commit: 7bf98ff6ceae710757b38b14efa00d42c34ca573
+mode/job/process: disabled / loaded-not-running / 0
+crash: count 0 / circuit closed / runActive false
+acceptance: deployment-dry-run, deployment-enabled-once, deployment-recovery-resleep
+reboot artifacts: absent
+```
+
+### Activation evidence
+
+```text
+verified deployment-acceptance stages=deployment-dry-run deployment-enabled-once deployment-recovery-resleep
+booted-out label=com.crazydennies.macbook-lid-monitor
+bootstrapped label=com.crazydennies.macbook-lid-monitor
+activated deployment mode=enabled label=com.crazydennies.macbook-lid-monitor
+baseline_wait=pass probes=5
+operational_baseline=pass pid=99898
+```
+
+Root diagnostics reported exact installed integrity, target hardware, complete acceptance, managed lease,
+fresh PID-bound health, and closed crash circuit. Independent post-command evidence showed:
+
+```text
+09:29:13 started pid=99898 mode=enabled
+09:29:14 startup-cooldown
+09:29:19 monitoring-armed
+mode/job/process: enabled / loaded / 1
+crash: count 0 / circuit closed / runActive true
+health metadata: root:wheel 0600, updating after activation
+reboot state/evidence/observer artifacts: absent
+```
+
+### Decision
+
+**Task 7 Step 1 approved and complete.** Persistent enabled mode is intentional. Open P0 = 0；Open P1
+without disposition = 0。Step 2 reboot observer preparation remains separately approval-gated；no reboot
+or push occurred.

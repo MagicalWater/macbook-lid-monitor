@@ -14,10 +14,11 @@ Production LaunchDaemon 只會透過 `scripts/manage-production-daemon.sh` 的�
 - Mac 被意外喚醒但上蓋仍未重新打開時，服務會在 recovery window 後再次請求睡眠。
 - 上蓋重新打開後，服務會重新進入監控狀態。
 
-> **部署狀態提醒：** Milestone 17 候選版本已在 repository 修正「上蓋 `<=68` 時冷開機或
-> 重新啟動後不會自動睡眠」的漏洞，但尚未部署到目前正式常駐服務。完成新版本 upgrade、
-> identity-bound acceptance、activate 與低角度登入前 reboot 驗收後，這項規則才會在 live
-> production 生效。部署前的暫時作法是開機後先把上蓋打開到 `>=75`，再降低到 `<=68`。
+> **部署狀態提醒：** Milestone 17 identity `7bf98ff6ceae` 已完成 upgrade、三階段
+> identity-bound acceptance 與 evidence-gated persistent activation；目前 production 為
+> `enabled`、single PID、`monitoring-armed`，低角度啟動規則已在 live binary 中生效。尚未完成的
+> 是上蓋 `<=68` 時重新啟動並停留 loginwindow 的獨立真機證明；在該驗收完成前，不宣稱整個
+> Milestone 17 已收尾。
 
 最常用管理命令：
 

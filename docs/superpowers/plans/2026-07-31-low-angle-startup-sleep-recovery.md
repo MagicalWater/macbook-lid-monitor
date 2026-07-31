@@ -337,9 +337,13 @@ is loaded／disabled／zero PID、crash count 0、circuit closed、runActive fal
 
 **Approval:** `activate`、reboot preparation、使用者手動 reboot、finish 各自獨立批准。
 
-- [ ] **Step 1: Persistent activation**
+- [x] **Step 1: Persistent activation**
 
 驗證 complete matching acceptance，activate 後 single PID、monitoring-armed、baseline pass。
+
+2026-07-31 已完成：installed identity `7bf98ff6ceae` 的三階段 acceptance 驗證通過；
+`activate` 成功後 PID `99898` 進入 `monitoring-armed`，`operational_baseline=pass`。最終保持
+enabled／loaded／single PID、crash count 0；reboot observer absent，未 reboot、未 push。
 
 - [ ] **Step 2: Arm low-angle reboot observer**
 

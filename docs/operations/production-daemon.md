@@ -113,15 +113,22 @@ LINE timed out(30000 ms)
 應持續保持上蓋明顯低於 `68`，直到第二次睡眠真正發生；若 15–20 秒尚未再次睡眠，不要立即
 翻開上蓋判定失敗。
 
-### 尚未完成 persistent activation 與 reboot 驗收時
+### Persistent activation 已完成、reboot 驗收尚未完成時
 
-Milestone 17 identity `7bf98ff6ceae` 已完成 package upgrade 與三階段 acceptance，但尚未完成：
+Milestone 17 identity `7bf98ff6ceae` 已完成 package upgrade、三階段 acceptance 與
+evidence-gated `activate`。2026-07-31 activation 後的嚴格基準為：
 
-1. evidence-gated `activate`；
-2. 上蓋 `<=68` 的登入前 reboot 真實驗收；
+```text
+mode=enabled
+job=loaded
+process-count=1
+health_state=monitoring-armed
+operational_baseline=pass
+```
 
-目前 production 仍刻意保持 loaded／disabled／zero PID；未取得 activation 批准前，不會長期
-自動執行真實睡眠。
+正式服務會長期自動執行真實睡眠。尚未完成的是上蓋 `<=68` 時重新啟動、停留 loginwindow，
+並證明新 boot 中的 system-domain daemon 在登入前完成 startup cooldown、startup-closed candidate、
+debounce 與一次睡眠要求。Reboot observer、手動 reboot 與 finish 各自仍需要獨立批准。
 
 ## 日常狀態檢查
 
