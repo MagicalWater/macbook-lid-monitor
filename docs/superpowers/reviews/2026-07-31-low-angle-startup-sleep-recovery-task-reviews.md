@@ -106,3 +106,35 @@ AutoSleepIntegrationTests regression suite: 9 tests, 0 failures
 
 **Task 2 approved.** Open P0 = 0；Open P1 without disposition = 0。可進入 Task 3
 composition equivalence verification。
+
+## Task 3 — Shared composition equivalence
+
+### Verification
+
+```text
+AutoSleepIntegrationTests: 11 tests, 0 failures
+ProductionDaemonCompositionTests: 13 tests, 0 failures
+Diagnostic-focused suites: 6 tests, 0 failures
+```
+
+### Accepted evidence
+
+- Foreground dry-run 低角度 startup：cooldown + debounce 後 exactly one `would-sleep`。
+- Foreground execute-sleep 低角度 startup：injected system operation exactly once。
+- Production dry-run 低角度 startup：穩定 startup transition + `would-sleep`。
+- Production enabled 低角度 startup：production requester exactly once。
+- 四種模式未注入不同 startup policy；差異只存在 requester effect。
+- Pure diagnostic CLI/parser、hardware ranking 與 diagnostics tests 保持通過。
+- Live production mutation：none。
+
+### Immediate review
+
+- 測試對 real coordinator/state-machine behavior 斷言，不只搜尋 source string：通過。
+- Enabled requester 使用 thread-safe counter，未改 production interface：通過。
+- Dry-run 不取得 sleep authority、execute-sleep authority 規則未改：通過。
+- 舊 unused test requester 已移除：通過。
+
+### Decision
+
+**Task 3 approved.** Open P0 = 0；Open P1 without disposition = 0。可進入 Task 4
+documentation/event authority synchronization。

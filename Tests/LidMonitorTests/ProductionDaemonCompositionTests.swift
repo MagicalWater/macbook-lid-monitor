@@ -114,6 +114,30 @@ final class ProductionDaemonCompositionTests: XCTestCase {
         session.stop(reason: "test")
     }
 
+    func testEnabledClosedStartupRequestsProductionRequesterOnce() throws {
+        let fixture = Fixture(mode: .enabled, descriptors: [Fixture.exactDescriptor])
+
+        let result = try fixture.application.start()
+        guard case let .running(session) = result else {
+            return XCTFail("expected running session")
+        }
+
+        fixture.stream.emit(report: [1, 60, 0], at: Date(timeIntervalSince1970: 1_001))
+        fixture.scheduler.runAll()
+        fixture.stream.emit(report: [1, 60, 0], at: Date(timeIntervalSince1970: 1_006))
+        fixture.scheduler.runAll()
+
+        XCTAssertEqual(fixture.requesterFactory.requestCount, 1)
+        XCTAssertTrue(
+            fixture.events.events.contains(.transition(name: "startup-closed-candidate"))
+        )
+        XCTAssertTrue(
+            fixture.events.events.contains(.transition(name: "startup-closed-debounce-elapsed"))
+        )
+        XCTAssertTrue(fixture.events.events.contains(.transition(name: "sleep-request-attempted")))
+        session.stop(reason: "test")
+    }
+
     func testOnlyValidDecodedReportsRecordHealthSamples() throws {
         let fixture = Fixture(mode: .dryRun, descriptors: [Fixture.exactDescriptor])
         let result = try fixture.application.start()
@@ -309,10 +333,10 @@ private final class CompositionScheduler: OneShotScheduling, @unchecked Sendable
 }
 
 private final class CompositionTask: CancellableTask, @unchecked Sendable { func cancel() {} }
-private final class CompositionRequester: SleepRequesting, @unchecked Sendable { func requestSleep() throws {} }
-
 private final class CompositionRequesterFactory: @unchecked Sendable {
     private(set) var requestedModes: [ProductionMode] = []
+    private let requestCounter = CompositionCounter()
+    var requestCount: Int { requestCounter.value }
     func make(_ mode: ProductionMode, _ sink: ProductionEventSinking) -> SleepRequesting {
         requestedModes.append(mode)
         switch mode {
@@ -323,9 +347,15 @@ private final class CompositionRequesterFactory: @unchecked Sendable {
                 }
             }
         case .enabled, .disabled:
-            return CompositionRequester()
+            return CountingCompositionRequester(counter: requestCounter)
         }
     }
+}
+
+private final class CountingCompositionRequester: SleepRequesting, @unchecked Sendable {
+    private let counter: CompositionCounter
+    init(counter: CompositionCounter) { self.counter = counter }
+    func requestSleep() throws { counter.increment() }
 }
 
 private final class CompositionEventSink: ProductionEventSinking, @unchecked Sendable {

@@ -102,6 +102,79 @@ final class AutoSleepIntegrationTests: XCTestCase {
         coordinator.stop()
     }
 
+    func testDryRunClosedStartupWouldSleepAfterCooldownAndDebounce() throws {
+        let base = Date(timeIntervalSince1970: 4_500)
+        let policy = LidSleepPolicy.calibratedDefault
+        let stream = IntegrationReportStream()
+        let scheduler = IntegrationScheduler()
+        let recorder = IntegrationEventRecorder()
+
+        let coordinator = AutoSleepComposition.makeCoordinator(
+            stream: stream,
+            decoder: CompositeLidAngleDecoder(decoders: [ReportID1DegreesDecoder()]),
+            scheduler: scheduler,
+            wakeObserver: IntegrationWakeObserver(),
+            executionMode: .dryRun,
+            policy: policy,
+            now: { base },
+            onOperationalEvent: recorder.record,
+            onTransitionEvent: recorder.recordTransition
+        )
+
+        try coordinator.start()
+        stream.emit(angle: policy.sleepThreshold, at: base.addingTimeInterval(1))
+        scheduler.fire(at: base.addingTimeInterval(5))
+        stream.emit(angle: policy.sleepThreshold, at: base.addingTimeInterval(6))
+        scheduler.fire(at: base.addingTimeInterval(7))
+
+        XCTAssertEqual(recorder.events, [.sleepRequestAttempted, .wouldSleep])
+        XCTAssertEqual(
+            recorder.transitions,
+            [
+                .startupCooldown,
+                .startupClosedCandidateStarted,
+                .startupClosedDebounceElapsed
+            ]
+        )
+        coordinator.stop()
+    }
+
+    func testExecuteSleepClosedStartupRequestsInjectedOperationOnce() throws {
+        let base = Date(timeIntervalSince1970: 4_700)
+        let policy = LidSleepPolicy.calibratedDefault
+        let stream = IntegrationReportStream()
+        let scheduler = IntegrationScheduler()
+        let operation = IntegrationSystemSleepOperation()
+        let recorder = IntegrationEventRecorder()
+
+        let coordinator = AutoSleepComposition.makeCoordinator(
+            stream: stream,
+            decoder: CompositeLidAngleDecoder(decoders: [ReportID1DegreesDecoder()]),
+            scheduler: scheduler,
+            wakeObserver: IntegrationWakeObserver(),
+            executionMode: .executeSleep,
+            policy: policy,
+            now: { base },
+            systemSleepOperation: operation,
+            onOperationalEvent: recorder.record,
+            onTransitionEvent: recorder.recordTransition
+        )
+
+        try coordinator.start()
+        stream.emit(angle: policy.sleepThreshold, at: base.addingTimeInterval(1))
+        scheduler.fire(at: base.addingTimeInterval(5))
+        stream.emit(angle: policy.sleepThreshold, at: base.addingTimeInterval(6))
+        scheduler.fire(at: base.addingTimeInterval(7))
+
+        XCTAssertEqual(operation.requestCount, 1)
+        XCTAssertEqual(recorder.events, [.sleepRequestAttempted, .sleepRequested])
+        XCTAssertEqual(
+            recorder.transitions.suffix(2),
+            [.startupClosedCandidateStarted, .startupClosedDebounceElapsed]
+        )
+        coordinator.stop()
+    }
+
     func testCancellingCandidateEmitsCandidateCancelledInsteadOfRearmed() throws {
         let base = Date(timeIntervalSince1970: 5_000)
         let policy = LidSleepPolicy.calibratedDefault
