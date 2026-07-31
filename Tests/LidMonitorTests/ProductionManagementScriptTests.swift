@@ -575,7 +575,7 @@ final class ProductionManagementScriptTests: XCTestCase {
         XCTAssertTrue(text.contains("expected exactly one sleep-request-attempted event"))
         XCTAssertTrue(text.contains("expected at most one sleep-requested return event"))
         XCTAssertTrue(text.contains("attempt-count=1 return-count=%s"))
-        XCTAssertTrue(text.contains("trap cleanup_task13_enabled_once_to_disabled EXIT"))
+        XCTAssertTrue(text.contains("trap cleanup_acceptance_to_disabled EXIT"))
         XCTAssertTrue(text.contains("action=close-lid-within-180-seconds"))
         XCTAssertFalse(text.contains("sudo -S"))
         XCTAssertFalse(text.contains("read -s"))
@@ -602,7 +602,7 @@ final class ProductionManagementScriptTests: XCTestCase {
         XCTAssertTrue(text.contains("expected exactly two sleep-request-attempted events"))
         XCTAssertTrue(text.contains("expected exactly one recovery-resleep event"))
         XCTAssertTrue(text.contains("expected two wake-recovery events"))
-        XCTAssertTrue(text.contains("trap cleanup_task13_recovery_resleep_to_disabled EXIT"))
+        XCTAssertTrue(text.contains("trap cleanup_acceptance_to_disabled EXIT"))
         XCTAssertTrue(text.contains("after-first-wake-keep-lid-below-68-degrees-for-15-seconds"))
         XCTAssertFalse(text.contains("sudo -S"))
         XCTAssertFalse(text.contains("read -s"))
@@ -698,6 +698,162 @@ final class ProductionManagementScriptTests: XCTestCase {
         XCTAssertEqual(config.mode, .disabled)
     }
 
+    func testTask13DryRunCleanupWaitsForCleanExitBeforeBootstrapAndPreservesCrashCount() throws {
+        let sandbox = root.appendingPathComponent(
+            ".build/production-package-task13-dry-run-clean-exit-root"
+        )
+        try? FileManager.default.removeItem(at: sandbox)
+        defer { try? FileManager.default.removeItem(at: sandbox) }
+
+        try seedStaging()
+        try runScript("install", environment: ["MLM_TEST_ROOT": sandbox.path])
+        try runScript("bootstrap", environment: ["MLM_TEST_ROOT": sandbox.path])
+        let crashBudget = sandbox.appendingPathComponent(
+            "Library/Application Support/MacBookLidMonitor/crash-budget.json"
+        )
+        let originalBudget = Data(
+            "{\"unexpectedExitTimes\":[1000.0],\"circuitOpen\":false,\"runActive\":false}".utf8
+        )
+        try originalBudget.write(to: crashBudget)
+
+        let output = try runScriptOutput(
+            "accept-task13-dry-run-path",
+            environment: [
+                "MLM_TEST_ROOT": sandbox.path,
+                "MLM_TEST_CLEAN_EXIT_ACTIVE_PROBES": "2",
+            ]
+        )
+
+        let verified = try XCTUnwrap(
+            output.range(of: "verified task=13 scope=dry-run-path")
+        )
+        let suffix = String(output[verified.lowerBound...])
+        let stopped = try XCTUnwrap(suffix.range(of: "stopped label="))
+        let bootedOut = try XCTUnwrap(suffix.range(of: "booted-out label="))
+        let daemonWait = try XCTUnwrap(suffix.range(of: "daemon-exit-wait=pass"))
+        let cleanWait = try XCTUnwrap(suffix.range(of: "clean-exit-wait=pass probes=3"))
+        let bootstrapped = try XCTUnwrap(suffix.range(of: "bootstrapped label="))
+        XCTAssertLessThan(stopped.lowerBound, bootedOut.lowerBound)
+        XCTAssertLessThan(bootedOut.lowerBound, daemonWait.lowerBound)
+        XCTAssertLessThan(daemonWait.lowerBound, cleanWait.lowerBound)
+        XCTAssertLessThan(cleanWait.lowerBound, bootstrapped.lowerBound)
+        XCTAssertEqual(try Data(contentsOf: crashBudget), originalBudget)
+    }
+
+    func testDeploymentDryRunCleanExitTimeoutDoesNotBootstrapOrRecordAcceptance() throws {
+        let sandbox = root.appendingPathComponent(
+            ".build/production-deployment-dry-run-clean-exit-timeout-root"
+        )
+        try? FileManager.default.removeItem(at: sandbox)
+        defer { try? FileManager.default.removeItem(at: sandbox) }
+
+        try seedStaging()
+        try runScript("install", environment: ["MLM_TEST_ROOT": sandbox.path])
+        try runScript("bootstrap", environment: ["MLM_TEST_ROOT": sandbox.path])
+        let support = sandbox.appendingPathComponent(
+            "Library/Application Support/MacBookLidMonitor"
+        )
+        let crashBudget = support.appendingPathComponent("crash-budget.json")
+        try Data(
+            "{\"unexpectedExitTimes\":[1000.0],\"circuitOpen\":false,\"runActive\":false}".utf8
+        ).write(to: crashBudget)
+
+        let result = try runScriptFailure(
+            "deployment-dry-run",
+            environment: [
+                "MLM_TEST_ROOT": sandbox.path,
+                "MLM_TEST_CLEAN_EXIT_ACTIVE_PROBES": "51",
+            ]
+        )
+
+        XCTAssertEqual(result.status, 70, result.output)
+        let timeout = try XCTUnwrap(
+            result.output.range(of: "error: timed out waiting for crash-budget clean exit")
+        )
+        let suffix = String(result.output[timeout.lowerBound...])
+        XCTAssertFalse(suffix.contains("bootstrapped label="), suffix)
+        XCTAssertFalse(suffix.contains("recorded deployment-acceptance"), suffix)
+        XCTAssertFalse(FileManager.default.fileExists(
+            atPath: support.appendingPathComponent("deployment-acceptance.plist").path
+        ))
+        let config = try ProductionConfigurationDecoder().decode(
+            Data(contentsOf: support.appendingPathComponent("config.plist"))
+        )
+        XCTAssertEqual(config.mode, .disabled)
+    }
+
+    func testTask13FailureTrapUsesBoundedCleanExitHandoff() throws {
+        let sandbox = root.appendingPathComponent(
+            ".build/production-deployment-dry-run-clean-exit-trap-root"
+        )
+        try? FileManager.default.removeItem(at: sandbox)
+        defer { try? FileManager.default.removeItem(at: sandbox) }
+
+        try seedStaging()
+        try runScript("install", environment: ["MLM_TEST_ROOT": sandbox.path])
+        try runScript("bootstrap", environment: ["MLM_TEST_ROOT": sandbox.path])
+        let support = sandbox.appendingPathComponent(
+            "Library/Application Support/MacBookLidMonitor"
+        )
+        try Data(
+            "{\"unexpectedExitTimes\":[1000.0],\"circuitOpen\":false,\"runActive\":false}".utf8
+        ).write(to: support.appendingPathComponent("crash-budget.json"))
+
+        let result = try runScriptFailure(
+            "deployment-dry-run",
+            environment: [
+                "MLM_TEST_ROOT": sandbox.path,
+                "MLM_TEST_DEPLOYMENT_FAIL_STAGE": "dry-run",
+                "MLM_TEST_CLEAN_EXIT_ACTIVE_PROBES": "2",
+            ]
+        )
+
+        XCTAssertTrue(result.output.contains("error=deployment-test-failure stage=dry-run"), result.output)
+        XCTAssertTrue(result.output.contains("clean-exit-wait=pass probes=3"), result.output)
+        XCTAssertFalse(FileManager.default.fileExists(
+            atPath: support.appendingPathComponent("deployment-acceptance.plist").path
+        ))
+        let config = try ProductionConfigurationDecoder().decode(
+            Data(contentsOf: support.appendingPathComponent("config.plist"))
+        )
+        XCTAssertEqual(config.mode, .disabled)
+    }
+
+    func testTask13AcceptanceCleanupUsesSharedSandboxIsolatedHandoff() throws {
+        let text = try String(
+            contentsOf: root.appendingPathComponent("scripts/manage-production-daemon.sh"),
+            encoding: .utf8
+        )
+        for helper in [
+            "crash_budget_clean_exit_persisted()",
+            "wait_for_crash_budget_clean_exit()",
+            "restore_disabled_job_after_acceptance()",
+            "cleanup_acceptance_to_disabled()",
+        ] {
+            XCTAssertTrue(text.contains(helper), helper)
+        }
+        XCTAssertGreaterThanOrEqual(
+            text.components(separatedBy: "restore_disabled_job_after_acceptance").count - 1,
+            4
+        )
+        XCTAssertGreaterThanOrEqual(
+            text.components(separatedBy: "trap cleanup_acceptance_to_disabled EXIT").count - 1,
+            3
+        )
+        let probeStart = try XCTUnwrap(text.range(of: "crash_budget_clean_exit_persisted()"))
+        let probeEnd = try XCTUnwrap(
+            text.range(
+                of: "\n}\n\nwait_for_crash_budget_clean_exit()",
+                range: probeStart.upperBound..<text.endIndex
+            )
+        )
+        let probe = String(text[probeStart.lowerBound..<probeEnd.upperBound])
+        XCTAssertTrue(probe.contains("if [[ -n \"$SYSTEM_ROOT\" ]]; then"), probe)
+        XCTAssertTrue(probe.contains("TEST_CLEAN_EXIT_ACTIVE_PROBES_REMAINING"), probe)
+        XCTAssertTrue(probe.contains("crash-budget.json"), probe)
+        XCTAssertTrue(probe.contains("/usr/bin/python3"), probe)
+    }
+
     func testTask13DryRunPathCommandRequiresFullDiagnosticChainAndFailSafe() throws {
         let text = try String(contentsOf: root.appendingPathComponent("scripts/manage-production-daemon.sh"), encoding: .utf8)
         XCTAssertTrue(text.contains("accept-task13-dry-run-path)"))
@@ -705,7 +861,7 @@ final class ProductionManagementScriptTests: XCTestCase {
         XCTAssertTrue(text.contains("debounce-elapsed evidence missing"))
         XCTAssertTrue(text.contains("expected exactly one sleep-request-attempted event"))
         XCTAssertTrue(text.contains("expected exactly one would-sleep event"))
-        XCTAssertTrue(text.contains("trap cleanup_task13_dry_run_path_to_disabled EXIT"))
+        XCTAssertTrue(text.contains("trap cleanup_acceptance_to_disabled EXIT"))
         XCTAssertTrue(text.contains("monitoring-armed readiness missing"))
         XCTAssertTrue(text.contains("ready task=13 scope=dry-run-path"))
         XCTAssertTrue(text.contains("event=transition.*pid=$daemon_pid.*name=monitoring-armed"))

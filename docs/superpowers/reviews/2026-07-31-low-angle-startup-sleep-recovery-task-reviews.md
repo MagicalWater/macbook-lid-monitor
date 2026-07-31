@@ -39,6 +39,38 @@ Task 6R2 repository-only execution approved。Design 選擇 bounded resident-exi
 crash-budget clean-state verification；不 reset、不強殺、不重跑 dry-run。Task 6 enabled-once
 維持 blocked。Open P0 = 0；Open P1 without disposition = 0。
 
+### RED execution evidence
+
+```text
+testTask13DryRunCleanupWaitsForCleanExitBeforeBootstrapAndPreservesCrashCount:
+failed as expected — post-verification cleanup has no daemon/clean-exit wait markers
+
+testDeploymentDryRunCleanExitTimeoutDoesNotBootstrapOrRecordAcceptance:
+failed as expected — command returned 0, bootstrapped and recorded acceptance
+
+testTask13FailureTrapUsesBoundedCleanExitHandoff:
+failed as expected — injected failure preserved, but trap emitted no clean-exit handoff evidence
+
+testTask13AcceptanceCleanupUsesSharedSandboxIsolatedHandoff:
+failed as expected — all four shared helper interfaces are absent
+```
+
+One initial failure-trap assertion used a non-authoritative wording. It was corrected to the existing
+stable output `error=deployment-test-failure stage=dry-run`; the rerun then failed only because
+`clean-exit-wait=pass` was absent。
+
+### RED immediate review
+
+- Tests execute real management commands against sandbox roots：通過。
+- Timeout test proves current code can incorrectly record acceptance after the missing boundary：通過。
+- Delayed test locks exact ordering rather than accepting a fixed sleep：通過。
+- Failure trap is independently covered：通過。
+- Production script mutation before RED：none。
+- Live production mutation：none。
+
+**Task 6R2-1 RED approved.** Open P0 = 0；Open P1 without disposition = 0。可進入
+Task 6R2-2 minimal GREEN。
+
 ## Task 1 — Startup-closed RED contract
 
 ### Baseline

@@ -31,7 +31,7 @@
 - Consumes: existing Task 13 sandbox acceptance commands、`runScriptResult`、Task 6R `wait_for_managed_daemon_exit`。
 - Produces: failing contract for `MLM_TEST_CLEAN_EXIT_ACTIVE_PROBES`、ordered handoff、timeout no-bootstrap、shared Task 13 cleanup。
 
-- [ ] **Step 1: 新增 delayed clean-exit RED test**
+- [x] **Step 1: 新增 delayed clean-exit RED test**
 
 新增：
 
@@ -69,7 +69,7 @@ bootstrapped
 
 並要求 crash-budget file bytes 完全不變。
 
-- [ ] **Step 2: 新增 clean-state timeout RED test**
+- [x] **Step 2: 新增 clean-state timeout RED test**
 
 新增：
 
@@ -89,7 +89,7 @@ XCTAssertEqual(decodedConfig.mode, .disabled)
 並截取 timeout message 後的 suffix，要求不包含 `bootstrapped label=` 或
 `recorded deployment-acceptance`。
 
-- [ ] **Step 3: 新增 failure-trap RED test**
+- [x] **Step 3: 新增 failure-trap RED test**
 
 新增：
 
@@ -107,7 +107,7 @@ func testTask13FailureTrapUsesBoundedCleanExitHandoff() throws
 要求原始 injected failure 保留、trap 輸出 `clean-exit-wait=pass probes=3`、mode disabled，且
 不建立 acceptance。
 
-- [ ] **Step 4: 新增 shared-scope 與 hook-isolation RED contract**
+- [x] **Step 4: 新增 shared-scope 與 hook-isolation RED contract**
 
 新增 source contract，要求：
 
@@ -116,7 +116,7 @@ func testTask13FailureTrapUsesBoundedCleanExitHandoff() throws
 - `MLM_TEST_CLEAN_EXIT_ACTIVE_PROBES` 位於 `SYSTEM_ROOT` branch；
 - production branch 使用真實 crash-budget JSON，不接受 environment override。
 
-- [ ] **Step 5: 執行 focused RED**
+- [x] **Step 5: 執行 focused RED**
 
 ```bash
 swift test --filter ProductionManagementScriptTests/testTask13DryRunCleanupWaitsForCleanExitBeforeBootstrapAndPreservesCrashCount
@@ -128,7 +128,7 @@ swift test --filter ProductionManagementScriptTests/testTask13AcceptanceCleanupU
 Expected：全部因 helper、hook、ordered wait 或 timeout semantics 尚不存在而失敗；unrelated
 failure = 0。
 
-- [ ] **Step 6: Immediate RED review and commit**
+- [x] **Step 6: Immediate RED review and commit**
 
 ```bash
 git add Tests/LidMonitorTests/ProductionManagementScriptTests.swift \
