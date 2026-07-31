@@ -1,7 +1,7 @@
 # Milestone 17 — 低角度啟動睡眠恢復 Task Register
 
 日期：2026-07-31
-狀態：Stage A／B 與 Tasks 1–5 complete。Task 6 第一次 upgrade 在 payload replacement 前因 maintenance bootout 退出競態安全停止；Task 6R complete 並已 fast-forward 整合到 local main。待 final-main package 重新 prepare/verify 後，Task 6 可重新請求 upgrade 批准。Installed production 為舊 identity、disabled、job absent、zero PID。
+狀態：Stage A／B 與 Tasks 1–5 complete。Task 6 upgrade 與 deployment-dry-run 已通過；dry-run cleanup 在 disabled bootstrap handoff 中誤增 crash budget。Task 6R2 in progress，enabled-once blocked。Installed production identity 為 `93d9881ecddb`、loaded、disabled、zero PID；dry-run acceptance pass，crash count 1 closed。
 
 ## Task register
 
@@ -13,7 +13,8 @@
 | 4 | README/runbook/event authority sync — complete | docs/event focused tests | none beyond repository implementation | revert Task 4 commit |
 | 5 | Repository holistic release gate — complete | 289 tests in current/clean clone; release/static/package gates; live old identity unchanged | separate approval required for push or production mutation | candidate remains local; current production unchanged |
 | 6 | Upgrade and bounded acceptance for new identity | upgrade, dry-run, enabled-once, recovery-resleep evidence | each mutation/real-sleep stage separately approved | reviewed rollback package; disabled/nonresident safe stops |
-| 6R | Repair maintenance bootout resident-process race — complete and integrated | 93 management tests, 292 full tests, timeout-before-replacement, release/static/package gates, ff-only integration | new approval required before upgrade retry | old identity remains disabled, booted out, zero PID |
+| 6R | Repair maintenance bootout resident-process race — complete, integrated and deployed | 93 management tests, 292 full tests, timeout-before-replacement, release/static/package gates, real upgrade retry pass | completed under separate upgrade approval | installed identity `93d9881ecddb`, loaded/disabled/zero PID |
+| 6R2 | Repair acceptance clean-exit/bootstrap handoff race — in progress | delayed clean-state wait, timeout no-bootstrap, crash-count preservation, full repository gates | repository-only execution approved; all production mutations remain separately gated | current identity remains loaded/disabled/zero PID; no reset or acceptance rerun |
 | 7 | Persistent activation and low-angle reboot/loginwindow proof | activation, changed boot, pre-login startup sleep, cleanup, baseline | activate/reboot start/manual reboot/finish separately approved | emergency disable/bootout; rollback only with approval |
 
 ## Stage gates
@@ -28,10 +29,10 @@ Task 5 已通過 current checkout 與 valid clean clone 的 289-test、release�
 
 ### Stage C — Production deployment — open
 
-Task 6 第一次 upgrade 已在 `bootout` 後、payload replacement 前 exit 70。Task 6R 必須先修復
-bounded daemon-exit synchronization 並形成新的 final-main package。每次 upgrade、真實睡眠、
-activate、reboot 都是新的批准 gate，不能沿用前一批准；新 payload identity 必須重新建立全部
-acceptance。
+Task 6 upgrade 與 deployment-dry-run 已通過。Dry-run cleanup 因舊 PID clean-exit persistence
+尚未完成就 bootstrap disabled daemon，誤增 crash budget。Task 6R2 必須先形成新的 final-main
+package；之後 upgrade、reset、dry-run revalidation、enabled-once、recovery-resleep 都是獨立批准
+gate，不能沿用既有批准。
 
 ## Completion rule
 

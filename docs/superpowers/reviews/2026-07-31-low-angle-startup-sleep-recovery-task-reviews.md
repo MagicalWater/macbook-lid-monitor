@@ -2,6 +2,43 @@
 
 日期：2026-07-31
 
+## Task 6R2 — Acceptance clean-exit handoff recovery
+
+### Incident evidence
+
+```text
+deployment-dry-run: pass
+installed identity: 93d9881ecddb
+final mode/job/process: disabled / loaded / 0
+crash state after cleanup: closed / count 1 / runActive false
+unexpected-exit timestamp: 2026-07-31T03:44:32.310Z
+same-second events:
+- PID 9182 stopping reason=signal
+- PID 9725 started mode=disabled
+```
+
+### Root-cause review
+
+- Signal handler 在 `ProductionDaemonSession.stop()` 中執行 `recordCleanExit()`：confirmed。
+- Cleanup `disable → bootout → bootstrap` 沒有 PID/clean-state gate：confirmed。
+- 新 disabled daemon `beginRun()` 可先看到舊 `runActive=true` 並誤增 count：confirmed。
+- Dry-run behavior/evidence 本身完整，問題限於 cleanup handoff：confirmed。
+
+### Repository baseline
+
+```text
+base commit: 93d9881ecddb0256c8cce97a360e55187902b4cb
+isolated worktree: macbook-lid-monitor-0d5e8167
+ProductionManagementScriptTests: 93 tests, 0 failures
+live production mutation: none
+```
+
+### Governance decision
+
+Task 6R2 repository-only execution approved。Design 選擇 bounded resident-exit + direct
+crash-budget clean-state verification；不 reset、不強殺、不重跑 dry-run。Task 6 enabled-once
+維持 blocked。Open P0 = 0；Open P1 without disposition = 0。
+
 ## Task 1 — Startup-closed RED contract
 
 ### Baseline

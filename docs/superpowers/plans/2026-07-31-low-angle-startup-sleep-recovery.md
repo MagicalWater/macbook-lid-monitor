@@ -267,17 +267,18 @@ Open P0 = 0、Open P1 without disposition = 0 後，提交 candidate closure。�
 - Modify: production system state through reviewed management commands
 - Create: production validation evidence
 
-- [ ] **Step 1: 批准並執行 verified package upgrade**
+- [x] **Step 1: 批准並執行 verified package upgrade**
 
 Upgrade 必須結束於 loaded/disabled/zero PID；舊 acceptance 因 payload identity 改變而失效。
 
-- [ ] **Step 2: 批准並執行 deployment dry-run acceptance**
+- [x] **Step 2: 批准並執行 deployment dry-run acceptance**
 
 在低角度 startup path 取得 candidate、debounce、一次 `would-sleep` evidence，最後 disabled。
 
 - [ ] **Step 3: 批准並執行 enabled-once acceptance**
 
-真實 sleep request exactly once，完成後 disabled。
+真實 sleep request exactly once，完成後 disabled。此 step 因 dry-run cleanup 誤增 crash budget
+而 blocked；Task 6R2 complete、重新部署、reset 與 dry-run revalidation 前不得執行。
 
 - [ ] **Step 4: 批准並執行 recovery-resleep acceptance**
 
@@ -289,7 +290,7 @@ Upgrade 必須結束於 loaded/disabled/zero PID；舊 acceptance 因 payload id
 
 ### Task 6R: Maintenance bootout bounded-exit recovery
 
-**Status:** in progress；由 Task 6 第一次 upgrade 的 exit-code 70 safe stop 觸發。
+**Status:** complete and integrated；Task 6 production upgrade retry 已使用修復後 package 成功。
 
 **Authority:**
 
@@ -298,9 +299,25 @@ docs/superpowers/specs/2026-07-31-maintenance-bootout-bounded-exit-recovery-desi
 docs/superpowers/plans/2026-07-31-maintenance-bootout-bounded-exit-recovery.md
 ```
 
-Task 6 在 Task 6R repository closure、local-main integration、final-main package 重新
-`prepare`／`verify` 與新的 production upgrade 批准前保持 blocked。不得重用 package
-`72a274e6ef29` 作為 final authority。
+### Task 6R2: Acceptance clean-exit handoff recovery
+
+**Status:** in progress；由 Task 6 deployment-dry-run pass 後的 crash-budget cleanup race 觸發。
+
+**Authority:**
+
+```text
+docs/superpowers/specs/2026-07-31-acceptance-clean-exit-handoff-recovery-design.md
+docs/superpowers/plans/2026-07-31-acceptance-clean-exit-handoff-recovery.md
+```
+
+Task 6R2 只允許 repository-only TDD。Production 必須維持 installed identity
+`93d9881ecddb`、loaded／disabled／zero PID、dry-run pass、crash count 1 closed；不得 reset、
+重跑 acceptance 或執行真實睡眠。
+
+Task 6 enabled-once 在 Task 6R2 repository closure、local-main integration、new package
+deployment、crash-budget reset 與 dry-run revalidation 各自獲得批准前保持 blocked。現有
+installed identity `93d9881ecddb` 只作為 current production baseline，不是 Task 6R2 final
+package authority。
 
 ### Task 7: Persistent activation 與低角度 reboot/loginwindow acceptance
 
