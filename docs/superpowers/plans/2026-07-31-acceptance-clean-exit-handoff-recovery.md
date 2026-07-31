@@ -147,7 +147,7 @@ git commit -m "test: define acceptance clean-exit handoff contract"
 - Consumes: `wait_for_managed_daemon_exit()`、`MANAGED_SUPPORT/crash-budget.json`、Task 6R2 RED contract。
 - Produces: `crash_budget_clean_exit_persisted()`、`wait_for_crash_budget_clean_exit()`、`restore_disabled_job_after_acceptance()`、`cleanup_acceptance_to_disabled()`。
 
-- [ ] **Step 1: 建立 sandbox-only clean-state probe counter**
+- [x] **Step 1: 建立 sandbox-only clean-state probe counter**
 
 在 script 初始化：
 
@@ -158,7 +158,7 @@ ACCEPTANCE_HANDOFF_STATE=idle
 
 Sandbox branch 驗證 non-negative integer；remaining > 0 時遞減並 return 1，歸零後 return 0。
 
-- [ ] **Step 2: 實作 production crash-budget clean-state probe**
+- [x] **Step 2: 實作 production crash-budget clean-state probe**
 
 `crash_budget_clean_exit_persisted` 的 production branch 使用 `/usr/bin/python3` 讀取：
 
@@ -176,7 +176,7 @@ $MANAGED_SUPPORT/crash-budget.json
 
 不得寫回 JSON。
 
-- [ ] **Step 3: 實作 5-second clean-state bounded wait**
+- [x] **Step 3: 實作 5-second clean-state bounded wait**
 
 ```bash
 wait_for_crash_budget_clean_exit() {
@@ -203,7 +203,7 @@ wait_for_crash_budget_clean_exit() {
 }
 ```
 
-- [ ] **Step 4: 實作 shared handoff state machine**
+- [x] **Step 4: 實作 shared handoff state machine**
 
 `restore_disabled_job_after_acceptance`：
 
@@ -231,7 +231,7 @@ waiting/failed → set disabled + stop + bootout only, never bootstrap
 
 Trap 必須 return 0，不能覆蓋原始 command failure。
 
-- [ ] **Step 5: Wire three Task 13 acceptance paths**
+- [x] **Step 5: Wire three Task 13 acceptance paths**
 
 在 dry-run、enabled-once、recovery-resleep：
 
@@ -240,7 +240,7 @@ Trap 必須 return 0，不能覆蓋原始 command failure。
 - diagnostics 只在 successful restore 後執行；
 - `trap - EXIT` 只在 restore success 後解除。
 
-- [ ] **Step 6: 執行 focused GREEN and regression**
+- [x] **Step 6: 執行 focused GREEN and regression**
 
 ```bash
 swift test --filter ProductionManagementScriptTests/testTask13DryRunCleanupWaitsForCleanExitBeforeBootstrapAndPreservesCrashCount
@@ -252,7 +252,7 @@ swift test --filter ProductionManagementScriptTests/testBoundedDeployment
 swift test --filter ProductionManagementScriptTests/testUpgradeWaitsForResidentDaemonToExitBeforeReplacingPayload
 ```
 
-- [ ] **Step 7: Static verification**
+- [x] **Step 7: Static verification**
 
 ```bash
 bash -n scripts/manage-production-daemon.sh scripts/lib/*.sh
@@ -260,7 +260,7 @@ shellcheck -x scripts/manage-production-daemon.sh scripts/lib/*.sh
 git diff --check
 ```
 
-- [ ] **Step 8: Immediate implementation review and commit**
+- [x] **Step 8: Immediate implementation review and commit**
 
 確認 ordered handoff、preserved crash count、failed-state no-rebootstrap、sandbox hook isolation 與
 no production mutation。

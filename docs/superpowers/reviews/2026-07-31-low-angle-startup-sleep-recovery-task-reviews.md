@@ -71,6 +71,63 @@ stable output `error=deployment-test-failure stage=dry-run`; the rerun then fail
 **Task 6R2-1 RED approved.** Open P0 = 0；Open P1 without disposition = 0。可進入
 Task 6R2-2 minimal GREEN。
 
+### GREEN implementation
+
+新增 shared interfaces：
+
+```text
+crash_budget_clean_exit_persisted
+wait_for_crash_budget_clean_exit
+restore_disabled_job_after_acceptance
+cleanup_acceptance_to_disabled
+```
+
+Handoff order：
+
+```text
+mode=disabled
+→ SIGTERM
+→ bootout
+→ bounded resident PID wait
+→ bounded crash-budget runActive=false wait
+→ bootstrap disabled
+```
+
+`ACCEPTANCE_HANDOFF_STATE=idle|waiting|complete|failed` 防止 normal helper failure 後 EXIT trap
+再次 bootstrap。Production crash-budget probe 直接解析 JSON；sandbox counter 只在
+`MLM_TEST_ROOT` branch 生效。
+
+### Focused GREEN evidence
+
+```text
+new clean-exit contracts: 4 tests, 0 failures
+Task 13 focused suite: 9 tests, 0 failures
+bounded deployment regression: 2 tests, 0 failures
+Task 6R resident-exit regression: 1 test, 0 failures
+bash -n: pass
+shellcheck -x: pass
+git diff --check: pass
+```
+
+### Immediate implementation review
+
+- Delayed clean-state probes 2 次 active、第三次 pass：通過。
+- Timeout return 70，timeout suffix 無 bootstrap/acceptance record：通過。
+- Existing crash-budget bytes 在 successful sandbox cleanup 中保持不變：通過。
+- Injected failure trap 經相同 bounded handoff 回復 disabled：通過。
+- `waiting|failed` trap 只 set disabled／stop／bootout，不 bootstrap：通過。
+- Production hook isolation：通過。
+- Task 12 original traps remain 3；Task 17 original trap remains 1：通過。
+- Task 13 shared traps = 3；success helper references = 3 paths：通過。
+- SIGKILL／kill -9：0。
+- reset crash budget invocation added：0。
+- Live production mutation：none。
+
+### Decision
+
+**Task 6R2-2 approved.** Open P0 = 0；Open P1 without disposition = 0。可進入 holistic
+repository gate；Task 6 enabled-once 仍 blocked。
+
 ## Task 1 — Startup-closed RED contract
 
 ### Baseline

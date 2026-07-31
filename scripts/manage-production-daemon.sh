@@ -12,6 +12,8 @@ source "$SCRIPT_DIR/lib/production-deployment-state.sh"
 source "$SCRIPT_DIR/lib/production-observability.sh"
 
 TEST_RESIDENT_DAEMON_PROBES_REMAINING="${MLM_TEST_RESIDENT_DAEMON_PROBES:-0}"
+TEST_CLEAN_EXIT_ACTIVE_PROBES_REMAINING="${MLM_TEST_CLEAN_EXIT_ACTIVE_PROBES:-0}"
+ACCEPTANCE_HANDOFF_STATE=idle
 
 usage() {
     printf '%s\n' 'usage: manage-production-daemon.sh prepare|verify|install|bootstrap|status|stop|bootout|disable|dry-run|deployment-dry-run|deployment-dry-run-reopen|deployment-dry-run-sleep-wake|deployment-enabled-once|deployment-recovery-resleep|deployment-reboot-start|deployment-reboot-finish|activate|upgrade|rollback|reset-crash-budget|rotate-logs|diagnostics|operational-baseline|uninstall|accept-task9|accept-task10|accept-task11|accept-task12-logged-in|accept-task12-loginwindow-start|accept-task12-loginwindow-finish|accept-task12-sleep-wake|accept-task13-dry-run-path|accept-task13-enabled-once|accept-task13-recovery-resleep|accept-task14-reboot-start|accept-task14-reboot-finish' >&2
@@ -148,6 +150,77 @@ wait_for_managed_daemon_exit() {
     done
 }
 
+crash_budget_clean_exit_persisted() {
+    if [[ -n "$SYSTEM_ROOT" ]]; then
+        case "$TEST_CLEAN_EXIT_ACTIVE_PROBES_REMAINING" in
+            ''|*[!0-9]*)
+                printf 'error: MLM_TEST_CLEAN_EXIT_ACTIVE_PROBES must be a non-negative integer\n' >&2
+                return 64
+                ;;
+        esac
+        if [[ "$TEST_CLEAN_EXIT_ACTIVE_PROBES_REMAINING" -gt 0 ]]; then
+            TEST_CLEAN_EXIT_ACTIVE_PROBES_REMAINING="$((TEST_CLEAN_EXIT_ACTIVE_PROBES_REMAINING - 1))"
+            return 1
+        fi
+        return 0
+    fi
+
+    local path="$MANAGED_SUPPORT/crash-budget.json" status
+    [[ -f "$path" && ! -L "$path" ]] || {
+        printf 'error: crash-budget clean-exit state unavailable\n' >&2
+        return 65
+    }
+    if /usr/bin/python3 - "$path" <<'PY'
+import json
+import sys
+
+try:
+    with open(sys.argv[1], 'rb') as handle:
+        value = json.load(handle)
+    times = value['unexpectedExitTimes']
+    circuit_open = value['circuitOpen']
+    run_active = value.get('runActive', False)
+    if not isinstance(times, list) or not isinstance(circuit_open, bool) or not isinstance(run_active, bool):
+        raise ValueError('invalid crash-budget schema')
+except Exception:
+    sys.exit(65)
+sys.exit(1 if run_active else 0)
+PY
+    then
+        return 0
+    else
+        status=$?
+    fi
+    if [[ "$status" -eq 1 ]]; then return 1; fi
+    printf 'error: crash-budget clean-exit state invalid\n' >&2
+    return 65
+}
+
+wait_for_crash_budget_clean_exit() {
+    local waits=0 probes=0 probe_status
+    while true; do
+        probes="$((probes + 1))"
+        if crash_budget_clean_exit_persisted; then
+            probe_status=0
+        else
+            probe_status=$?
+        fi
+        if [[ "$probe_status" -eq 0 ]]; then
+            printf 'clean-exit-wait=pass probes=%s\n' "$probes"
+            return 0
+        fi
+        if [[ "$probe_status" -ne 1 ]]; then
+            return "$probe_status"
+        fi
+        if [[ "$waits" -ge 50 ]]; then
+            printf 'error: timed out waiting for crash-budget clean exit\n' >&2
+            return 70
+        fi
+        waits="$((waits + 1))"
+        if [[ -z "$SYSTEM_ROOT" ]]; then /bin/sleep 0.1; fi
+    done
+}
+
 set_managed_mode() {
     local requested_mode=$1 temporary
     case "$requested_mode" in
@@ -173,6 +246,55 @@ disable_job() {
     set_managed_mode disabled
     stop_job
     printf 'disabled label=%s\n' "$LAUNCHD_LABEL"
+}
+
+restore_disabled_job_after_acceptance() {
+    local status
+    ACCEPTANCE_HANDOFF_STATE=waiting
+    set_managed_mode disabled
+    stop_job
+    printf 'disabled label=%s\n' "$LAUNCHD_LABEL"
+    bootout_job
+    if wait_for_managed_daemon_exit; then
+        :
+    else
+        status=$?
+        ACCEPTANCE_HANDOFF_STATE=failed
+        return "$status"
+    fi
+    if wait_for_crash_budget_clean_exit; then
+        :
+    else
+        status=$?
+        ACCEPTANCE_HANDOFF_STATE=failed
+        return "$status"
+    fi
+    if bootstrap_job; then
+        ACCEPTANCE_HANDOFF_STATE=complete
+        return 0
+    else
+        status=$?
+        ACCEPTANCE_HANDOFF_STATE=failed
+        return "$status"
+    fi
+}
+
+cleanup_acceptance_to_disabled() {
+    local original_status=$?
+    if [[ -f "$MANAGED_CONFIG" && ! -L "$MANAGED_CONFIG" ]]; then
+        case "$ACCEPTANCE_HANDOFF_STATE" in
+            complete) ;;
+            idle)
+                restore_disabled_job_after_acceptance || true
+                ;;
+            waiting|failed)
+                set_managed_mode disabled >/dev/null 2>&1 || true
+                stop_job >/dev/null 2>&1 || true
+                bootout_job >/dev/null 2>&1 || true
+                ;;
+        esac
+    fi
+    return "$original_status"
 }
 
 reset_crash_budget() {
@@ -551,14 +673,8 @@ accept_task13_enabled_once() {
     local mode before_pid process_count log_offset attempt_count=0 returned_count=0 wake_found=0
     mode="$(/usr/libexec/PlistBuddy -c 'Print :Mode' "$MANAGED_CONFIG")"
     [[ "$mode" == "disabled" ]] || { printf 'error: expected disabled starting mode\n' >&2; return 65; }
-    cleanup_task13_enabled_once_to_disabled() {
-        if [[ -f "$MANAGED_CONFIG" && ! -L "$MANAGED_CONFIG" ]]; then
-            disable_job >/dev/null 2>&1 || true
-            bootout_job >/dev/null 2>&1 || true
-            bootstrap_job >/dev/null 2>&1 || true
-        fi
-    }
-    trap cleanup_task13_enabled_once_to_disabled EXIT
+    ACCEPTANCE_HANDOFF_STATE=idle
+    trap cleanup_acceptance_to_disabled EXIT
     if [[ "${1:-legacy}" != stable ]]; then
         prepare_as_invoking_user
         verify_package
@@ -605,9 +721,7 @@ accept_task13_enabled_once() {
         [[ "$(pgrep -f '^/Library/PrivilegedHelperTools/macbook-lid-monitor-daemon$')" == "$before_pid" ]] || { printf 'error: daemon PID changed across enabled sleep/wake\n' >&2; return 70; }
     fi
     printf 'verified task=13 scope=enabled-once attempt-count=1 return-count=%s wake-evidence=true pid-stable=true\n' "$returned_count"
-    disable_job
-    bootout_job
-    bootstrap_job
+    restore_disabled_job_after_acceptance
     diagnostics
     trap - EXIT
     printf 'accepted task=13 scope=enabled-once final-mode=disabled label=%s\n' "$LAUNCHD_LABEL"
@@ -618,14 +732,8 @@ accept_task13_recovery_resleep() {
     local mode before_pid process_count log_offset attempt_count=0 return_count=0 recovery_count=0 wake_count=0
     mode="$(/usr/libexec/PlistBuddy -c 'Print :Mode' "$MANAGED_CONFIG")"
     [[ "$mode" == "disabled" ]] || { printf 'error: expected disabled starting mode\n' >&2; return 65; }
-    cleanup_task13_recovery_resleep_to_disabled() {
-        if [[ -f "$MANAGED_CONFIG" && ! -L "$MANAGED_CONFIG" ]]; then
-            disable_job >/dev/null 2>&1 || true
-            bootout_job >/dev/null 2>&1 || true
-            bootstrap_job >/dev/null 2>&1 || true
-        fi
-    }
-    trap cleanup_task13_recovery_resleep_to_disabled EXIT
+    ACCEPTANCE_HANDOFF_STATE=idle
+    trap cleanup_acceptance_to_disabled EXIT
     if [[ "${1:-legacy}" != stable ]]; then
         prepare_as_invoking_user
         verify_package
@@ -677,9 +785,7 @@ accept_task13_recovery_resleep() {
         [[ "$(pgrep -f '^/Library/PrivilegedHelperTools/macbook-lid-monitor-daemon$')" == "$before_pid" ]] || { printf 'error: daemon PID changed across recovery resleep\n' >&2; return 70; }
     fi
     printf 'verified task=13 scope=recovery-resleep attempt-count=2 return-count=%s recovery-count=1 wake-count=%s pid-stable=true\n' "$return_count" "$wake_count"
-    disable_job
-    bootout_job
-    bootstrap_job
+    restore_disabled_job_after_acceptance
     diagnostics
     trap - EXIT
     printf 'accepted task=13 scope=recovery-resleep final-mode=disabled label=%s\n' "$LAUNCHD_LABEL"
@@ -690,14 +796,8 @@ accept_task13_dry_run_path() {
     local mode startup_log_offset log_offset daemon_pid readiness_count candidate_count debounce_count attempt_count would_sleep_count process_count
     mode="$(/usr/libexec/PlistBuddy -c 'Print :Mode' "$MANAGED_CONFIG")"
     [[ "$mode" == "disabled" ]] || { printf 'error: expected disabled starting mode\n' >&2; return 65; }
-    cleanup_task13_dry_run_path_to_disabled() {
-        if [[ -f "$MANAGED_CONFIG" && ! -L "$MANAGED_CONFIG" ]]; then
-            disable_job >/dev/null 2>&1 || true
-            bootout_job >/dev/null 2>&1 || true
-            bootstrap_job >/dev/null 2>&1 || true
-        fi
-    }
-    trap cleanup_task13_dry_run_path_to_disabled EXIT
+    ACCEPTANCE_HANDOFF_STATE=idle
+    trap cleanup_acceptance_to_disabled EXIT
     if [[ "${1:-legacy}" != stable ]]; then
         prepare_as_invoking_user
         verify_package
@@ -749,9 +849,7 @@ accept_task13_dry_run_path() {
         [[ "$process_count" == 1 ]] || { printf 'error: expected one dry-run daemon, got %s\n' "$process_count" >&2; return 70; }
     fi
     printf 'verified task=13 scope=dry-run-path candidate=true debounce=true attempt-count=1 would-sleep-count=1\n'
-    disable_job
-    bootout_job
-    bootstrap_job
+    restore_disabled_job_after_acceptance
     diagnostics
     trap - EXIT
     printf 'accepted task=13 scope=dry-run-path final-mode=disabled label=%s\n' "$LAUNCHD_LABEL"
