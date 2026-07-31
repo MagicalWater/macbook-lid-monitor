@@ -343,11 +343,18 @@ is loaded／disabled／zero PID、crash count 0、circuit closed、runActive fal
 
 2026-07-31 已完成：installed identity `7bf98ff6ceae` 的三階段 acceptance 驗證通過；
 `activate` 成功後 PID `99898` 進入 `monitoring-armed`，`operational_baseline=pass`。最終保持
-enabled／loaded／single PID、crash count 0；reboot observer absent，未 reboot、未 push。
+enabled／loaded／single PID、crash count 0。Step 1 完成當時 reboot observer 尚未建立；Step 2 隨後已另行批准並完成 arm。未 reboot、未 push。
 
-- [ ] **Step 2: Arm low-angle reboot observer**
+- [x] **Step 2: Arm low-angle reboot observer**
 
 記錄 boot epoch、PID、identity；observer 必須 one-shot、root-owned、bounded cleanup。
+
+2026-07-31 已完成：以目前 enabled production PID `99898`、boot epoch `1785457249` 與
+installed identity `7bf98ff6ceae` 建立 deployment reboot state。Observer script／LaunchDaemon
+分別為 root:wheel `0700`／`0644`；state 與 initial observer evidence 為 root:wheel `0600`。
+Observer LaunchDaemon 已在目前 boot 執行一次並正常退出（runs=1、last exit code=0），保留為
+下一次開機的 RunAtLoad one-shot。Production 在 arm 前後均為 enabled／loaded／single PID，
+`operational_baseline=pass`。未 reboot、未 finish、未 rollback、未 push。
 
 - [ ] **Step 3: 使用者在上蓋 `<=68` 時手動重新啟動**
 

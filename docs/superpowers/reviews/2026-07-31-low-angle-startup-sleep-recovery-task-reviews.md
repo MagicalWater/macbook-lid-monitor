@@ -870,3 +870,75 @@ reboot state/evidence/observer artifacts: absent
 **Task 7 Step 1 approved and complete.** Persistent enabled mode is intentional. Open P0 = 0；Open P1
 without disposition = 0。Step 2 reboot observer preparation remains separately approval-gated；no reboot
 or push occurred.
+
+## Task 7 Step 2 — Low-angle reboot observer preparation review
+
+### Approval and scope
+
+The user separately approved observer preparation only. The operation was required to stop in an armed
+state and prohibited automatic reboot、finish、rollback and push. A failure cleanup trap was prepared to
+boot out the observer, remove all four temporary artifacts and re-check the existing enabled production
+baseline.
+
+### Preflight evidence
+
+```text
+repository head: 786f843879c9bdc84f55d2e2afdef211cbebd5a2
+working tree: clean
+installed version: 7bf98ff6ceae
+installed source commit: 7bf98ff6ceae710757b38b14efa00d42c34ca573
+mode/job/process: enabled / loaded / 1
+prepared PID: 99898
+boot epoch: 1785457249
+crash: count 0 / circuit closed / runActive true
+existing reboot artifacts: 0
+operational baseline: pass
+```
+
+### Arm evidence
+
+```text
+verified deployment-acceptance stages=deployment-dry-run deployment-enabled-once deployment-recovery-resleep
+wrote deployment-reboot-state boot-epoch=1785457249
+armed deployment-reboot-start boot-epoch=1785457249 pid=99898
+deployment_reboot_start_exit=0
+```
+
+Managed metadata and source integrity:
+
+```text
+deployment-reboot.plist: root:wheel 0600, regular file, link count 1
+reboot-observer.sh: root:wheel 0700, regular file, link count 1
+reboot observer LaunchDaemon plist: root:wheel 0644, regular file, link count 1
+observer script SHA-256: 653cf6ef43405556bbff6bbaf8ed1fa698ee475a58521b8031df3ef2d9d1e89f
+observer plist SHA-256: fd53298736e2b6c10845539628dcd00a3a11effb2f8d74e98d6c15029143e6a4
+```
+
+The RunAtLoad observer executed once on the current boot and exited normally:
+
+```text
+observer job: loaded / not running
+runs: 1
+last exit code: 0
+initial evidence boot epoch: 1785457249
+initial evidence PID: 99898
+initial evidence console user: water
+```
+
+This same-boot evidence is expected and is not the reboot proof. On the next boot, launchd will execute the
+one-shot observer again and overwrite the evidence with the new boot/PID/loginwindow state. Step 4 will
+reject the run unless the boot epoch changed and the observed PID differs from prepared PID `99898`.
+
+### Final state and decision
+
+```text
+production: enabled / loaded / PID 99898 / operational baseline pass
+observer: armed, root-owned, one-shot, currently not running
+manual reboot: not executed
+finish: not executed
+rollback: not executed
+push: not executed
+```
+
+**Task 7 Step 2 approved and complete.** Open P0 = 0；Open P1 without disposition = 0。Step 3 manual
+low-angle reboot remains separately approval-gated.
