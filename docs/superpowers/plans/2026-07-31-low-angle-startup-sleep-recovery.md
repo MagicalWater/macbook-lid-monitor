@@ -379,14 +379,24 @@ deployment acceptance、monitoring health 與 PID 綁定全部相符。`operatio
 observer plist 與 launchd job 均為 absent。Production 最終保持 enabled／loaded／single PID
 `281`、crash count 0。未 reboot、未 disable、未 rollback、未 push。
 
-- [ ] **Step 5: Milestone holistic closure**
+- [x] **Step 5: Milestone holistic closure**
 
 同步 README/runbook/validation/reviews/task register；current checkout 與 clean snapshot gates 重新
 通過；production 最終 enabled/running；取得 push 批准後 push。
 
+2026-07-31 已完成：以 exact final main `2cd8b62f0f1bb86e2bf9286017b1ae396ff92803`
+從頭執行 current checkout 與 independent clean snapshot gate，兩邊均為 300 tests、1 child-only
+skip、0 failures，ProductionManagementScriptTests 99/99；兩個 release products、`bash -n`、
+`shellcheck -x`、package prepare/verify、manifest source-commit 與 clean-tree gates 全部通過。
+Final live root read-only gate 的 `status`、`diagnostics`、`operational-baseline` 均 rc 0；PID `281`
+輸出有效 elapsed/cpu/rss/vsz，baseline pass。前後 production 均為 enabled／loaded／single PID、
+crash clean、artifact count 0，repository HEAD／working tree 未變。README closure state與其 executable
+contract再於 current與clean snapshot各跑完整300-test suite通過。Milestone 17本機 holistic closure
+完成；push仍未獲批准，未執行 reboot、disable、rollback或production mutation。
+
 ### Task 7R: README deployment-state contract synchronization
 
-**Status:** complete；Task 7 Step 5 re-entry unblocked，但 Step 5 本身仍 open。
+**Status:** complete；此 recovery 完成時 Step 5 尚 open，後續已由 final holistic closure 完成。
 
 2026-07-31 第一次 Step 5 current-checkout full suite 在
 `testReadmePresentsProductionQuickStartBeforeForegroundDetails` fail-stop：測試仍要求候選階段的
@@ -406,7 +416,7 @@ ProductionManagementScriptTests 98/98。Open P0 = 0；Open P1 without dispositio
 
 ### Task 7R2: macOS diagnostics process-metric compatibility
 
-**Status:** complete；Task 7 Step 5 re-entry unblocked again，但 Step 5 本身仍 open。
+**Status:** complete；此 recovery 完成時 Step 5 尚 open，後續已由 final holistic closure 完成。
 
 2026-07-31 第二次 Step 5 已通過 current checkout 與 independent clean snapshot 的完整 repository
 gates，但在最後 live read-only gate 依 fail-stop 規則停止：`status` 成功，`diagnostics` 回傳 1，

@@ -19,7 +19,7 @@ Production LaunchDaemon 只會透過 `scripts/manage-production-daemon.sh` 的�
 > reboot/loginwindow 真機驗收。新 boot 中的 system-domain daemon 已在登入前自動啟動，完成
 > startup cooldown、startup-closed candidate、debounce 與一次真實睡眠要求；finish verifier
 > 亦確認 changed boot、pre-login observer、新 PID、identity、health 與 baseline，並清理所有
-> temporary reboot artifacts。Milestone 17 僅剩 repository holistic closure 與未獲批准的 push。
+> temporary reboot artifacts。Milestone 17 本機 holistic closure 已完成；目前僅 push 尚未獲批准。
 
 最常用管理命令：
 

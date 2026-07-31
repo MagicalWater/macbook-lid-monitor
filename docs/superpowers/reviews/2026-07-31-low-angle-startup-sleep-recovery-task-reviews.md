@@ -1172,3 +1172,81 @@ mutation=false reboot=false disable=false rollback=false push=false
 to observability compatibility, its executable contract, and recovery documentation. Daemon sleep policy、
 README facts、installed production payload、mode and launchd lifecycle were not modified. Task 7 Step 5
 remains open and must restart all holistic gates from the beginning.
+
+## Task 7 Step 5 — Final Milestone holistic closure review
+
+### Approval and fail-stop boundary
+
+The user approved a fresh run from exact final main
+`2cd8b62f0f1bb86e2bf9286017b1ae396ff92803`. No earlier Task 7R or Task 7R2 verification was accepted
+as a substitute. Any current-checkout、clean-snapshot or live gate failure required an immediate stop.
+Production mutation、reboot、disable、rollback and push were prohibited.
+
+### Current-checkout repository evidence
+
+```text
+full suite: 300 tests, 1 child-only skip, 0 failures
+ProductionManagementScriptTests: 99/99
+release macbook-lid-monitor: pass
+release macbook-lid-monitor-daemon: pass
+bash -n: pass
+shellcheck -x: pass
+package prepare/verify: pass
+manifest source commit: 2cd8b62f0f1bb86e2bf9286017b1ae396ff92803
+working tree: clean
+```
+
+Two operator-command retries stopped before package execution because incorrect local tool/helper paths
+were supplied (`/usr/local/bin/shellcheck` and a nonexistent standalone package helper). They did not
+indicate repository failures or modify files. The complete repository gate was then rerun from release
+through package with the repository's actual `/opt/homebrew/bin/shellcheck` and
+`manage-production-daemon.sh prepare/verify` interfaces and passed.
+
+### Independent exact-commit snapshot evidence
+
+```text
+HEAD: 2cd8b62f0f1bb86e2bf9286017b1ae396ff92803
+tree: 89ea89ca1d7c99dce5970836e1453d43a2b8e7f2
+initial .build: absent
+full suite: 300 tests, 1 child-only skip, 0 failures
+ProductionManagementScriptTests: 99/99
+release/static/package: pass
+manifest source commit: 2cd8b62f0f1bb86e2bf9286017b1ae396ff92803
+tracked state after gates: clean
+```
+
+### Final live read-only evidence
+
+```text
+status_rc=0
+diagnostics_rc=0
+pid=281 elapsed=05:34:30 cpu=0.0 rss=11888 vsz=435345440
+operational_baseline=pass pid=281
+operational_baseline_rc=0
+post mode/process: enabled / 1 / PID 281
+crash count: 0 / circuit closed / runActive true
+artifact_count=0
+observer_job=absent
+repository HEAD/status unchanged
+mutation=false reboot=false disable=false rollback=false push=false
+```
+
+### Closure authority synchronization
+
+README was advanced from "holistic closure remains" to "local holistic closure complete; push remains
+unapproved", and the executable README contract was synchronized to the same fact. Focused verification
+passed 1/1. The synchronized candidate then passed a fresh full suite in both current checkout and an
+independent clean snapshot:
+
+```text
+current closure suite: 300 tests, 1 skip, 0 failures; management 99/99
+clean closure snapshot: 300 tests, 1 skip, 0 failures; management 99/99
+```
+
+The production runbook was reviewed and required no factual command or lifecycle change.
+
+### Holistic decision
+
+**Task 7 Step 5 approved and complete. Milestone 17 local holistic closure is complete.** Open P0 = 0；
+Open P1 without disposition = 0。Production remains enabled／loaded／single PID `281`, monitoring-armed
+and crash-clean. Push remains a separate unapproved action.
