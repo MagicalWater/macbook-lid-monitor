@@ -1,7 +1,7 @@
 # Milestone 17 — 低角度啟動睡眠恢復 Task Register
 
 日期：2026-07-31
-狀態：Tasks 1–5 repository candidate complete。Tasks 6–7 尚未開始，保留逐步 production approval gates；目前 installed production 仍是舊 identity 與舊 startup behavior。
+狀態：Stage A／B 與 Tasks 1–5 complete，候選已 fast-forward 整合回本機 `main`。Stage C／Tasks 6–7 尚未開始，保留逐步 production approval gates；目前 installed production 仍是舊 identity 與舊 startup behavior。
 
 ## Task register
 
@@ -17,17 +17,17 @@
 
 ## Stage gates
 
-### Stage A — Repository behavior
+### Stage A — Repository behavior — complete
 
-Tasks 1–4。只能在 isolated worktree 修改 source/tests/docs；不得改變 `/Library` 或 launchd。
+Tasks 1–4 已在 isolated worktree 完成並通過 immediate reviews；沒有改變 `/Library` 或 launchd。
 
-### Stage B — Repository holistic release
+### Stage B — Repository holistic release — complete
 
-Task 5。Current checkout 與 clean snapshot evidence 都必須通過；live production 只讀核對。
+Task 5 已通過 current checkout 與 valid clean clone 的 289-test、release、static、package gates；live production 僅做只讀核對。候選 commits 已 fast-forward 整合回本機 `main`。
 
-### Stage C — Production deployment
+### Stage C — Production deployment — open
 
-Tasks 6–7。每次 upgrade、真實睡眠、activate、reboot 都是新的批准 gate，不能沿用前一 Task
+Tasks 6–7 尚未開始。每次 upgrade、真實睡眠、activate、reboot 都是新的批准 gate，不能沿用前一 Task
 批准。新 payload identity 必須重新建立全部 acceptance。
 
 ## Completion rule

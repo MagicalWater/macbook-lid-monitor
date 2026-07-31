@@ -264,3 +264,60 @@ production mutation: none
 **Task 5 approved — repository candidate complete.** Open P0 = 0；Open P1 without disposition = 0。
 Tasks 6–7 remain open and separately approval-gated. The bug is fixed in the repository candidate,
 but not yet in the installed production daemon。
+
+## Task 5 post-worktree integration and cross-conversation handoff review
+
+### Integration evidence
+
+```text
+base main before integration: 818855fc828304187a4dc308e51827caa3022d3e
+repository candidate closure: 73015cac8bce121b2ea3137c3b616f3b91eb4a03
+integration method: git merge --ff-only
+result: local main points to repository candidate closure before handoff synchronization
+candidate commits reachable from main: yes
+production mutation: none
+push: none
+```
+
+### Documentation synchronization findings
+
+#### S17-T5-P1-3 — Implementation Plan Tasks 1–5 checkboxes remained open
+
+Task register、reviews 與 validation 均已記錄 Tasks 1–5 complete，但 Implementation Plan 的
+Tasks 1–5 steps 仍為 unchecked。這會讓下一個對話誤判 repository implementation 尚未執行。
+
+**Disposition：** 將 Tasks 1–5 全部已完成 steps 更新為 checked；Tasks 6–7 保持 unchecked。
+Finding closed。
+
+#### S17-T5-P1-4 — Validation scope header remained Tasks 1–4
+
+Validation 正文已包含 Task 5 holistic evidence，但 scope header 仍寫 Tasks 1–4。
+
+**Disposition：** scope 更新為 Tasks 1–5 repository candidate 與 holistic release gate。
+Finding closed。
+
+#### S17-T5-P1-5 — Missing cross-conversation authority
+
+Repository candidate 已完成但尚無 Milestone 17 Task 5 → Task 6 handoff，且 candidate commits
+仍只存在 detached worktree；直接切換對話會增加從錯誤 worktree 開始、遺漏 approval gate 或誤判
+installed production 已修復的風險。
+
+**Disposition：** 候選以 fast-forward 整合回本機 main，新增
+`docs/handoffs/2026-07-31-milestone-17-task5-to-task6-handoff.md`，明確記錄 authority、Git、
+live production、remaining Tasks、read order 與獨立批准邊界。Finding closed。
+
+### Handoff holistic review
+
+- Spec／Plan／Task／review／validation 的 Tasks 1–5 狀態一致：通過。
+- Stage A／B complete；Stage C open：通過。
+- Local main 已包含全部 candidate commits：通過。
+- README/runbook 仍正確宣告 live production 尚未部署 Milestone 17：通過。
+- Installed old identity、enabled、single PID、running：只讀核對通過。
+- 下一步明確從 Task 6 開始，不沿用舊 approval：通過。
+- Push、upgrade、sleep、activate、reboot：none。
+
+### Decision
+
+**Task 5 integration and handoff closure approved.** Open P0 = 0；Open P1 without disposition = 0。
+Milestone 17 可安全切換至新對話，從 Task 6 read-only baseline audit 開始；Milestone 17 本身仍未
+complete，因 Tasks 6–7／Stage C 尚未執行。

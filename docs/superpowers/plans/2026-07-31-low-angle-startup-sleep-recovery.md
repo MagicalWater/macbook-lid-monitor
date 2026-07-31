@@ -31,7 +31,7 @@
 - Consumes: 既有 `LidSleepStateMachine.handle(_:)`、`LidSleepCoordinator` 與 manual scheduler fixtures。
 - Produces: startup closed state/effect 的 failing executable contract，供 Task 2 實作。
 
-- [ ] **Step 1: 新增 state-machine RED tests**
+- [x] **Step 1: 新增 state-machine RED tests**
 
 新增明確測試，預期 API 為：
 
@@ -42,12 +42,12 @@ case startupClosedCandidate(deadline: Date)
 並覆蓋：fresh closed startup 建立 candidate、deadline request once、hysteresis cancellation
 disarms、reopen cancellation opens、invalid/stale fail-open。
 
-- [ ] **Step 2: 新增 coordinator RED tests**
+- [x] **Step 2: 新增 coordinator RED tests**
 
 驗證 startup cooldown 後排程 close debounce、transition 為
 `.startupClosedCandidateStarted`，並在 deadline 只呼叫 requester 一次。
 
-- [ ] **Step 3: 執行 focused tests 證明 RED**
+- [x] **Step 3: 執行 focused tests 證明 RED**
 
 ```bash
 swift test --filter LidSleepStateMachineTests
@@ -57,11 +57,11 @@ swift test --filter LidSleepCoordinatorTests
 Expected: compile 或 assertion failure，原因只指向缺少 startup closed contract；既有 unrelated
 tests 不得失敗。
 
-- [ ] **Step 4: Task-level RED review**
+- [x] **Step 4: Task-level RED review**
 
 記錄失敗名稱、失敗原因、無 production mutation，以及 Open P0/P1 disposition。
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add Tests/LidMonitorTests/LidSleepStateMachineTests.swift \
@@ -87,7 +87,7 @@ git commit -m "test: define low-angle startup sleep contract"
 - Consumes: Task 1 failing contract；既有 `scheduleCloseDebounce(deadline:)` 與 `cancelCloseDebounce` effects。
 - Produces: `.startupClosedCandidate(deadline:)` 與穩定 transition event，不改 requester interface。
 
-- [ ] **Step 1: 新增 state 與 transition event**
+- [x] **Step 1: 新增 state 與 transition event**
 
 State：
 
@@ -103,21 +103,21 @@ case startupClosedCandidateCancelled
 case startupClosedDebounceElapsed
 ```
 
-- [ ] **Step 2: 實作 startup cooldown classification**
+- [x] **Step 2: 實作 startup cooldown classification**
 
 在 `.startupCooldownElapsed(at:)` 依最新 sample freshness 與角度分類：`>=75` open、`<=68`
 startup candidate、其餘 disarmed。
 
-- [ ] **Step 3: 實作 candidate cancellation 與 deadline**
+- [x] **Step 3: 實作 candidate cancellation 與 deadline**
 
 `>=75` 取消並 open；`69...74` 或 invalid 取消並 disarm；fresh `<=68` deadline 只產生一次
 `.requestSleep`；stale/missing fail-open。
 
-- [ ] **Step 4: Coordinator 映射共用 debounce task**
+- [x] **Step 4: Coordinator 映射共用 debounce task**
 
 沿用 `closeDebounceTask`；新增 transition output，不新增 scheduler property。
 
-- [ ] **Step 5: 執行 focused GREEN tests**
+- [x] **Step 5: 執行 focused GREEN tests**
 
 ```bash
 swift test --filter LidSleepStateMachineTests
@@ -126,11 +126,11 @@ swift test --filter LidSleepCoordinatorTests
 
 Expected: all selected tests pass。
 
-- [ ] **Step 6: Immediate implementation review**
+- [x] **Step 6: Immediate implementation review**
 
 檢查 ordinary close、wake recovery、sleep failure、stop cancellation 與 no-fourth-timer constraints。
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add Sources/LidMonitorCore Tests/LidMonitorTests \
@@ -148,20 +148,20 @@ git commit -m "fix: sleep after closed low-angle startup"
 - Consumes: Task 2 shared coordinator behavior。
 - Produces: dry-run、execute-sleep、production dry-run、production enabled 的 equivalence evidence。
 
-- [ ] **Step 1: 新增 foreground integration tests**
+- [x] **Step 1: 新增 foreground integration tests**
 
 低角度 startup 必須在 cooldown + debounce 後：dry-run 一次 `would-sleep`；injected real requester
 一次 request。
 
-- [ ] **Step 2: 新增 production composition tests**
+- [x] **Step 2: 新增 production composition tests**
 
 驗證 production 不注入 startup policy override，兩種 production mode 只替換 requester effect。
 
-- [ ] **Step 3: 驗證 pure diagnostic boundary**
+- [x] **Step 3: 驗證 pure diagnostic boundary**
 
 既有 list/watch parser 與 diagnostic tests 必須保持不建立 auto-sleep side effect。
 
-- [ ] **Step 4: 執行 focused composition tests**
+- [x] **Step 4: 執行 focused composition tests**
 
 ```bash
 swift test --filter AutoSleepIntegrationTests
@@ -169,7 +169,7 @@ swift test --filter ProductionDaemonCompositionTests
 swift test --filter Diagnostic
 ```
 
-- [ ] **Step 5: Task-level review and commit**
+- [x] **Step 5: Task-level review and commit**
 
 ```bash
 git add Sources Tests docs/superpowers/reviews/2026-07-31-low-angle-startup-sleep-recovery-task-reviews.md
@@ -188,20 +188,20 @@ git commit -m "test: verify shared startup sleep composition"
 - Consumes: Tasks 1–3 final behavior and stable transition names。
 - Produces: README-first product semantics、中文 operator guidance、repository validation evidence。
 
-- [ ] **Step 1: 更新 README 第一入口**
+- [x] **Step 1: 更新 README 第一入口**
 
 說明低角度冷開機／daemon restart 會在約 7 秒安全延遲後睡眠；`69...74` 與 stale/invalid
 仍 fail-open。
 
-- [ ] **Step 2: 更新正式中文操作手冊**
+- [x] **Step 2: 更新正式中文操作手冊**
 
 加入低角度 reboot 行為、驗收與 troubleshooting；不得暗示任意硬體支援。
 
-- [ ] **Step 3: 更新 event contract tests**
+- [x] **Step 3: 更新 event contract tests**
 
 驗證新 transition name 穩定、redacted，且無 raw angle per-report production logging。
 
-- [ ] **Step 4: 執行 focused docs/event tests**
+- [x] **Step 4: 執行 focused docs/event tests**
 
 ```bash
 swift test --filter ProductionEventTests
@@ -209,7 +209,7 @@ swift test --filter ProductionManagementScriptTests/testProductionRunbookDocumen
 swift test --filter ProductionManagementScriptTests/testReadmePresentsProductionQuickStartBeforeForegroundDetails
 ```
 
-- [ ] **Step 5: Immediate review and commit**
+- [x] **Step 5: Immediate review and commit**
 
 ```bash
 git add README.md docs Tests
@@ -227,7 +227,7 @@ git commit -m "docs: document low-angle startup sleep recovery"
 - Consumes: Tasks 1–4 commits。
 - Produces: implementation-complete candidate commit；不改 production。
 
-- [ ] **Step 1: 執行 current checkout full suite**
+- [x] **Step 1: 執行 current checkout full suite**
 
 ```bash
 swift test
@@ -235,7 +235,7 @@ swift build -c release --product macbook-lid-monitor
 swift build -c release --product macbook-lid-monitor-daemon
 ```
 
-- [ ] **Step 2: 執行 package/static gates**
+- [x] **Step 2: 執行 package/static gates**
 
 ```bash
 bash -n scripts/manage-production-daemon.sh scripts/lib/*.sh
@@ -245,16 +245,16 @@ shellcheck -x scripts/manage-production-daemon.sh scripts/lib/*.sh
 git diff --check
 ```
 
-- [ ] **Step 3: 執行 independent clean snapshot gate**
+- [x] **Step 3: 執行 independent clean snapshot gate**
 
 在 repository-controlled temporary clean snapshot 執行相同 full suite、release build 與 package
 verification；不得讀取 uncommitted working-tree state。
 
-- [ ] **Step 4: Live read-only gate**
+- [x] **Step 4: Live read-only gate**
 
 確認目前 production 仍是原 identity、enabled、running、single PID；不執行 sudo mutation。
 
-- [ ] **Step 5: Holistic repository review and commit**
+- [x] **Step 5: Holistic repository review and commit**
 
 Open P0 = 0、Open P1 without disposition = 0 後，提交 candidate closure。不得 push 或 upgrade，
 除非使用者另行批准。

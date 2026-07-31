@@ -1,7 +1,7 @@
 # Milestone 17 — 低角度啟動睡眠恢復 Repository Validation
 
 日期：2026-07-31
-範圍：Tasks 1–4 repository candidate；尚未進行 production upgrade 或真實睡眠驗收。
+範圍：Tasks 1–5 repository candidate 與 holistic release gate；尚未進行 production upgrade 或真實睡眠驗收。
 
 ## 已確認根因
 
@@ -125,3 +125,25 @@ still has the old startup-disarmed behavior until Tasks 6–7 are approved and c
 Tasks 1–5 are repository-complete with Open P0 = 0 and Open P1 without disposition = 0. Production
 upgrade, real-sleep acceptance, persistent activation, and low-angle reboot/loginwindow acceptance
 remain open and independently approval-gated.
+
+## Main integration and handoff synchronization
+
+Tasks 1–5 candidate commits 已使用 `git merge --ff-only` 整合回本機 `main`。沒有 merge commit、
+conflict 或 production mutation。
+
+```text
+main before integration: 818855fc828304187a4dc308e51827caa3022d3e
+candidate closure: 73015cac8bce121b2ea3137c3b616f3b91eb4a03
+integration: fast-forward
+origin push: not performed
+```
+
+交接 authority：
+
+```text
+docs/handoffs/2026-07-31-milestone-17-task5-to-task6-handoff.md
+```
+
+Implementation Plan 的 Tasks 1–5 steps 已同步為 complete；Tasks 6–7 保持 open。Task register
+明確記錄 Stage A／B complete、Stage C open。Installed production 仍是舊 identity，repository
+integration 不代表漏洞已部署修復。
