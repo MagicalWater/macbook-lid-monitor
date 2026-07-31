@@ -178,7 +178,7 @@ git commit -m "fix: wait for maintenance daemon exit"
 - Consumes: Task 6R-1/2 commits and focused evidence。
 - Produces: final recovery candidate identity、Task 6 blocked→ready transition；不進行 production upgrade。
 
-- [ ] **Step 1: 執行 full management and Swift gates**
+- [x] **Step 1: 執行 full management and Swift gates**
 
 ```bash
 swift test --filter ProductionManagementScriptTests
@@ -187,7 +187,7 @@ swift build -c release --product macbook-lid-monitor
 swift build -c release --product macbook-lid-monitor-daemon
 ```
 
-- [ ] **Step 2: 執行 static/package gates**
+- [x] **Step 2: 執行 static/package gates**
 
 ```bash
 bash -n scripts/manage-production-daemon.sh scripts/lib/*.sh
@@ -197,16 +197,16 @@ shellcheck -x scripts/manage-production-daemon.sh scripts/lib/*.sh
 git diff --check
 ```
 
-- [ ] **Step 3: Live production read-only verification**
+- [x] **Step 3: Live production read-only verification**
 
 確認仍為 old identity、mode disabled、job absent、zero PID；不得 sudo 或 bootstrap。
 
-- [ ] **Step 4: Holistic review and docs synchronization**
+- [x] **Step 4: Holistic review and docs synchronization**
 
 記錄 RED/GREEN、90-test/full-suite、static/package、production unchanged evidence；Task 6R complete，
 Task 6 upgrade 回到 open 但必須使用新的 final-main package 並重新取得批准。
 
-- [ ] **Step 5: Commit recovery closure**
+- [x] **Step 5: Commit recovery closure**
 
 ```bash
 git add docs/superpowers docs/validation

@@ -434,3 +434,53 @@ git diff --check: pass
 
 **Task 6R-2 approved.** Open P0 = 0；Open P1 without disposition = 0。可進入 Task 6R-3
 holistic repository gate。
+
+## Task 6R-3 — Holistic repository gate
+
+### Verification evidence
+
+```text
+ProductionManagementScriptTests: 93 tests, 0 failures
+Swift full suite: 292 tests, 0 failures
+release macbook-lid-monitor: pass
+release macbook-lid-monitor-daemon: pass
+bash -n: pass
+shellcheck -x: pass
+package prepare/verify at implementation commit: pass
+git diff --check: pass
+```
+
+Candidate package evidence：
+
+```text
+source commit: 0e0b8a0086c98e27b59200c0e24c6e584d430bd2
+version: 0e0b8a0086c9
+binary SHA-256: 313009ec8e61bd5929c63d5e37f202bc1a60f10dcaa8d2fdb815b8330500b070
+```
+
+### Independent holistic review
+
+- Diff 僅擴充 maintenance exit synchronization，未碰 auto-sleep state machine：通過。
+- Exact production probe 與 sandbox deterministic hook 分離：通過。
+- 5 秒上限、timeout return 70、no kill：通過。
+- Backup／acceptance invalidation／payload activation 仍在 successful wait 後：通過。
+- 93-test management 與 292-test full suite 均 fresh pass：通過。
+- Release/static/package gates fresh pass：通過。
+- Live production old identity／disabled／job absent／zero PID：只讀通過。
+
+### Live production evidence
+
+```text
+installed version: 0885d54dbf13
+installed source commit: 0885d54dbf133fdd8620d4a38379a8ed64819430
+mode: disabled
+job: absent
+process count: 0
+production mutation: none
+```
+
+### Decision
+
+**Task 6R repository candidate approved.** Open P0 = 0；Open P1 without disposition = 0。
+Fast-forward integration 後必須從 final local main 重新 prepare/verify；Task 6 upgrade 仍需新的明確
+批准，舊 `72a274e6ef29` approval 不可沿用。
