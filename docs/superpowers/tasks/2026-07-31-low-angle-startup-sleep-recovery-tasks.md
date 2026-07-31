@@ -1,7 +1,7 @@
 # Milestone 17 — 低角度啟動睡眠恢復 Task Register
 
 日期：2026-07-31
-狀態：Stage A／B 與 Tasks 1–5 complete。Task 6 第一次 upgrade 在 payload replacement 前因 maintenance bootout 退出競態安全停止；Task 6R repository candidate complete，待 local-main integration 與 final-main package 重新 prepare/verify。Task 6 仍 blocked。Installed production 為舊 identity、disabled、job absent、zero PID。
+狀態：Stage A／B 與 Tasks 1–5 complete。Task 6 第一次 upgrade 在 payload replacement 前因 maintenance bootout 退出競態安全停止；Task 6R complete 並已 fast-forward 整合到 local main。待 final-main package 重新 prepare/verify 後，Task 6 可重新請求 upgrade 批准。Installed production 為舊 identity、disabled、job absent、zero PID。
 
 ## Task register
 
@@ -13,7 +13,7 @@
 | 4 | README/runbook/event authority sync — complete | docs/event focused tests | none beyond repository implementation | revert Task 4 commit |
 | 5 | Repository holistic release gate — complete | 289 tests in current/clean clone; release/static/package gates; live old identity unchanged | separate approval required for push or production mutation | candidate remains local; current production unchanged |
 | 6 | Upgrade and bounded acceptance for new identity | upgrade, dry-run, enabled-once, recovery-resleep evidence | each mutation/real-sleep stage separately approved | reviewed rollback package; disabled/nonresident safe stops |
-| 6R | Repair maintenance bootout resident-process race — repository candidate complete | 93 management tests, 292 full tests, timeout-before-replacement, release/static/package gates | integration allowed by approved repository-only execution; new approval required before upgrade retry | old identity remains disabled, booted out, zero PID |
+| 6R | Repair maintenance bootout resident-process race — complete and integrated | 93 management tests, 292 full tests, timeout-before-replacement, release/static/package gates, ff-only integration | new approval required before upgrade retry | old identity remains disabled, booted out, zero PID |
 | 7 | Persistent activation and low-angle reboot/loginwindow proof | activation, changed boot, pre-login startup sleep, cleanup, baseline | activate/reboot start/manual reboot/finish separately approved | emergency disable/bootout; rollback only with approval |
 
 ## Stage gates

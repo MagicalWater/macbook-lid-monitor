@@ -484,3 +484,23 @@ production mutation: none
 **Task 6R repository candidate approved.** Open P0 = 0；Open P1 without disposition = 0。
 Fast-forward integration 後必須從 final local main 重新 prepare/verify；Task 6 upgrade 仍需新的明確
 批准，舊 `72a274e6ef29` approval 不可沿用。
+
+## Task 6R — Local-main integration review
+
+### Integration evidence
+
+```text
+main before integration: 72a274e6ef2924213c1b43840bff6db34370d356
+recovery candidate: 79bf1396fb2af6b35bb4e3fcc86470678401c8dc
+method: git merge --ff-only
+conflicts: none
+working tree after integration: clean
+push: none
+production mutation: none
+```
+
+### Decision
+
+Task 6R is integrated into local main。This integration does not authorize production upgrade。
+Final-main full verification and package prepare/verify remain required before presenting a new Task 6
+upgrade gate。

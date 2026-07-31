@@ -213,7 +213,7 @@ git add docs/superpowers docs/validation
 git commit -m "docs: close bounded maintenance exit recovery"
 ```
 
-- [ ] **Step 6: Integrate to local main only after review**
+- [x] **Step 6: Integrate to local main only after review**
 
 使用 fast-forward integration；不得 push。整合後從 final main 再執行一次 repository-only
 `prepare`／`verify`，並將新的 package identity 提交給使用者批准 production upgrade。

@@ -110,3 +110,16 @@ production mutation during Task 6R: none
 Task 6R repository candidate passes with Open P0 = 0 and Open P1 without disposition = 0。After
 fast-forward integration and final-main package prepare/verify, Task 6 may request a new explicit
 production upgrade approval. No previous upgrade approval carries forward。
+
+## Local-main integration
+
+```text
+main before integration: 72a274e6ef2924213c1b43840bff6db34370d356
+candidate: 79bf1396fb2af6b35bb4e3fcc86470678401c8dc
+integration: fast-forward only
+conflicts: none
+push: none
+```
+
+The integration synchronization commit that contains this section is the final-main source authority
+for the next package prepare/verify gate。
