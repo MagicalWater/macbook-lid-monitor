@@ -1,7 +1,7 @@
 # Milestone 17 — 低角度啟動睡眠恢復 Task Register
 
 日期：2026-07-31
-狀態：Stage A／B 與 Tasks 1–5 complete。Task 6R2 deployed identity `99a51a4a2c45` 的 dry-run核心行為通過，但 cleanup因重疊 termination signal留下 `runActive=true`。Task 6R3 repository candidate complete，integration pending；production disabled、job absent、zero PID，所有 acceptance absent。
+狀態：Stage A／B 與 Tasks 1–5 complete。Task 6R2 deployed identity `99a51a4a2c45` 的 dry-run核心行為通過，但 cleanup因重疊 termination signal留下 `runActive=true`。Task 6R3 已 ff-only 整合至 local main，fresh final-main verification pending；production disabled、job absent、zero PID，所有 acceptance absent。
 
 ## Task register
 
@@ -15,7 +15,7 @@
 | 6 | Upgrade and bounded acceptance for new identity | upgrade, dry-run, enabled-once, recovery-resleep evidence | each mutation/real-sleep stage separately approved | reviewed rollback package; disabled/nonresident safe stops |
 | 6R | Repair maintenance bootout resident-process race — complete, integrated and deployed | 93 management tests, 292 full tests, timeout-before-replacement, release/static/package gates, real upgrade retry pass | completed under separate upgrade approval | installed identity `93d9881ecddb`, loaded/disabled/zero PID |
 | 6R2 | Repair acceptance clean-exit/bootstrap handoff race — complete and integrated; final-main verification in progress | 97 management tests, 296 full tests, delayed clean-state wait, timeout no-bootstrap, crash-count preservation, release/static/package gates, ff-only integration | all production mutations remain separately gated | current identity remains loaded/disabled/zero PID; no reset or acceptance rerun |
-| 6R3 | Repair overlapping termination and signal-handler completion race — repository candidate complete; integration pending | true double-SIGTERM child RED/GREEN, single bootout authority, 98 management tests, 299 full tests, release/static/package gates | repository plus bounded production re-entry approved as one fail-stop batch | current identity `99a51a4a2c45`, disabled/job absent/zero PID; no acceptance recorded |
+| 6R3 | Repair overlapping termination and signal-handler completion race — integrated; final-main verification pending | true double-SIGTERM child RED/GREEN, single bootout authority, 98 management tests, 299 full tests, release/static/package gates, ff-only integration | repository plus bounded production re-entry approved as one fail-stop batch | current identity `99a51a4a2c45`, disabled/job absent/zero PID; no acceptance recorded |
 | 7 | Persistent activation and low-angle reboot/loginwindow proof | activation, changed boot, pre-login startup sleep, cleanup, baseline | activate/reboot start/manual reboot/finish separately approved | emergency disable/bootout; rollback only with approval |
 
 ## Stage gates

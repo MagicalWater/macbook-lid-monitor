@@ -730,3 +730,18 @@ candidate binary SHA-256: 5666ac3123fab73d6acbc92bcb8243a90095eb083c822d47e3279e
 
 **Task 6R3 repository candidate approved.** Open P0 = 0；Open P1 without disposition = 0。
 Proceed to ff-only local-main integration and fresh final-main verification before production mutation.
+
+## Task 6R3 — Local-main integration review
+
+```text
+main before integration: 99a51a4a2c454edce1344ce5f3e040a0cc2b3a0f
+candidate: 65193e1bddf5b34facefac4ad95ebbcdddaeaa46
+method: git merge --ff-only
+conflicts: none
+working tree after integration: clean
+push: none
+production mutation: none
+```
+
+Integration itself does not authorize deployment. Fresh verification and package prepare/verify must run
+on the final local-main documentation commit before any production mutation.

@@ -322,7 +322,7 @@ installed identity `99a51a4a2c45` is now the incident baseline, not an accepted 
 
 ### Task 6R3: Graceful shutdown single-authority recovery
 
-**Status:** repository candidate complete；holistic gates pass，local-main integration pending。
+**Status:** integrated to local main；fresh final-main verification pending。
 
 **Authority:**
 
@@ -334,8 +334,9 @@ docs/validation/2026-07-31-graceful-shutdown-single-authority-recovery.md
 
 Task 6R3 adds an independent true double-SIGTERM child contract, guards signal-handler completion, and
 removes the overlapping management `stop_job` authority. Repository gates pass at 98 management tests
-and 299 full tests. Production remains disabled／job absent／zero PID with the incident `runActive=true`
-state unchanged until final-main integration and package verification complete。
+and 299 full tests. Local main fast-forwarded from `99a51a4` to `65193e1` with no conflict and no push。
+Production remains disabled／job absent／zero PID with incident `runActive=true` until final-main package
+verification completes。
 
 ### Task 7: Persistent activation 與低角度 reboot/loginwindow acceptance
 

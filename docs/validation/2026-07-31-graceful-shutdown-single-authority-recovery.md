@@ -120,8 +120,9 @@ plist SHA-256: 02ed783137c406d5baad9b07ec20ac60283b0bad8a1b2b29fa07d02d4689c24b
 disabled config SHA-256: 201d3fae2c0d6266df417ce65374721b5793415d8bf4e2a9c479fe63790f77bf
 ```
 
-Local-main integration requires a new final-main package identity; this pre-closure identity is not the
-production deployment authority.
+Local main fast-forwarded cleanly from `99a51a4a2c454edce1344ce5f3e040a0cc2b3a0f` to
+`65193e1bddf5b34facefac4ad95ebbcdddaeaa46`. A final integration-authority commit follows; therefore the
+pre-closure identity remains non-deployable until fresh verification on that final commit.
 
 ## Live production read-only gate
 

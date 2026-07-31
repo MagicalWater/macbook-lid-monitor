@@ -191,7 +191,7 @@ git add docs/superpowers docs/validation
 git commit -m "docs: close graceful shutdown recovery"
 ```
 
-- [ ] **Step 3: Fast-forward local main only**
+- [x] **Step 3: Fast-forward local main only**
 
 Require main still clean and exactly based on `99a51a4`; use `git merge --ff-only`. Do not push.
 
