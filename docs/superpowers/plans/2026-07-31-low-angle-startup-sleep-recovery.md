@@ -383,3 +383,22 @@ observer plist 與 launchd job 均為 absent。Production 最終保持 enabled�
 
 同步 README/runbook/validation/reviews/task register；current checkout 與 clean snapshot gates 重新
 通過；production 最終 enabled/running；取得 push 批准後 push。
+
+### Task 7R: README deployment-state contract synchronization
+
+**Status:** complete；Task 7 Step 5 re-entry unblocked，但 Step 5 本身仍 open。
+
+2026-07-31 第一次 Step 5 current-checkout full suite 在
+`testReadmePresentsProductionQuickStartBeforeForegroundDetails` fail-stop：測試仍要求候選階段的
+`Milestone 17 候選版本` 與 `尚未部署到目前正式常駐服務`，但 README 已依 Steps 1–4 的正式
+evidence 正確更新為 identity `7bf98ff6ceae` 已部署、persistent activation 與低角度
+reboot/loginwindow proof 已完成。
+
+Task 7R 先重現 focused RED（1 test、2 assertions），再只修改
+`Tests/LidMonitorTests/ProductionManagementScriptTests.swift` 的 README required-text contract，改為
+鎖定 deployed identity、identity-bound acceptance、persistent activation、reboot/loginwindow 真機
+驗收，以及僅剩 holistic closure 與未批准 push。README、runtime source、scripts、packaging 與
+production state均未修改。
+
+驗證結果：focused GREEN 1/1；完整 suite 299 tests、1 child-only skip、0 failures，其中
+ProductionManagementScriptTests 98/98。Open P0 = 0；Open P1 without disposition = 0。

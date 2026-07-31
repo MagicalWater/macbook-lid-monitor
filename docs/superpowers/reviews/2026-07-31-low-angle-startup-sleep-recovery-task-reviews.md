@@ -1038,3 +1038,61 @@ occurred.
 **Task 7 Step 4 approved and complete.** Changed boot、pre-login auto-start、new PID、low-angle startup
 sleep, exact identity, health, baseline and temporary cleanup are all proven. Open P0 = 0；Open P1
 without disposition = 0。Step 5 Milestone holistic closure remains open and separately governed.
+
+## Task 7R — README deployment-state contract synchronization review
+
+### Trigger and fail-stop boundary
+
+The first approved Task 7 Step 5 current-checkout run stopped at the full-suite gate:
+
+```text
+ProductionManagementScriptTests/testReadmePresentsProductionQuickStartBeforeForegroundDetails
+299 tests / 1 skip / 2 assertion failures
+```
+
+Both assertions were stale candidate-stage strings:
+
+```text
+Milestone 17 候選版本
+尚未部署到目前正式常駐服務
+```
+
+No clean snapshot、release、static、package、closure documentation or commit was performed after the
+failure. Repository remained clean at `cf4b95330d84a99fe2be08fd2c066753a2a8f7c2`; production remained
+enabled／loaded／PID `281` with crash state clean and zero reboot artifacts.
+
+### Root cause and minimal repair
+
+Commit `3d47ddd` correctly introduced the candidate-stage README contract before deployment. Later
+activation and reboot-finish documentation advanced README authority, but the test required-text list
+was not synchronized. This was an authority drift defect, not a runtime or README factual defect.
+
+The repair changed only `Tests/LidMonitorTests/ProductionManagementScriptTests.swift`, replacing the two
+stale candidate assertions with deployed-state assertions for:
+
+```text
+identity 7bf98ff6ceae upgrade
+identity-bound acceptance and persistent activation
+reboot/loginwindow real-machine acceptance
+only holistic closure and unapproved push remain
+```
+
+README、Sources、scripts、packaging and production state were not modified.
+
+### TDD and verification
+
+```text
+focused RED: 1 test, 2 expected assertion failures
+focused GREEN: 1 test, 0 failures
+full suite: 299 tests, 1 child-only skip, 0 failures
+ProductionManagementScriptTests: 98 tests, 0 failures
+```
+
+Immediate review confirmed the existing quick-start、management-command and runbook-link requirements
+remain intact; only stale deployment-state expectations changed.
+
+### Decision
+
+**Task 7R approved and complete.** Open P0 = 0；Open P1 without disposition = 0。Task 7 Step 5 is
+unblocked but remains open and must restart its holistic gates from the beginning. No production
+mutation、reboot、disable、rollback or push occurred.

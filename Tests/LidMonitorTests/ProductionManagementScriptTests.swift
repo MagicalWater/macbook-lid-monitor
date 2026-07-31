@@ -69,8 +69,10 @@ final class ProductionManagementScriptTests: XCTestCase {
             "manage-production-daemon.sh disable",
             "manage-production-daemon.sh uninstall",
             "docs/operations/production-daemon.md",
-            "Milestone 17 候選版本",
-            "尚未部署到目前正式常駐服務",
+            "Milestone 17 identity `7bf98ff6ceae` 已完成 upgrade",
+            "identity-bound acceptance、evidence-gated persistent activation",
+            "reboot/loginwindow 真機驗收",
+            "Milestone 17 僅剩 repository holistic closure 與未獲批准的 push",
         ] {
             XCTAssertTrue(firstHundredLines.contains(requiredText), requiredText)
         }

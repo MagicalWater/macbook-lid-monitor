@@ -1,7 +1,7 @@
 # Milestone 17 — 低角度啟動睡眠恢復 Task Register
 
 日期：2026-07-31
-狀態：Stage A／B complete。Task 6R3 已完成 repository TDD、local-main integration、final-main verification、production upgrade、crash repair與三階段 acceptance。Installed identity 為 `7bf98ff6ceae`。Task 7 Steps 1–4 已完成；changed boot、pre-login observer、新 PID `281`、低角度 startup sleep、baseline 與 temporary cleanup 均已驗證。Production enabled／loaded／single PID、monitoring-armed、crash clean。僅 Step 5 holistic closure 尚未執行。
+狀態：Stage A／B complete。Task 6R3 已完成 repository TDD、local-main integration、final-main verification、production upgrade、crash repair與三階段 acceptance。Installed identity 為 `7bf98ff6ceae`。Task 7 Steps 1–4 已完成；changed boot、pre-login observer、新 PID `281`、低角度 startup sleep、baseline 與 temporary cleanup 均已驗證。Task 7R 已修復 Step 5 首次 full-suite 暴露的過期 README deployment-state test contract，完整 suite 恢復 299 tests、0 failures。Production enabled／loaded／single PID、monitoring-armed、crash clean。僅 Step 5 holistic closure 尚未重新執行。
 
 ## Task register
 
@@ -17,6 +17,7 @@
 | 6R2 | Repair acceptance clean-exit/bootstrap handoff race — complete, integrated, superseded by 6R3 | 97 management tests, 296 full tests, delayed clean-state wait, timeout no-bootstrap, crash-count preservation, release/static/package gates, ff-only integration | historical recovery authority only | no independent open production scope remains |
 | 6R3 | Repair overlapping termination and signal-handler completion race — complete | true double-SIGTERM child RED/GREEN, single bootout authority, 98 management tests, 299 full tests, final package `7bf98ff6ceae`, three-stage production acceptance | repository plus bounded production re-entry approved as one fail-stop batch; recovery-only retest separately approved | loaded/disabled/zero PID; crash count 0; no activate/reboot/push |
 | 7 | Persistent activation and low-angle reboot/loginwindow proof — Steps 1–4 complete, Step 5 open | prepared boot/PID `1785457249`/`99898`; new boot/PID `1785491605`/`281`; pre-login=true; startup candidate、debounce、one sleep request、wake/rearm、baseline、artifact cleanup verified | activate、reboot preparation、manual reboot、finish completed; holistic closure remains open | production remains enabled/single PID; emergency disable/bootout only with approval |
+| 7R | Synchronize README deployment-state contract — complete | focused RED 1 test/2 assertions; focused GREEN 1/1; full suite 299 tests, 1 skip, 0 failures; management 98/98 | explicitly approved recovery scope | test/docs only; README/runtime/production unchanged; Step 5 remains open |
 
 ## Stage gates
 
@@ -48,6 +49,11 @@ pre-login=true、new PID `281`、完整 acceptance 與 `operational_baseline=pas
 後才清理 temporary reboot state、observer evidence、observer executable、observer plist 與
 observer launchd job；cleanup 後 artifact count 0，production 仍 enabled／loaded／single PID、
 crash count 0。Milestone holistic closure 仍由 Step 5 獨立治理。
+
+Step 5 第一次 current-checkout full suite 依 fail-stop 規則停止於一個過期 README contract test：
+測試仍要求候選階段的「尚未部署」文字。Task 7R 已以 RED→GREEN 最小修正 test authority，
+完整 suite恢復 299 tests、1 skip、0 failures；沒有修改 README正式事實、runtime source或
+production。Step 5 必須從頭重新執行，不能沿用失敗 run 的部分結果。
 
 ## Completion rule
 
