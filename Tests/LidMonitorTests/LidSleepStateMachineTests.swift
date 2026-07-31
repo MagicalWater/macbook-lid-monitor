@@ -74,6 +74,87 @@ final class LidSleepStateMachineTests: XCTestCase {
         XCTAssertEqual(machine.state, .disarmed)
     }
 
+    func testStartupClosedAngleSchedulesStartupCandidate() {
+        var machine = makeMachine()
+        let deadline = start.addingTimeInterval(7)
+        _ = machine.handle(.angleChanged(60, at: start.addingTimeInterval(1)))
+
+        XCTAssertEqual(
+            machine.handle(.startupCooldownElapsed(at: start.addingTimeInterval(5))),
+            [
+                .stateChanged(.startupClosedCandidate(deadline: deadline)),
+                .scheduleCloseDebounce(deadline: deadline)
+            ]
+        )
+        XCTAssertEqual(machine.state, .startupClosedCandidate(deadline: deadline))
+    }
+
+    func testStartupClosedCandidateRequestsSleepExactlyOnce() {
+        var machine = startupClosedCandidateMachine()
+        let deadline = start.addingTimeInterval(7)
+
+        XCTAssertEqual(
+            machine.handle(.closeDebounceElapsed(at: deadline)),
+            [.stateChanged(.triggered), .requestSleep]
+        )
+        XCTAssertEqual(
+            machine.handle(.closeDebounceElapsed(at: deadline.addingTimeInterval(1))),
+            []
+        )
+    }
+
+    func testStartupHysteresisAngleStaysDisarmed() {
+        var machine = makeMachine()
+        _ = machine.handle(.angleChanged(65, at: start.addingTimeInterval(1)))
+
+        XCTAssertEqual(
+            machine.handle(.startupCooldownElapsed(at: start.addingTimeInterval(5))),
+            [.stateChanged(.disarmed)]
+        )
+        XCTAssertEqual(machine.state, .disarmed)
+    }
+
+    func testStartupClosedCandidateHysteresisCancelsToDisarmed() {
+        var machine = startupClosedCandidateMachine()
+
+        XCTAssertEqual(
+            machine.handle(.angleChanged(65, at: start.addingTimeInterval(6))),
+            [.cancelCloseDebounce, .stateChanged(.disarmed)]
+        )
+        XCTAssertEqual(machine.state, .disarmed)
+    }
+
+    func testStartupClosedCandidateReopenCancelsToOpen() {
+        var machine = startupClosedCandidateMachine()
+
+        XCTAssertEqual(
+            machine.handle(.angleChanged(70, at: start.addingTimeInterval(6))),
+            [.cancelCloseDebounce, .stateChanged(.open)]
+        )
+        XCTAssertEqual(machine.state, .open)
+    }
+
+    func testInvalidDataCancelsStartupClosedCandidateToDisarmed() {
+        var machine = startupClosedCandidateMachine()
+
+        XCTAssertEqual(
+            machine.handle(.dataInvalid(at: start.addingTimeInterval(6))),
+            [.cancelCloseDebounce, .stateChanged(.disarmed)]
+        )
+        XCTAssertEqual(machine.state, .disarmed)
+    }
+
+    func testStaleStartupClosedSampleFailsOpen() {
+        var machine = LidSleepStateMachine(policy: policy, maximumSampleAge: 2)
+        _ = machine.handle(.angleChanged(60, at: start.addingTimeInterval(1)))
+
+        XCTAssertEqual(
+            machine.handle(.startupCooldownElapsed(at: start.addingTimeInterval(5))),
+            [.stateChanged(.disarmed)]
+        )
+        XCTAssertEqual(machine.state, .disarmed)
+    }
+
     func testNormalCloseDebounceRequestsSleepOnce() {
         var machine = armedMachine()
         let close = start.addingTimeInterval(6)
@@ -228,6 +309,13 @@ final class LidSleepStateMachineTests: XCTestCase {
         var machine = armedMachine()
         _ = machine.handle(.angleChanged(60, at: start.addingTimeInterval(6)))
         _ = machine.handle(.closeDebounceElapsed(at: start.addingTimeInterval(8)))
+        return machine
+    }
+
+    private func startupClosedCandidateMachine() -> LidSleepStateMachine {
+        var machine = makeMachine()
+        _ = machine.handle(.angleChanged(60, at: start.addingTimeInterval(1)))
+        _ = machine.handle(.startupCooldownElapsed(at: start.addingTimeInterval(5)))
         return machine
     }
 

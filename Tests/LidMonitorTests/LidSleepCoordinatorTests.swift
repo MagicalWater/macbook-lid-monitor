@@ -40,6 +40,57 @@ final class LidSleepCoordinatorTests: XCTestCase {
         )
     }
 
+    func testClosedStartupSchedulesDebounceAndRequestsSleepOnce() throws {
+        let fixture = makeFixture()
+        try fixture.coordinator.start()
+        fixture.stream.send(angle: 60, at: now.addingTimeInterval(1))
+
+        fixture.scheduler.fire(deadline: now.addingTimeInterval(5))
+
+        XCTAssertEqual(
+            fixture.scheduler.pendingDeadlines,
+            [now.addingTimeInterval(7)]
+        )
+        XCTAssertEqual(
+            fixture.transitions,
+            [.startupCooldown, .startupClosedCandidateStarted]
+        )
+
+        fixture.scheduler.fire(deadline: now.addingTimeInterval(7))
+        fixture.scheduler.fire(deadline: now.addingTimeInterval(7))
+
+        XCTAssertEqual(fixture.requester.requestCount, 1)
+        XCTAssertEqual(
+            fixture.transitions,
+            [
+                .startupCooldown,
+                .startupClosedCandidateStarted,
+                .startupClosedDebounceElapsed
+            ]
+        )
+    }
+
+    func testStartupClosedCandidateHysteresisCancelsAndDisarms() throws {
+        let fixture = makeFixture()
+        try fixture.coordinator.start()
+        fixture.stream.send(angle: 60, at: now.addingTimeInterval(1))
+        fixture.scheduler.fire(deadline: now.addingTimeInterval(5))
+
+        fixture.stream.send(angle: 65, at: now.addingTimeInterval(6))
+
+        XCTAssertTrue(fixture.scheduler.pendingDeadlines.isEmpty)
+        XCTAssertEqual(fixture.requester.requestCount, 0)
+        XCTAssertEqual(
+            fixture.transitions,
+            [
+                .startupCooldown,
+                .startupClosedCandidateStarted,
+                .startupClosedCandidateCancelled,
+                .disarmed
+            ]
+        )
+    }
+
     func testAngle60SchedulesOneDebounceAnd61CancelsIt() throws {
         let fixture = makeFixture()
         try fixture.coordinator.start()
