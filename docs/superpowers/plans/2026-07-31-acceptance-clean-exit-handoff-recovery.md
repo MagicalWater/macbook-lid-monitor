@@ -333,8 +333,12 @@ git add docs/superpowers docs/validation
 git commit -m "docs: close acceptance clean-exit handoff recovery"
 ```
 
-- [ ] **Step 6: Local-main integration only after complete review**
+- [x] **Step 6: Local-main integration only after complete review**
 
 使用 ff-only integration；不得 push。整合後在 final main fresh tree 重跑 full suite，重新
 prepare/verify package，並提交新的 production mutation approval wording。
+
+Integration evidence：base `93d9881ecddb0256c8cce97a360e55187902b4cb` fast-forward 至
+reviewed closure `a0ddb32e20a01f678c29a81e3b86a58e4ff76642`，無 conflict，main working tree clean；
+push 與 production mutation均未執行。
 

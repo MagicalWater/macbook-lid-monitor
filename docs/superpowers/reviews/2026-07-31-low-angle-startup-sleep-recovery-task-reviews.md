@@ -170,6 +170,21 @@ production mutation: none
 可執行 local-main ff-only integration；不得 push 或執行 production mutation。Integration 後必須
 從 final main fresh tree重新測試與 prepare/verify package。
 
+### Task 6R2 local-main integration
+
+```text
+base main: 93d9881ecddb0256c8cce97a360e55187902b4cb
+reviewed closure: a0ddb32e20a01f678c29a81e3b86a58e4ff76642
+method: git merge --ff-only
+conflicts: none
+main working tree after merge: clean
+push: not executed
+production mutation: none
+```
+
+Integration accepted。Task 6R2 的最後 gate 是 integration-authority commit 上的 fresh full suite、
+release/static 與 final-main package prepare/verify；未通過前不得請求 production upgrade。
+
 ## Task 1 — Startup-closed RED contract
 
 ### Baseline

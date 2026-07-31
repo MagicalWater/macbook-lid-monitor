@@ -301,7 +301,7 @@ docs/superpowers/plans/2026-07-31-maintenance-bootout-bounded-exit-recovery.md
 
 ### Task 6R2: Acceptance clean-exit handoff recovery
 
-**Status:** repository candidate complete；holistic gates pass，local-main integration pending。
+**Status:** complete and integrated to local main；final-main fresh verification in progress。
 
 **Authority:**
 
@@ -310,9 +310,9 @@ docs/superpowers/specs/2026-07-31-acceptance-clean-exit-handoff-recovery-design.
 docs/superpowers/plans/2026-07-31-acceptance-clean-exit-handoff-recovery.md
 ```
 
-Task 6R2 repository-only TDD 已完成。Production 維持 installed identity
+Task 6R2 repository-only TDD 與 local-main ff-only integration 已完成。Production 維持 installed identity
 `93d9881ecddb`、loaded／disabled／zero PID、dry-run pass、crash count 1 closed；不得 reset、
-重跑 acceptance 或執行真實睡眠。Integration 後仍必須重新建立 final-main package，所有
+重跑 acceptance 或執行真實睡眠。仍必須重新建立 final-main package，所有
 production mutation繼續分開批准。
 
 Task 6 enabled-once 在 Task 6R2 repository closure、local-main integration、new package

@@ -206,3 +206,10 @@ Task 6R2 repository candidate通過不等於 production 已修復。後續必須
 
 在上述 gate 完成前，Task 6 enabled-once 維持 blocked。
 
+## Local-main integration
+
+Reviewed worktree closure `a0ddb32e20a01f678c29a81e3b86a58e4ff76642` 已從 base
+`93d9881ecddb0256c8cce97a360e55187902b4cb` 以 `git merge --ff-only` 整合到本機 `main`。
+整合無 conflict、working tree clean；未 push、未修改 production。Final-main fresh test與 package
+evidence 必須在 integration-authority commit 上重新建立。
+
