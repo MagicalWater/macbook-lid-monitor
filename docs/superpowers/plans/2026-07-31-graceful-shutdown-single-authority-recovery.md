@@ -6,7 +6,7 @@
 
 **Architecture:** `ProcessSignalController` owns signal completion and ignores repeated SIGTERM/SIGINT until its handler returns. `manage-production-daemon.sh` uses one launchd termination authority (`bootout`) before bounded PID and crash-state waits. Production re-entry is serial and fail-stop.
 
-**Tech Stack:** Swift 6 / Foundation / Darwin / Dispatch, XCTest with fork/pipe/waitpid, Bash, launchd, SwiftPM.
+**Tech Stack:** Swift 6 / Foundation / Darwin / Dispatch, independent xctest subprocess, Bash, launchd, SwiftPM.
 
 ## Global Constraints
 
@@ -25,50 +25,30 @@
 - Modify: `Sources/LidMonitorCore/ProcessSignalController.swift`
 
 **Interfaces:**
-- Consumes: `ProcessSignalController.start(onSignal:)`, POSIX `fork`, `pipe`, `kill`, `waitpid`.
+- Consumes: `ProcessSignalController.start(onSignal:)`, `Process`, `xcrun xctest`, POSIX `kill`.
 - Produces: repeated SIGTERM completion guarantee; no public API change.
 
-- [ ] **Step 1: Write the failing fork-child test**
+- [ ] **Step 1: Write the failing independent-child test**
 
-Add `testSecondRealSIGTERMDuringHandlerDoesNotTerminateChild()`:
+Add a child-only test that runs when `MLM_SIGNAL_PROBE_CHILD=1`, writes `ready`／`entered`／`completed`
+marker files, and blocks in the handler completion window. Add parent test
+`testSecondRealSIGTERMDuringHandlerDoesNotTerminateChild()` that launches:
 
 ```swift
-func testSecondRealSIGTERMDuringHandlerDoesNotTerminateChild() throws {
-    var fds: [Int32] = [0, 0]
-    XCTAssertEqual(pipe(&fds), 0)
-    let pid = fork()
-    XCTAssertGreaterThanOrEqual(pid, 0)
-    if pid == 0 {
-        close(fds[0])
-        let finished = DispatchSemaphore(value: 0)
-        let controller = ProcessSignalController()
-        try! controller.start {
-            var entered = UInt8(ascii: "H")
-            _ = write(fds[1], &entered, 1)
-            usleep(250_000)
-            var completed = UInt8(ascii: "C")
-            _ = write(fds[1], &completed, 1)
-            finished.signal()
-        }
-        var ready = UInt8(ascii: "R")
-        _ = write(fds[1], &ready, 1)
-        finished.wait()
-        controller.stop()
-        _exit(0)
-    }
-    close(fds[1])
-    XCTAssertEqual(try readByte(from: fds[0]), UInt8(ascii: "R"))
-    XCTAssertEqual(kill(pid, SIGTERM), 0)
-    XCTAssertEqual(try readByte(from: fds[0]), UInt8(ascii: "H"))
-    XCTAssertEqual(kill(pid, SIGTERM), 0)
-    var status: Int32 = 0
-    XCTAssertEqual(waitpid(pid, &status, 0), pid)
-    XCTAssertTrue(WIFEXITED(status))
-    XCTAssertEqual(WEXITSTATUS(status), 0)
-}
+let process = Process()
+process.executableURL = URL(fileURLWithPath: "/usr/bin/xcrun")
+process.arguments = ["xctest", "-XCTest", childName, Bundle(for: Self.self).bundleURL.path]
+process.environment = childEnvironment
+try process.run()
+waitForMarker("ready")
+kill(process.processIdentifier, SIGTERM)
+waitForMarker("entered")
+kill(process.processIdentifier, SIGTERM)
+process.waitUntilExit()
+XCTAssertEqual(process.terminationReason, .exit)
+XCTAssertEqual(process.terminationStatus, 0)
+XCTAssertTrue(markerExists("completed"))
 ```
-
-Use a private `readByte(from:)` helper that throws on EOF/read failure and always closes descriptors.
 
 - [ ] **Step 2: Run RED**
 
@@ -78,7 +58,7 @@ Run:
 swift test --filter ProcessSignalControllerTests.testSecondRealSIGTERMDuringHandlerDoesNotTerminateChild
 ```
 
-Expected: FAIL because child terminates by SIGTERM before normal exit.
+Expected: FAIL because child xctest terminates by SIGTERM before normal exit.
 
 - [ ] **Step 3: Implement the minimal signal completion guard**
 
@@ -101,7 +81,7 @@ Keep handler synchronous; do not add retries, queues, or new public state.
 swift test --filter ProcessSignalControllerTests
 ```
 
-Expected: all tests pass, child exits 0.
+Expected: all tests pass, independent child exits 0.
 
 - [ ] **Step 5: Immediate review and commit**
 
@@ -203,7 +183,7 @@ git diff --check
 
 - [ ] **Step 2: Record holistic evidence and commit closure**
 
-Document RED/GREEN, true-signal child status, single-authority ordering, suite counts, package identity,
+Document RED/GREEN, independent true-signal child status, single-authority ordering, suite counts, package identity,
 and unchanged live production state.
 
 ```bash

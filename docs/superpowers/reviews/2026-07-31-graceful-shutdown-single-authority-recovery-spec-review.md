@@ -15,7 +15,8 @@
 - 只延長 timeout 無法處理永久未落盤：拒絕正確。
 - 只修 management 或只修 signal controller均留下單點風險：分析完整。
 - Selected design 使用 single termination authority與 completion guard：通過。
-- True signal-level fork test可在不殺死 XCTest parent的前提下捕捉原 bug：通過。
+- Independent xctest child可在不殺死 XCTest parent的前提下捕捉真實雙-signal bug，並避免
+  multithreaded fork-after-Dispatch風險：通過。
 - Timeout／no-bootstrap／no-force-kill semantics未弱化：通過。
 
 ## Decision

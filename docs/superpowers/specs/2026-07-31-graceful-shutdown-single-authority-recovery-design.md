@@ -120,13 +120,17 @@ EXIT trap 的 failed state 只重申 mode disabled 與 `bootout`；不得再呼�
 
 ### True signal-level contract
 
-新增 fork child test：
+新增獨立 xctest child-process test：
 
-1. child 啟動 `ProcessSignalController` 並向 parent 回報 ready；
-2. parent 對 child 發出第一個真實 SIGTERM；
-3. handler 回報 entered 並暫停在 completion window；
-4. parent 發出第二個真實 SIGTERM；
-5. child 必須完成 handler、正常 exit 0，且 handler count=1。
+1. parent 以 `xcrun xctest -XCTest ... <bundle>` 啟動只執行 signal-probe method 的 child；
+2. child 啟動 `ProcessSignalController` 並以 marker file 向 parent 回報 ready；
+3. parent 對 child 發出第一個真實 SIGTERM；
+4. handler 回報 entered 並暫停在 completion window；
+5. parent 發出第二個真實 SIGTERM；
+6. child 必須完成 handler、正常 exit 0，且 handler count=1。
+
+不在 multithreaded XCTest process 中使用 `fork` 後繼續呼叫 Foundation／Dispatch；child 透過
+`exec` 後的獨立 xctest process 建立乾淨 runtime。
 
 現有程式應以 SIGTERM signal termination 失敗；修復後必須正常通過。
 
@@ -144,7 +148,7 @@ Repository gates、local-main integration與 final package verification通過後
 
 ## Test strategy
 
-1. Fork child true-signal test：第二個 SIGTERM 不得中斷 handler。
+1. Independent xctest child true-signal test：第二個 SIGTERM 不得中斷 handler。
 2. Unit contract：handler 完成前 signal disposition 為 ignore，完成後恢復 default。
 3. Management source/sandbox contract：acceptance cleanup 只使用一次 bootout，不呼叫 stop_job。
 4. Delayed clean-state與timeout no-bootstrap contracts保持通過。

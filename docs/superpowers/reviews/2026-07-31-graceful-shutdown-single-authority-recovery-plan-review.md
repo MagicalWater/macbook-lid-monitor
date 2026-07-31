@@ -12,7 +12,8 @@
 
 ## Layer 2 — Execution review
 
-- Fork child isolates expected RED signal death from XCTest parent: pass.
+- Independent xctest child isolates expected RED signal death from XCTest parent and avoids unsafe
+  post-fork Dispatch use: pass.
 - Minimal signal change ignores repeats only during synchronous handler completion: pass.
 - Management change follows the already-successful maintenance single-bootout pattern: pass.
 - Production batch has per-stage fail-stop gates and safe-state checks: pass.
