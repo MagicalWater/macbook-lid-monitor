@@ -301,7 +301,8 @@ docs/superpowers/plans/2026-07-31-maintenance-bootout-bounded-exit-recovery.md
 
 ### Task 6R2: Acceptance clean-exit handoff recovery
 
-**Status:** complete and integrated to local main；final-main fresh verification in progress。
+**Status:** repository fix complete and integrated；production re-entry reached `99a51a4a2c45` but the
+first dry-run exposed a second graceful-shutdown race. Superseded by Task 6R3.
 
 **Authority:**
 
@@ -317,8 +318,24 @@ production mutation繼續分開批准。
 
 Task 6 enabled-once 在 Task 6R2 repository closure、local-main integration、new package
 deployment、crash-budget reset 與 dry-run revalidation 各自獲得批准前保持 blocked。現有
-installed identity `93d9881ecddb` 只作為 current production baseline，不是 Task 6R2 final
-package authority。
+installed identity `99a51a4a2c45` is now the incident baseline, not an accepted Task 6 identity。
+
+### Task 6R3: Graceful shutdown single-authority recovery
+
+**Status:** repository candidate complete；holistic gates pass，local-main integration pending。
+
+**Authority:**
+
+```text
+docs/superpowers/specs/2026-07-31-graceful-shutdown-single-authority-recovery-design.md
+docs/superpowers/plans/2026-07-31-graceful-shutdown-single-authority-recovery.md
+docs/validation/2026-07-31-graceful-shutdown-single-authority-recovery.md
+```
+
+Task 6R3 adds an independent true double-SIGTERM child contract, guards signal-handler completion, and
+removes the overlapping management `stop_job` authority. Repository gates pass at 98 management tests
+and 299 full tests. Production remains disabled／job absent／zero PID with the incident `runActive=true`
+state unchanged until final-main integration and package verification complete。
 
 ### Task 7: Persistent activation 與低角度 reboot/loginwindow acceptance
 

@@ -28,7 +28,7 @@
 - Consumes: `ProcessSignalController.start(onSignal:)`, `Process`, `xcrun xctest`, POSIX `kill`.
 - Produces: repeated SIGTERM completion guarantee; no public API change.
 
-- [ ] **Step 1: Write the failing independent-child test**
+- [x] **Step 1: Write the failing independent-child test**
 
 Add a child-only test that runs when `MLM_SIGNAL_PROBE_CHILD=1`, writes `ready`／`entered`／`completed`
 marker files, and blocks in the handler completion window. Add parent test
@@ -50,7 +50,7 @@ XCTAssertEqual(process.terminationStatus, 0)
 XCTAssertTrue(markerExists("completed"))
 ```
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 Run:
 
@@ -60,7 +60,7 @@ swift test --filter ProcessSignalControllerTests.testSecondRealSIGTERMDuringHand
 
 Expected: FAIL because child xctest terminates by SIGTERM before normal exit.
 
-- [ ] **Step 3: Implement the minimal signal completion guard**
+- [x] **Step 3: Implement the minimal signal completion guard**
 
 In `ProcessSignalController.finish(invokeHandler:)`, after ownership is acquired:
 
@@ -75,7 +75,7 @@ signal(SIGINT, SIG_DFL)
 
 Keep handler synchronous; do not add retries, queues, or new public state.
 
-- [ ] **Step 4: Run focused GREEN and existing signal tests**
+- [x] **Step 4: Run focused GREEN and existing signal tests**
 
 ```bash
 swift test --filter ProcessSignalControllerTests
@@ -83,7 +83,7 @@ swift test --filter ProcessSignalControllerTests
 
 Expected: all tests pass, independent child exits 0.
 
-- [ ] **Step 5: Immediate review and commit**
+- [x] **Step 5: Immediate review and commit**
 
 Verify repeated signals are ignored only during owned completion and defaults are restored afterward.
 
@@ -104,7 +104,7 @@ git commit -m "fix: guard graceful signal completion"
 - Consumes: `bootout_job`, `wait_for_managed_daemon_exit`, `wait_for_crash_budget_clean_exit`.
 - Produces: `restore_disabled_job_after_acceptance` and EXIT trap with exactly one termination authority.
 
-- [ ] **Step 1: Write RED source and sandbox contracts**
+- [x] **Step 1: Write RED source and sandbox contracts**
 
 Add tests asserting:
 
@@ -120,7 +120,7 @@ set_managed_mode disabled
 The function body must not contain `stop_job`. The `waiting|failed` EXIT branch must use `bootout_job`
 without `stop_job` or `bootstrap_job`.
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 ```bash
 swift test --filter ProductionManagementScriptTests.testAcceptanceCleanupUsesSingleBootoutAuthority
@@ -128,11 +128,11 @@ swift test --filter ProductionManagementScriptTests.testAcceptanceCleanupUsesSin
 
 Expected: FAIL because current helper calls `stop_job` before `bootout_job`.
 
-- [ ] **Step 3: Implement minimal management change**
+- [x] **Step 3: Implement minimal management change**
 
 Remove `stop_job` from the normal handoff and failed trap branch. Preserve mode change, bootout, both bounded waits, bootstrap ordering, return codes, and output contracts.
 
-- [ ] **Step 4: Run focused GREEN and regression groups**
+- [x] **Step 4: Run focused GREEN and regression groups**
 
 ```bash
 swift test --filter ProductionManagementScriptTests.testAcceptanceCleanupUsesSingleBootoutAuthority
@@ -143,7 +143,7 @@ swift test --filter ProductionManagementScriptTests.testDeploymentDryRunCleanExi
 
 Expected: all pass.
 
-- [ ] **Step 5: Static review and commit**
+- [x] **Step 5: Static review and commit**
 
 ```bash
 bash -n scripts/manage-production-daemon.sh
@@ -167,7 +167,7 @@ git commit -m "fix: use one acceptance shutdown authority"
 - Consumes: Task 1/2 commits and verification evidence.
 - Produces: approved local-main candidate and exact production re-entry identity.
 
-- [ ] **Step 1: Run repository gates**
+- [x] **Step 1: Run repository gates**
 
 ```bash
 swift test --filter ProductionManagementScriptTests
@@ -181,7 +181,7 @@ shellcheck -x scripts/manage-production-daemon.sh scripts/lib/*.sh
 git diff --check
 ```
 
-- [ ] **Step 2: Record holistic evidence and commit closure**
+- [x] **Step 2: Record holistic evidence and commit closure**
 
 Document RED/GREEN, independent true-signal child status, single-authority ordering, suite counts, package identity,
 and unchanged live production state.

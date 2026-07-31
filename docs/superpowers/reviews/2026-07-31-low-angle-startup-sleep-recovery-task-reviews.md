@@ -687,3 +687,46 @@ production mutation: none
 Task 6R is integrated into local main。This integration does not authorize production upgrade。
 Final-main full verification and package prepare/verify remain required before presenting a new Task 6
 upgrade gate。
+
+## Task 6R3 — Graceful shutdown single-authority recovery review
+
+### Incident review
+
+- Dry-run core chain reached candidate/debounce/attempt/would-sleep exactly once: pass.
+- Cleanup stopped before enabled-once and left disabled/job absent/zero PID: pass.
+- `runActive=true` remained after PID exit and stopping log: confirmed.
+- Root cause traced to management double termination plus signal controller restoring default before
+  handler completion: confirmed.
+
+### TDD review
+
+```text
+true double-SIGTERM RED: child terminated by signal 15, completed marker missing
+true double-SIGTERM GREEN: child normal exit 0, completed marker present
+single-authority RED: stop_job found in normal and failed branches
+single-authority GREEN: exactly one bootout, no stop_job
+```
+
+### Holistic evidence
+
+```text
+ProductionManagementScriptTests: 98 tests, 0 failures
+Swift full suite: 299 tests, 1 child-only skip, 0 failures
+release builds: pass
+bash -n: pass
+shellcheck -x: pass
+package prepare/verify: pass
+candidate version: bd35fea2f346
+candidate binary SHA-256: 5666ac3123fab73d6acbc92bcb8243a90095eb083c822d47e3279eff5edbc044
+```
+
+### Scope review
+
+- Changed runtime behavior is limited to signal completion and Task 13 cleanup termination authority.
+- No auto-sleep policy, activation, reboot, rollback, force-kill or reset semantics changed.
+- Live production remained `99a51a4a2c45`, disabled, job absent, zero PID, runActive=true.
+
+### Decision
+
+**Task 6R3 repository candidate approved.** Open P0 = 0；Open P1 without disposition = 0。
+Proceed to ff-only local-main integration and fresh final-main verification before production mutation.
