@@ -817,6 +817,112 @@ final class ProductionManagementScriptTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: sandbox.appendingPathComponent("Library/Application Support/MacBookLidMonitor/rollback/macbook-lid-monitor-daemon").path))
     }
 
+    func testUpgradeWaitsForResidentDaemonToExitBeforeReplacingPayload() throws {
+        let sandbox = root.appendingPathComponent(".build/production-package-upgrade-delayed-exit-root")
+        try? FileManager.default.removeItem(at: sandbox)
+        defer { try? FileManager.default.removeItem(at: sandbox) }
+        try seedStaging()
+        try runScript("install", environment: ["MLM_TEST_ROOT": sandbox.path])
+        let installedBinary = sandbox.appendingPathComponent(
+            "Library/PrivilegedHelperTools/macbook-lid-monitor-daemon"
+        )
+        try Data("old-delayed-exit-payload".utf8).write(to: installedBinary)
+        try synchronizeInstalledManifestChecksum(in: sandbox)
+        try seedStaging()
+        let stagedBinary = root.appendingPathComponent(
+            ".build/production-package/macbook-lid-monitor-daemon"
+        )
+
+        let output = try runScriptOutput(
+            "upgrade",
+            environment: [
+                "MLM_TEST_ROOT": sandbox.path,
+                "MLM_TEST_RESIDENT_DAEMON_PROBES": "2",
+            ]
+        )
+
+        XCTAssertTrue(output.contains("daemon-exit-wait=pass probes=3"), output)
+        XCTAssertEqual(try Data(contentsOf: installedBinary), try Data(contentsOf: stagedBinary))
+    }
+
+    func testUpgradeFailsBeforePayloadReplacementWhenResidentDaemonExitTimesOut() throws {
+        let sandbox = root.appendingPathComponent(".build/production-package-upgrade-exit-timeout-root")
+        try? FileManager.default.removeItem(at: sandbox)
+        defer { try? FileManager.default.removeItem(at: sandbox) }
+        try seedStaging()
+        try runScript("install", environment: ["MLM_TEST_ROOT": sandbox.path])
+        let support = sandbox.appendingPathComponent(
+            "Library/Application Support/MacBookLidMonitor"
+        )
+        let installedBinary = sandbox.appendingPathComponent(
+            "Library/PrivilegedHelperTools/macbook-lid-monitor-daemon"
+        )
+        let installedManifest = support.appendingPathComponent("manifest.plist")
+        let config = support.appendingPathComponent("config.plist")
+        let acceptance = support.appendingPathComponent("deployment-acceptance.plist")
+        let rollback = support.appendingPathComponent("rollback")
+        let oldBinary = Data("old-timeout-payload".utf8)
+        try oldBinary.write(to: installedBinary)
+        try synchronizeInstalledManifestChecksum(in: sandbox)
+        _ = try runDeploymentLibrary(
+            "record_deployment_acceptance deployment-dry-run pass",
+            sandbox: sandbox
+        )
+        var enabled = try plistDictionary(at: config)
+        enabled["Mode"] = "enabled"
+        try PropertyListSerialization.data(fromPropertyList: enabled, format: .xml, options: 0)
+            .write(to: config)
+        let oldManifest = try Data(contentsOf: installedManifest)
+        try seedStaging()
+
+        let result = try runScriptFailure(
+            "upgrade",
+            environment: [
+                "MLM_TEST_ROOT": sandbox.path,
+                "MLM_TEST_RESIDENT_DAEMON_PROBES": "51",
+            ]
+        )
+
+        XCTAssertEqual(result.status, 70, result.output)
+        XCTAssertTrue(
+            result.output.contains("error: timed out waiting for resident daemon exit"),
+            result.output
+        )
+        XCTAssertEqual(try Data(contentsOf: installedBinary), oldBinary)
+        XCTAssertEqual(try Data(contentsOf: installedManifest), oldManifest)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: acceptance.path))
+        XCTAssertEqual(
+            try ProductionConfigurationDecoder().decode(Data(contentsOf: config)).mode,
+            .disabled
+        )
+        XCTAssertFalse(FileManager.default.fileExists(atPath: rollback.path))
+    }
+
+    func testMaintenanceResidentProbeHookIsSandboxOnly() throws {
+        let text = try String(
+            contentsOf: root.appendingPathComponent("scripts/manage-production-daemon.sh"),
+            encoding: .utf8
+        )
+        let start = try XCTUnwrap(text.range(of: "managed_daemon_is_resident() {"))
+        let end = try XCTUnwrap(
+            text.range(of: "\n}\n\nwait_for_managed_daemon_exit()", range: start.upperBound..<text.endIndex)
+        )
+        let helper = String(text[start.lowerBound..<end.upperBound])
+
+        XCTAssertTrue(helper.contains("if [[ -n \"$SYSTEM_ROOT\" ]]; then"), helper)
+        XCTAssertTrue(helper.contains("TEST_RESIDENT_DAEMON_PROBES_REMAINING"), helper)
+        XCTAssertTrue(
+            helper.contains(
+                "pgrep -f '^/Library/PrivilegedHelperTools/macbook-lid-monitor-daemon$'"
+            ),
+            helper
+        )
+        XCTAssertTrue(
+            helper.contains("return 1\n    fi\n    pgrep -f"),
+            helper
+        )
+    }
+
     func testUpgradeRepairsLegacyInstallMissingManagedSleepAuthorityBeforeNoOp() throws {
         let sandbox = root.appendingPathComponent(".build/production-package-upgrade-lease-repair-root")
         try? FileManager.default.removeItem(at: sandbox)

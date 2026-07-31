@@ -368,3 +368,35 @@ bootstrap、dry-run 或真實睡眠。
 Spec、task-level Spec review、holistic Spec review、Implementation Plan、task-level Plan review 與
 holistic Plan review 已建立。Recovery scope 僅限 bounded daemon-exit synchronization；production
 必須維持 old identity／disabled／job absent／zero PID。
+
+### Task 6R-1 RED contract
+
+新增 executable contracts：
+
+- resident daemon 經兩次 probe 後退出，upgrade 必須輸出第三次 probe 成功並替換 payload；
+- resident daemon 持續超過 50 個 wait interval，upgrade 必須 return 70，且 binary、manifest、
+  acceptance 與 rollback boundary 保持 transaction 前狀態；
+- deterministic resident probe hook 必須只存在於 `SYSTEM_ROOT` sandbox branch，production 仍用
+  exact daemon-path `pgrep`。
+
+### RED execution evidence
+
+```text
+delayed-exit test: failed as expected
+reason: upgrade completed without daemon-exit-wait evidence
+
+timeout test: failed as expected
+reason: upgrade ignored deterministic resident probes, returned 0, replaced payload,
+        invalidated acceptance and created rollback slot
+
+sandbox-only hook test: failed as expected
+reason: managed_daemon_is_resident / wait_for_managed_daemon_exit do not exist
+
+unrelated failure: none
+production mutation: none
+```
+
+### RED review decision
+
+三條 failure 都直接指向缺少 bounded-exit contract，而非 test fixture、staging identity 或 Swift
+compile error。**Task 6R-1 RED approved.** Open P0 = 0；Open P1 without disposition = 0。
