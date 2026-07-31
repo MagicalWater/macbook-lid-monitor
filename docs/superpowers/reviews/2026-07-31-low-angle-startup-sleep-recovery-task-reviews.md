@@ -1249,4 +1249,40 @@ The production runbook was reviewed and required no factual command or lifecycle
 
 **Task 7 Step 5 approved and complete. Milestone 17 local holistic closure is complete.** Open P0 = 0；
 Open P1 without disposition = 0。Production remains enabled／loaded／single PID `281`, monitoring-armed
-and crash-clean. Push remains a separate unapproved action.
+and crash-clean. At Step 5 closure, push remained a separate unapproved action.
+
+## Milestone 17 — Remote sync closure review
+
+### Approval and initial push
+
+On 2026-08-01 the user separately approved remote push. Fresh preflight confirmed:
+
+```text
+local HEAD: 27ad074433d826ace4c59bc338dcd4d3e7eaba1d
+branch: main
+working tree: clean
+ahead of origin/main: 35
+behind: 0
+production: enabled / loaded / PID 281 / crash clean
+```
+
+The approved push completed successfully:
+
+```text
+cf9f26e..27ad074  main -> main
+```
+
+Post-push fetch confirmed local `main` and `origin/main` both pointed to `27ad074...`, with ahead/behind
+both zero. No production mutation、reboot、disable or rollback occurred.
+
+### Authority follow-up
+
+Because the successful push made the prior README statement "push remains unapproved" stale, a minimal
+authority follow-up synchronized README、its executable contract、Plan、Task register、review and a new
+remote-sync validation. The same explicit push approval covers this final authority-only commit and its
+push, after which local `main` and `origin/main` must again be equal.
+
+### Decision
+
+**Milestone 17 remote sync approved and complete.** Open P0 = 0；Open P1 without disposition = 0。
+Production remains enabled／loaded／single PID `281`, monitoring-armed and crash-clean.

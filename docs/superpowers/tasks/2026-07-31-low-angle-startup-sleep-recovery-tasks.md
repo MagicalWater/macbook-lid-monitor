@@ -1,7 +1,7 @@
 # Milestone 17 — 低角度啟動睡眠恢復 Task Register
 
-日期：2026-07-31
-狀態：Milestone 17本機 holistic closure complete。Installed identity `7bf98ff6ceae` 已完成 upgrade、三階段 acceptance、persistent activation與低角度 reboot/loginwindow proof。Task 7R／7R2已修復兩次fail-stop所暴露的README contract drift與macOS diagnostics compatibility defect。Final main `2cd8b62f0f1bb86e2bf9286017b1ae396ff92803` 的current與exact-commit clean snapshot均為300 tests、1 skip、0 failures，release/static/package全部通過；live status／diagnostics／operational-baseline均rc 0。Production enabled／loaded／single PID `281`、monitoring-armed、crash clean、artifact count 0。僅push尚未獲批准。
+日期：2026-07-31；remote sync：2026-08-01
+狀態：Milestone 17 holistic closure 與 remote sync complete。Installed identity `7bf98ff6ceae` 已完成 upgrade、三階段 acceptance、persistent activation與低角度 reboot/loginwindow proof。Task 7R／7R2已修復兩次fail-stop所暴露的README contract drift與macOS diagnostics compatibility defect。Final main `2cd8b62f0f1bb86e2bf9286017b1ae396ff92803` 的current與exact-commit clean snapshot均為300 tests、1 skip、0 failures，release/static/package全部通過；live status／diagnostics／operational-baseline均rc 0。Production enabled／loaded／single PID `281`、monitoring-armed、crash clean、artifact count 0。使用者已於2026-08-01明確批准push，`origin/main` 已同步完整closure authority。
 
 ## Task register
 
@@ -16,7 +16,7 @@
 | 6R | Repair maintenance bootout resident-process race — complete, integrated and deployed | 93 management tests, 292 full tests, timeout-before-replacement, release/static/package gates, real upgrade retry pass | completed under separate upgrade approval | installed identity `93d9881ecddb`, loaded/disabled/zero PID |
 | 6R2 | Repair acceptance clean-exit/bootstrap handoff race — complete, integrated, superseded by 6R3 | 97 management tests, 296 full tests, delayed clean-state wait, timeout no-bootstrap, crash-count preservation, release/static/package gates, ff-only integration | historical recovery authority only | no independent open production scope remains |
 | 6R3 | Repair overlapping termination and signal-handler completion race — complete | true double-SIGTERM child RED/GREEN, single bootout authority, 98 management tests, 299 full tests, final package `7bf98ff6ceae`, three-stage production acceptance | repository plus bounded production re-entry approved as one fail-stop batch; recovery-only retest separately approved | loaded/disabled/zero PID; crash count 0; no activate/reboot/push |
-| 7 | Persistent activation and low-angle reboot/loginwindow proof — complete | prepared boot/PID `1785457249`/`99898`; new boot/PID `1785491605`/`281`; pre-login=true; startup sleep、wake/rearm、baseline、cleanup；final current/clean 300 tests and live read-only gate pass | activate、reboot preparation、manual reboot、finish與holistic closure均分開批准並完成；push未批准 | production remains enabled/single PID; emergency disable/bootout only with approval |
+| 7 | Persistent activation and low-angle reboot/loginwindow proof — complete | prepared boot/PID `1785457249`/`99898`; new boot/PID `1785491605`/`281`; pre-login=true; startup sleep、wake/rearm、baseline、cleanup；final current/clean 300 tests and live read-only gate pass | activate、reboot preparation、manual reboot、finish、holistic closure與remote push均分開批准並完成 | production remains enabled/single PID; emergency disable/bootout only with approval |
 | 7R | Synchronize README deployment-state contract — complete | focused RED 1 test/2 assertions; focused GREEN 1/1; full suite 299 tests, 1 skip, 0 failures; management 98/98 | explicitly approved recovery scope | historical recovery complete；final Step 5 subsequently closed |
 | 7R2 | Repair macOS diagnostics process metrics — complete | real-process RED; `etimes`→`etime`; current/clean 300 tests, 1 skip, 0 failures; management 99/99; release/static/package; live diagnostics rc 0 | explicitly approved recovery scope | historical recovery complete；final Step 5 subsequently closed |
 
@@ -70,13 +70,15 @@ Final Step 5 run 的current checkout與exact-commit independent clean snapshot�
 manifest binding均通過。Final root read-only gate確認status rc 0、diagnostics rc 0、
 `operational_baseline=pass pid=281`；前後production enabled／loaded／single PID、crash clean、
 artifact count 0，Git clean。README completion state與test authority同步後，current與clean snapshot
-再各自完整跑300 tests通過。Milestone 17本機closure完成；push保持未批准。
+再各自完整跑300 tests通過。Milestone 17本機closure完成。2026-08-01 remote push另行獲准；
+closure commit `27ad074433d826ace4c59bc338dcd4d3e7eaba1d` 已同步到 `origin/main`，remote-sync authority
+follow-up亦在同一批准範圍內推送，使local／remote current authority一致。
 
 ## Completion rule
 
 Tasks 1–7、Stage A/B/C reviews、低角度 loginwindow reboot evidence、final baseline與holistic
-review均已通過，因此Milestone 17本機closure complete。Remote push不是closure成立條件，仍需
-獨立明確批准。
+review均已通過，因此Milestone 17本機closure complete。Remote push雖不是closure成立條件，但已於
+2026-08-01另行明確批准並完成；local main與`origin/main`最終同步。
 
 ## Governance findings
 

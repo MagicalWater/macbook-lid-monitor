@@ -72,7 +72,8 @@ final class ProductionManagementScriptTests: XCTestCase {
             "Milestone 17 identity `7bf98ff6ceae` 已完成 upgrade",
             "identity-bound acceptance、evidence-gated persistent activation",
             "reboot/loginwindow 真機驗收",
-            "Milestone 17 本機 holistic closure 已完成；目前僅 push 尚未獲批准",
+            "Milestone 17 本機 holistic closure 與 remote sync 均已完成",
+            "`origin/main` 已包含完整 closure authority",
         ] {
             XCTAssertTrue(firstHundredLines.contains(requiredText), requiredText)
         }

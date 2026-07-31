@@ -392,7 +392,10 @@ Final live root read-only gate 的 `status`、`diagnostics`、`operational-basel
 輸出有效 elapsed/cpu/rss/vsz，baseline pass。前後 production 均為 enabled／loaded／single PID、
 crash clean、artifact count 0，repository HEAD／working tree 未變。README closure state與其 executable
 contract再於 current與clean snapshot各跑完整300-test suite通過。Milestone 17本機 holistic closure
-完成；push仍未獲批准，未執行 reboot、disable、rollback或production mutation。
+完成。2026-08-01 使用者另行明確批准 remote push；closure commit
+`27ad074433d826ace4c59bc338dcd4d3e7eaba1d` 已先同步到 `origin/main`，隨後以同一批准範圍追加
+remote-sync authority commit，使 remote `main` 與 current authority 最終一致。全程未執行
+reboot、disable、rollback或production mutation。
 
 ### Task 7R: README deployment-state contract synchronization
 
