@@ -942,3 +942,54 @@ push: not executed
 
 **Task 7 Step 2 approved and complete.** Open P0 = 0；Open P1 without disposition = 0。Step 3 manual
 low-angle reboot remains separately approval-gated.
+
+## Task 7 Step 3 — Low-angle manual reboot runtime review
+
+### Approval and execution boundary
+
+The user separately approved only the manual reboot and low-angle loginwindow observation. The
+operation prohibited automatic finish、cleanup、rollback and push. The user manually restarted macOS,
+kept the lid approximately 45–55 degrees through boot, remained at loginwindow until the startup sleep
+occurred, reopened above 75 degrees, allowed observer time, then logged in and reconnected bridge-mac.
+
+### Changed boot and PID evidence
+
+```text
+prepared boot epoch: 1785457249
+current boot epoch: 1785491605
+boot changed: true
+prepared PID: 99898
+current PID: 281
+mode/job/process: enabled / loaded / 1
+crash: count 0 / circuit closed / runActive true
+```
+
+The current boot time was `2026-07-31 17:53:25 +0800`. Production log evidence for PID `281` was:
+
+```text
+17:53:39 started mode=enabled
+17:53:41 startup-cooldown / monitoring-disarmed
+17:53:47 startup-closed-candidate
+17:53:48 startup-closed-debounce-elapsed
+17:53:48 sleep-request-attempted
+17:53:48 sleep-requested
+17:54:06 monitoring-armed
+```
+
+`pmset` independently recorded a real wake at `17:54:05` due to keyboard/trackpad HID activity. This
+matches the user's observation that the low-angle startup sleep occurred and the lid was then reopened.
+No second sleep request or duplicate production PID was observed.
+
+### Observer evidence boundary
+
+The observer LaunchDaemon remains loaded／not running with `runs=1` and `last exit code=0`. Its protected
+evidence plist is root:wheel `0600` and its mtime advanced to `17:54:07`, after the new boot and rearm.
+Step 3 does not claim the protected `ConsoleUser`、identity、health PID or boot fields are accepted; those
+fields are intentionally verified by `deployment-reboot-finish` in Step 4 before cleanup.
+
+### Decision
+
+**Task 7 Step 3 manual reboot and runtime observation approved and complete.** Changed boot、new PID、
+low-angle startup candidate、debounce、exactly one real sleep request、wake and same-PID rearm are proven.
+Open P0 = 0；Open P1 without disposition = 0。Step 4 finish remains separately approval-gated；observer
+artifacts remain intentionally installed and no cleanup、rollback or push occurred.

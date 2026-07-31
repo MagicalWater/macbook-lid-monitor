@@ -356,9 +356,16 @@ Observer LaunchDaemon 已在目前 boot 執行一次並正常退出（runs=1、l
 下一次開機的 RunAtLoad one-shot。Production 在 arm 前後均為 enabled／loaded／single PID，
 `operational_baseline=pass`。未 reboot、未 finish、未 rollback、未 push。
 
-- [ ] **Step 3: 使用者在上蓋 `<=68` 時手動重新啟動**
+- [x] **Step 3: 使用者在上蓋 `<=68` 時手動重新啟動**
 
 停留 loginwindow，等待 startup cooldown + debounce + bounded observation window。
+
+2026-07-31 已完成手動 reboot 與低角度 runtime observation：boot epoch 從 `1785457249`
+變為 `1785491605`，production PID 從 `99898` 變為 `281`。新 PID 在登入前啟動後依序記錄
+`startup-closed-candidate`、`startup-closed-debounce-elapsed`、一次
+`sleep-request-attempted`／`sleep-requested`；`pmset` 隨後記錄 17:54:05 的 keyboard/trackpad
+wake。開蓋後同一 PID 回到 `monitoring-armed`。Observer evidence mtime 更新至 17:54:07，
+但受保護 plist 的 pre-login console user、identity 與 PID 綁定仍由 Step 4 root verifier 驗證。
 
 - [ ] **Step 4: Finish and verify**
 
