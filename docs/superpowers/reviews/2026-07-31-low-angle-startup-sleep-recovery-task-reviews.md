@@ -1096,3 +1096,79 @@ remain intact; only stale deployment-state expectations changed.
 **Task 7R approved and complete.** Open P0 = 0；Open P1 without disposition = 0。Task 7 Step 5 is
 unblocked but remains open and must restart its holistic gates from the beginning. No production
 mutation、reboot、disable、rollback or push occurred.
+
+## Task 7R2 — macOS diagnostics process-metric compatibility review
+
+### Trigger and fail-stop boundary
+
+The second approved Task 7 Step 5 run passed current-checkout and independent clean-snapshot repository
+gates, then stopped at the final live read-only gate:
+
+```text
+status_rc=0
+diagnostics_rc=1
+live_gate_retry_status=fail stage=diagnostics
+```
+
+No closure documentation or commit was created after the failure. Production remained enabled／loaded／
+PID `281`, crash state clean, reboot artifacts absent, and Git candidate state unchanged.
+
+### Root cause
+
+`process_metric_lines` used:
+
+```text
+ps -p <pid> -o etimes=,%cpu=,rss=,vsz=
+```
+
+macOS `ps` returns `ps: etimes: keyword not found` and exit code 1. Under `set -euo pipefail`, diagnostics
+therefore exited immediately after status. Existing sandbox tests injected `MLM_TEST_PROCESS_METRICS`, so
+they did not execute the real macOS `ps` field contract.
+
+### TDD and minimal repair
+
+A new focused test installs into `MLM_TEST_ROOT`, launches a real `/bin/sleep` child, injects only its real
+PID and sandbox job state, and deliberately does not inject metrics. RED reproduced diagnostics rc 1 with
+one focused failure. GREEN changed only `etimes` to macOS-supported `etime`; the external keys remain:
+
+```text
+pid=<pid> elapsed=<etime> cpu=<percent> rss=<bytes> vsz=<bytes>
+```
+
+The test also requires one five-field metric line with no `unavailable` fallback.
+
+### Holistic repository evidence
+
+```text
+focused GREEN: 1 test, 0 failures
+current full suite: 300 tests, 1 child-only skip, 0 failures
+current ProductionManagementScriptTests: 99/99
+clean snapshot full suite: 300 tests, 1 child-only skip, 0 failures
+clean snapshot ProductionManagementScriptTests: 99/99
+current and clean release builds: pass
+bash -n / shellcheck -x: pass
+package prepare / verify: pass
+git diff --check: pass
+```
+
+The independent snapshot began without `.build`, used a local temporary candidate commit, and remained
+tracked-clean after all gates.
+
+### Live read-only verification
+
+```text
+diagnostics_rc=0
+metric_line=pid=281 elapsed=04:37:54 cpu=0.0 rss=11872 vsz=435345440
+post mode/process: enabled / 1 / PID 281
+artifact_count=0
+observer_job=absent
+candidate diff SHA unchanged
+mutation=false reboot=false disable=false rollback=false push=false
+```
+
+### Decision
+
+**Task 7R2 approved and complete.** Open P0 = 0；Open P1 without disposition = 0。The repair is limited
+to observability compatibility, its executable contract, and recovery documentation. Daemon sleep policy、
+README facts、installed production payload、mode and launchd lifecycle were not modified. Task 7 Step 5
+remains open and must restart all holistic gates from the beginning.

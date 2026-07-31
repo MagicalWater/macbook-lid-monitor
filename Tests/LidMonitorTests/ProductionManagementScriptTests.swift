@@ -286,6 +286,50 @@ final class ProductionManagementScriptTests: XCTestCase {
         XCTAssertTrue(text.contains("pgrep -f '^/Library/PrivilegedHelperTools/macbook-lid-monitor-daemon$' || true"))
     }
 
+    func testDiagnosticsUsesMacOSCompatibleMetricsForRealProcessWithoutInjectedFixture() throws {
+        let sandbox = root.appendingPathComponent(".build/production-observability-real-process-root")
+        try? FileManager.default.removeItem(at: sandbox)
+        defer { try? FileManager.default.removeItem(at: sandbox) }
+
+        try seedStaging()
+        try runScript("install", environment: ["MLM_TEST_ROOT": sandbox.path])
+
+        let child = Process()
+        child.executableURL = URL(fileURLWithPath: "/bin/sleep")
+        child.arguments = ["30"]
+        try child.run()
+        defer {
+            if child.isRunning {
+                child.terminate()
+            }
+            child.waitUntilExit()
+        }
+
+        let result = try runScriptResult(
+            "diagnostics",
+            environment: [
+                "MLM_TEST_ROOT": sandbox.path,
+                "MLM_TEST_JOB_STATE": "loaded",
+                "MLM_TEST_PROCESS_IDS": String(child.processIdentifier),
+            ]
+        )
+
+        guard result.status == 0 else {
+            XCTFail("diagnostics exited \(result.status): \(result.output)")
+            return
+        }
+        let metricLine = try XCTUnwrap(
+            result.output.split(separator: "\n").map(String.init).first {
+                $0.hasPrefix("pid=\(child.processIdentifier) ")
+            }
+        )
+        for key in ["elapsed=", "cpu=", "rss=", "vsz="] {
+            XCTAssertTrue(metricLine.contains(key), "\(key) in \(metricLine)")
+        }
+        XCTAssertFalse(metricLine.contains("unavailable"), metricLine)
+        XCTAssertEqual(metricLine.split(separator: " ").count, 5, metricLine)
+    }
+
     func testUninstallRemovesOnlyManagedArtifactsAndPreservesUnrelatedFiles() throws {
         let sandbox = root.appendingPathComponent(".build/production-package-uninstall-root")
         try? FileManager.default.removeItem(at: sandbox)

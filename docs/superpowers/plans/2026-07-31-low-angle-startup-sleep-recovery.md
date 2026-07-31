@@ -402,3 +402,24 @@ production state均未修改。
 
 驗證結果：focused GREEN 1/1；完整 suite 299 tests、1 child-only skip、0 failures，其中
 ProductionManagementScriptTests 98/98。Open P0 = 0；Open P1 without disposition = 0。
+
+
+### Task 7R2: macOS diagnostics process-metric compatibility
+
+**Status:** complete；Task 7 Step 5 re-entry unblocked again，但 Step 5 本身仍 open。
+
+2026-07-31 第二次 Step 5 已通過 current checkout 與 independent clean snapshot 的完整 repository
+gates，但在最後 live read-only gate 依 fail-stop 規則停止：`status` 成功，`diagnostics` 回傳 1，
+因此 `operational-baseline` 未執行。Root cause 是 production observability 使用 macOS `ps` 不支援的
+`etimes` 欄位；sandbox tests 以 `MLM_TEST_PROCESS_METRICS` 注入值，未覆蓋真實 `ps` contract。
+
+Task 7R2 新增不注入 metrics fixture、以真實 `/bin/sleep` 子進程 PID 執行 `diagnostics` 的 focused
+contract。RED 精確為 diagnostics rc 1；最小 GREEN 僅將 `ps -o etimes=` 改為 macOS 支援的
+`ps -o etime=`，仍輸出 parser-friendly `elapsed=... cpu=... rss=... vsz=...`。未修改 daemon
+sleep policy、README、packaging 或 production installed payload。
+
+驗證結果：focused GREEN 1/1；current checkout 與 independent clean snapshot 均為 300 tests、
+1 child-only skip、0 failures，其中 ProductionManagementScriptTests 99/99；兩邊 release、bash -n、
+shellcheck、package prepare/verify 與 diff gates 全部通過。Live read-only diagnostics 對 PID `281`
+回傳 rc 0 與有效 metrics；前後 production enabled／loaded／single PID、crash clean、artifact count 0，
+Git candidate diff SHA 不變。Open P0 = 0；Open P1 without disposition = 0。

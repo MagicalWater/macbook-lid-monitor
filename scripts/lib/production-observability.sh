@@ -36,7 +36,7 @@ process_metric_lines() {
     if [[ -n "$SYSTEM_ROOT" && -n "${MLM_TEST_PROCESS_METRICS:-}" ]]; then
         metrics=$MLM_TEST_PROCESS_METRICS
     else
-        metrics="$(ps -p "$pid" -o etimes=,%cpu=,rss=,vsz= 2>/dev/null | awk 'NF {printf "elapsed=%s cpu=%s rss=%s vsz=%s", $1, $2, $3, $4}')"
+        metrics="$(ps -p "$pid" -o etime=,%cpu=,rss=,vsz= 2>/dev/null | awk 'NF {printf "elapsed=%s cpu=%s rss=%s vsz=%s", $1, $2, $3, $4}')"
     fi
     [[ -n "$metrics" ]] || metrics='elapsed=unavailable cpu=unavailable rss=unavailable vsz=unavailable'
     printf 'pid=%s %s\n' "$pid" "$metrics"
