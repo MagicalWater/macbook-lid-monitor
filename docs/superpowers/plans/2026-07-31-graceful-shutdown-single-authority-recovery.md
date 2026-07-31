@@ -1,0 +1,259 @@
+# Task 6R3 Graceful Shutdown Single-Authority Recovery Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Eliminate the acceptance cleanup double-termination race, prove repeated real signals cannot interrupt graceful completion, and safely re-enter bounded production acceptance.
+
+**Architecture:** `ProcessSignalController` owns signal completion and ignores repeated SIGTERM/SIGINT until its handler returns. `manage-production-daemon.sh` uses one launchd termination authority (`bootout`) before bounded PID and crash-state waits. Production re-entry is serial and fail-stop.
+
+**Tech Stack:** Swift 6 / Foundation / Darwin / Dispatch, XCTest with fork/pipe/waitpid, Bash, launchd, SwiftPM.
+
+## Global Constraints
+
+- Base commit is `99a51a4a2c454edce1344ce5f3e040a0cc2b3a0f`.
+- Production begins installed at `99a51a4a2c45`, disabled, job absent, zero PID, crash `runActive=true`.
+- No production mutation before repository holistic review, local-main integration, and final package verification.
+- No SIGKILL, `kill -9`, unbounded waits, activate, reboot, or push.
+- Any production acceptance failure stops the batch immediately and leaves disabled safe state.
+
+---
+
+### Task 1: True repeated-signal contract
+
+**Files:**
+- Modify: `Tests/LidMonitorTests/ProcessSignalControllerTests.swift`
+- Modify: `Sources/LidMonitorCore/ProcessSignalController.swift`
+
+**Interfaces:**
+- Consumes: `ProcessSignalController.start(onSignal:)`, POSIX `fork`, `pipe`, `kill`, `waitpid`.
+- Produces: repeated SIGTERM completion guarantee; no public API change.
+
+- [ ] **Step 1: Write the failing fork-child test**
+
+Add `testSecondRealSIGTERMDuringHandlerDoesNotTerminateChild()`:
+
+```swift
+func testSecondRealSIGTERMDuringHandlerDoesNotTerminateChild() throws {
+    var fds: [Int32] = [0, 0]
+    XCTAssertEqual(pipe(&fds), 0)
+    let pid = fork()
+    XCTAssertGreaterThanOrEqual(pid, 0)
+    if pid == 0 {
+        close(fds[0])
+        let finished = DispatchSemaphore(value: 0)
+        let controller = ProcessSignalController()
+        try! controller.start {
+            var entered = UInt8(ascii: "H")
+            _ = write(fds[1], &entered, 1)
+            usleep(250_000)
+            var completed = UInt8(ascii: "C")
+            _ = write(fds[1], &completed, 1)
+            finished.signal()
+        }
+        var ready = UInt8(ascii: "R")
+        _ = write(fds[1], &ready, 1)
+        finished.wait()
+        controller.stop()
+        _exit(0)
+    }
+    close(fds[1])
+    XCTAssertEqual(try readByte(from: fds[0]), UInt8(ascii: "R"))
+    XCTAssertEqual(kill(pid, SIGTERM), 0)
+    XCTAssertEqual(try readByte(from: fds[0]), UInt8(ascii: "H"))
+    XCTAssertEqual(kill(pid, SIGTERM), 0)
+    var status: Int32 = 0
+    XCTAssertEqual(waitpid(pid, &status, 0), pid)
+    XCTAssertTrue(WIFEXITED(status))
+    XCTAssertEqual(WEXITSTATUS(status), 0)
+}
+```
+
+Use a private `readByte(from:)` helper that throws on EOF/read failure and always closes descriptors.
+
+- [ ] **Step 2: Run RED**
+
+Run:
+
+```bash
+swift test --filter ProcessSignalControllerTests.testSecondRealSIGTERMDuringHandlerDoesNotTerminateChild
+```
+
+Expected: FAIL because child terminates by SIGTERM before normal exit.
+
+- [ ] **Step 3: Implement the minimal signal completion guard**
+
+In `ProcessSignalController.finish(invokeHandler:)`, after ownership is acquired:
+
+```swift
+signal(SIGTERM, SIG_IGN)
+signal(SIGINT, SIG_IGN)
+resources.source?.cancel()
+resources.handler?()
+signal(SIGTERM, SIG_DFL)
+signal(SIGINT, SIG_DFL)
+```
+
+Keep handler synchronous; do not add retries, queues, or new public state.
+
+- [ ] **Step 4: Run focused GREEN and existing signal tests**
+
+```bash
+swift test --filter ProcessSignalControllerTests
+```
+
+Expected: all tests pass, child exits 0.
+
+- [ ] **Step 5: Immediate review and commit**
+
+Verify repeated signals are ignored only during owned completion and defaults are restored afterward.
+
+```bash
+git add Tests/LidMonitorTests/ProcessSignalControllerTests.swift Sources/LidMonitorCore/ProcessSignalController.swift
+git commit -m "fix: guard graceful signal completion"
+```
+
+---
+
+### Task 2: Acceptance management single authority
+
+**Files:**
+- Modify: `Tests/LidMonitorTests/ProductionManagementScriptTests.swift`
+- Modify: `scripts/manage-production-daemon.sh`
+
+**Interfaces:**
+- Consumes: `bootout_job`, `wait_for_managed_daemon_exit`, `wait_for_crash_budget_clean_exit`.
+- Produces: `restore_disabled_job_after_acceptance` and EXIT trap with exactly one termination authority.
+
+- [ ] **Step 1: Write RED source and sandbox contracts**
+
+Add tests asserting:
+
+```text
+restore_disabled_job_after_acceptance:
+set_managed_mode disabled
+→ bootout_job
+→ wait_for_managed_daemon_exit
+→ wait_for_crash_budget_clean_exit
+→ bootstrap_job
+```
+
+The function body must not contain `stop_job`. The `waiting|failed` EXIT branch must use `bootout_job`
+without `stop_job` or `bootstrap_job`.
+
+- [ ] **Step 2: Run RED**
+
+```bash
+swift test --filter ProductionManagementScriptTests.testAcceptanceCleanupUsesSingleBootoutAuthority
+```
+
+Expected: FAIL because current helper calls `stop_job` before `bootout_job`.
+
+- [ ] **Step 3: Implement minimal management change**
+
+Remove `stop_job` from the normal handoff and failed trap branch. Preserve mode change, bootout, both bounded waits, bootstrap ordering, return codes, and output contracts.
+
+- [ ] **Step 4: Run focused GREEN and regression groups**
+
+```bash
+swift test --filter ProductionManagementScriptTests.testAcceptanceCleanupUsesSingleBootoutAuthority
+swift test --filter ProductionManagementScriptTests.testTask13
+swift test --filter ProductionManagementScriptTests.testBoundedDeployment
+swift test --filter ProductionManagementScriptTests.testDeploymentDryRunCleanExitTimeout
+```
+
+Expected: all pass.
+
+- [ ] **Step 5: Static review and commit**
+
+```bash
+bash -n scripts/manage-production-daemon.sh
+shellcheck -x scripts/manage-production-daemon.sh scripts/lib/*.sh
+git diff --check
+git add Tests/LidMonitorTests/ProductionManagementScriptTests.swift scripts/manage-production-daemon.sh
+git commit -m "fix: use one acceptance shutdown authority"
+```
+
+---
+
+### Task 3: Holistic repository closure and integration
+
+**Files:**
+- Modify: `docs/superpowers/plans/2026-07-31-low-angle-startup-sleep-recovery.md`
+- Modify: `docs/superpowers/tasks/2026-07-31-low-angle-startup-sleep-recovery-tasks.md`
+- Modify: `docs/superpowers/reviews/2026-07-31-low-angle-startup-sleep-recovery-task-reviews.md`
+- Create: `docs/validation/2026-07-31-graceful-shutdown-single-authority-recovery.md`
+
+**Interfaces:**
+- Consumes: Task 1/2 commits and verification evidence.
+- Produces: approved local-main candidate and exact production re-entry identity.
+
+- [ ] **Step 1: Run repository gates**
+
+```bash
+swift test --filter ProductionManagementScriptTests
+swift test
+swift build -c release --product macbook-lid-monitor
+swift build -c release --product macbook-lid-monitor-daemon
+bash -n scripts/manage-production-daemon.sh scripts/lib/*.sh
+shellcheck -x scripts/manage-production-daemon.sh scripts/lib/*.sh
+./scripts/manage-production-daemon.sh prepare
+./scripts/manage-production-daemon.sh verify
+git diff --check
+```
+
+- [ ] **Step 2: Record holistic evidence and commit closure**
+
+Document RED/GREEN, true-signal child status, single-authority ordering, suite counts, package identity,
+and unchanged live production state.
+
+```bash
+git add docs/superpowers docs/validation
+git commit -m "docs: close graceful shutdown recovery"
+```
+
+- [ ] **Step 3: Fast-forward local main only**
+
+Require main still clean and exactly based on `99a51a4`; use `git merge --ff-only`. Do not push.
+
+- [ ] **Step 4: Fresh final-main verification**
+
+Rerun full Swift suite, release/static checks, package prepare/verify from the integrated main tree.
+
+---
+
+### Task 4: Production deployment, crash repair, and bounded acceptance batch
+
+**Files:**
+- No repository source mutation after final-main package verification.
+- Record production evidence in the existing validation/review authority only after all stages finish.
+
+**Interfaces:**
+- Consumes: final-main verified package.
+- Produces: installed fixed identity and identity-bound dry-run/enabled-once/recovery-resleep acceptance.
+
+- [ ] **Step 1: Deploy fixed package**
+
+Run visible Terminal `sudo ./scripts/manage-production-daemon.sh upgrade`. Verify loaded／disabled／zero PID.
+
+- [ ] **Step 2: Repair crash state**
+
+Run explicit `sudo ./scripts/manage-production-daemon.sh reset-crash-budget` only while mode disabled and
+zero PID. Verify count 0, circuit closed, runActive false or missing clean state before next start.
+
+- [ ] **Step 3: Run serial acceptance batch**
+
+Run in order:
+
+```text
+deployment-dry-run
+deployment-enabled-once
+deployment-recovery-resleep
+```
+
+After each stage require matching acceptance plus loaded／disabled／zero PID and crash count 0. Any failure
+stops immediately; no later stage runs.
+
+- [ ] **Step 4: Final verification**
+
+Verify complete three-stage acceptance, rollback integrity, repository clean, no activation/reboot/push.
+
