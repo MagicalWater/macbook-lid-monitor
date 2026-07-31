@@ -171,3 +171,96 @@ README-first contract: 1 test, 0 failures
 
 **Task 4 approved.** Open P0 = 0；Open P1 without disposition = 0。可進入 Task 5
 repository holistic release gate。
+
+## Task 5 — Repository holistic release gate
+
+### Current-checkout gate
+
+```text
+Swift XCTest: 289 tests, 0 failures
+ProductionManagementScriptTests: 90 tests, 0 failures
+release product macbook-lid-monitor: pass
+release product macbook-lid-monitor-daemon: pass
+bash -n: pass
+shellcheck -x: pass
+package prepare/verify: pass
+git diff --check: pass
+candidate implementation commit: 3d47ddd29ba4cb9773dc4db016f4dd6f6ca86b72
+```
+
+### Clean-snapshot findings
+
+#### S17-T5-P1-1 — `/private/tmp` 不是有效的 management-test clean environment
+
+第一次 independent clone 位於 `/private/tmp`。該目錄的 group inheritance 與使用者 home
+sandbox 不同，所有建立 managed sleep-authority lease 的測試都被 verifier 正確拒絕：
+
+```text
+error=installed-set-invalid reason=group path=.../sleep-authority.lock
+```
+
+這不是 candidate behavior failure；同一 90-test management suite 在 normal checkout 已通過，
+且失敗皆集中於相同 group policy boundary。
+
+**Disposition：** 停止無效環境測試，在
+`/Users/water/.devspace/clean-snapshots/` 建立 owner=`water`、group=`staff` 的 independent clean
+clone，重新執行完整 gate。新環境 289 tests、release、static、package 全部通過。Finding closed。
+
+#### S17-T5-P1-2 — Independent Swift release builds 的 binary SHA 不相同
+
+Current checkout 與 clean clone 對同一 commit 建置的 Mach-O SHA-256 不同。調查顯示兩者
+`LC_UUID` 與 linker-generated ad-hoc code signature 不同；移除 signature 後 binary 仍因 UUID
+不同而不相同。Source 中未嵌入 checkout path。
+
+既有 release authority 的 clean-snapshot contract 要求兩邊各自完成 release build 與 package
+manifest self-verification，從未要求跨 build byte-for-byte reproducibility。正式安裝也只會取用
+一次 final `prepare`／`verify` 產生的固定 package，不會混用兩個 build 的 manifest 或 binary。
+
+**Disposition：** 不弱化 package checksum，也不新增不在本 Milestone scope 的 linker flag。
+記錄 Swift linker UUID／ad-hoc signing 的 build non-reproducibility；兩個 package 均對自身
+binary checksum 驗證通過。Deployment 前仍必須從 final main commit 重新建立並鎖定單一 package。
+Finding closed。
+
+### Valid clean-snapshot gate
+
+```text
+path owner/group: water:staff
+source commit: 3d47ddd29ba4cb9773dc4db016f4dd6f6ca86b72
+Swift XCTest: 289 tests, 0 failures
+release product macbook-lid-monitor: pass
+release product macbook-lid-monitor-daemon: pass
+bash -n: pass
+shellcheck -x: pass
+package prepare/verify: pass
+git diff --check: pass
+tracked working tree: clean
+```
+
+### Live read-only gate
+
+```text
+installed source commit: 0885d54dbf133fdd8620d4a38379a8ed64819430
+installed version: 0885d54dbf13
+mode: enabled
+launchd state: running
+PID: 288
+process count: 1
+production mutation: none
+```
+
+### Holistic repository review
+
+- Approved Spec supersession is reflected in source, tests, README and runbook: pass。
+- All auto-sleep compositions share one startup policy: pass。
+- Hysteresis/freshness/invalid/failure fail-open boundaries remain: pass。
+- No fourth timer, polling loop or unrestricted retry exists: pass。
+- Stable foreground and production transition evidence exists: pass。
+- Current-checkout and valid independent clean-snapshot gates pass: pass。
+- Current live production is explicitly still old identity/old behavior: pass。
+- No upgrade, sleep, activate, reboot, rollback, uninstall or push occurred: pass。
+
+### Decision
+
+**Task 5 approved — repository candidate complete.** Open P0 = 0；Open P1 without disposition = 0。
+Tasks 6–7 remain open and separately approval-gated. The bug is fixed in the repository candidate,
+but not yet in the installed production daemon。

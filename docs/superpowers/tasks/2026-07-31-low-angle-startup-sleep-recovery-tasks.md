@@ -1,7 +1,7 @@
 # Milestone 17 — 低角度啟動睡眠恢復 Task Register
 
 日期：2026-07-31
-狀態：Tasks 1–4 complete；Task 5 repository holistic gate in progress。Tasks 6–7 保留逐步 production approval gates。
+狀態：Tasks 1–5 repository candidate complete。Tasks 6–7 尚未開始，保留逐步 production approval gates；目前 installed production 仍是舊 identity 與舊 startup behavior。
 
 ## Task register
 
@@ -11,7 +11,7 @@
 | 2 | Shared startup closed state machine — complete | focused GREEN tests and immediate review | none beyond repository implementation | revert Task 2 commit; live production unchanged |
 | 3 | Shared composition equivalence — complete | foreground/production integration tests | none beyond repository implementation | revert Task 3 commit |
 | 4 | README/runbook/event authority sync — complete | docs/event focused tests | none beyond repository implementation | revert Task 4 commit |
-| 5 | Repository holistic release gate | full suite, release, package, clean snapshot, live read-only gate | separate approval required for push or production mutation | candidate remains local; current production unchanged |
+| 5 | Repository holistic release gate — complete | 289 tests in current/clean clone; release/static/package gates; live old identity unchanged | separate approval required for push or production mutation | candidate remains local; current production unchanged |
 | 6 | Upgrade and bounded acceptance for new identity | upgrade, dry-run, enabled-once, recovery-resleep evidence | each mutation/real-sleep stage separately approved | reviewed rollback package; disabled/nonresident safe stops |
 | 7 | Persistent activation and low-angle reboot/loginwindow proof | activation, changed boot, pre-login startup sleep, cleanup, baseline | activate/reboot start/manual reboot/finish separately approved | emergency disable/bootout; rollback only with approval |
 
