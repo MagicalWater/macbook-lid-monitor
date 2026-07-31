@@ -252,7 +252,6 @@ restore_disabled_job_after_acceptance() {
     local status
     ACCEPTANCE_HANDOFF_STATE=waiting
     set_managed_mode disabled
-    stop_job
     printf 'disabled label=%s\n' "$LAUNCHD_LABEL"
     bootout_job
     if wait_for_managed_daemon_exit; then
@@ -289,7 +288,6 @@ cleanup_acceptance_to_disabled() {
                 ;;
             waiting|failed)
                 set_managed_mode disabled >/dev/null 2>&1 || true
-                stop_job >/dev/null 2>&1 || true
                 bootout_job >/dev/null 2>&1 || true
                 ;;
         esac

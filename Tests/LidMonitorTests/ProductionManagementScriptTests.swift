@@ -728,12 +728,11 @@ final class ProductionManagementScriptTests: XCTestCase {
             output.range(of: "verified task=13 scope=dry-run-path")
         )
         let suffix = String(output[verified.lowerBound...])
-        let stopped = try XCTUnwrap(suffix.range(of: "stopped label="))
         let bootedOut = try XCTUnwrap(suffix.range(of: "booted-out label="))
         let daemonWait = try XCTUnwrap(suffix.range(of: "daemon-exit-wait=pass"))
         let cleanWait = try XCTUnwrap(suffix.range(of: "clean-exit-wait=pass probes=3"))
         let bootstrapped = try XCTUnwrap(suffix.range(of: "bootstrapped label="))
-        XCTAssertLessThan(stopped.lowerBound, bootedOut.lowerBound)
+        XCTAssertFalse(suffix.contains("stopped label="), suffix)
         XCTAssertLessThan(bootedOut.lowerBound, daemonWait.lowerBound)
         XCTAssertLessThan(daemonWait.lowerBound, cleanWait.lowerBound)
         XCTAssertLessThan(cleanWait.lowerBound, bootstrapped.lowerBound)
@@ -852,6 +851,55 @@ final class ProductionManagementScriptTests: XCTestCase {
         XCTAssertTrue(probe.contains("TEST_CLEAN_EXIT_ACTIVE_PROBES_REMAINING"), probe)
         XCTAssertTrue(probe.contains("crash-budget.json"), probe)
         XCTAssertTrue(probe.contains("/usr/bin/python3"), probe)
+    }
+
+    func testAcceptanceCleanupUsesSingleBootoutAuthority() throws {
+        let text = try String(
+            contentsOf: root.appendingPathComponent("scripts/manage-production-daemon.sh"),
+            encoding: .utf8
+        )
+        let restoreStart = try XCTUnwrap(
+            text.range(of: "restore_disabled_job_after_acceptance()")
+        )
+        let restoreEnd = try XCTUnwrap(
+            text.range(
+                of: "\n}\n\ncleanup_acceptance_to_disabled()",
+                range: restoreStart.upperBound..<text.endIndex
+            )
+        )
+        let restore = String(text[restoreStart.lowerBound..<restoreEnd.upperBound])
+        XCTAssertFalse(restore.contains("stop_job"), restore)
+        XCTAssertEqual(
+            restore.components(separatedBy: "bootout_job").count - 1,
+            1,
+            restore
+        )
+        let setMode = try XCTUnwrap(restore.range(of: "set_managed_mode disabled"))
+        let bootout = try XCTUnwrap(restore.range(of: "bootout_job"))
+        let daemonWait = try XCTUnwrap(restore.range(of: "wait_for_managed_daemon_exit"))
+        let cleanWait = try XCTUnwrap(restore.range(of: "wait_for_crash_budget_clean_exit"))
+        let bootstrap = try XCTUnwrap(restore.range(of: "bootstrap_job"))
+        XCTAssertLessThan(setMode.lowerBound, bootout.lowerBound)
+        XCTAssertLessThan(bootout.lowerBound, daemonWait.lowerBound)
+        XCTAssertLessThan(daemonWait.lowerBound, cleanWait.lowerBound)
+        XCTAssertLessThan(cleanWait.lowerBound, bootstrap.lowerBound)
+
+        let cleanupStart = try XCTUnwrap(text.range(of: "cleanup_acceptance_to_disabled()"))
+        let cleanupEnd = try XCTUnwrap(
+            text.range(
+                of: "\n}\n\nreset_crash_budget()",
+                range: cleanupStart.upperBound..<text.endIndex
+            )
+        )
+        let cleanup = String(text[cleanupStart.lowerBound..<cleanupEnd.upperBound])
+        let failedStart = try XCTUnwrap(cleanup.range(of: "waiting|failed)"))
+        let failedEnd = try XCTUnwrap(
+            cleanup.range(of: ";;", range: failedStart.upperBound..<cleanup.endIndex)
+        )
+        let failedBranch = String(cleanup[failedStart.lowerBound..<failedEnd.upperBound])
+        XCTAssertTrue(failedBranch.contains("bootout_job"), failedBranch)
+        XCTAssertFalse(failedBranch.contains("stop_job"), failedBranch)
+        XCTAssertFalse(failedBranch.contains("bootstrap_job"), failedBranch)
     }
 
     func testTask13DryRunPathCommandRequiresFullDiagnosticChainAndFailSafe() throws {
