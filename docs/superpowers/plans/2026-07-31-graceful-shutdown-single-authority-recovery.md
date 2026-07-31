@@ -195,7 +195,7 @@ git commit -m "docs: close graceful shutdown recovery"
 
 Require main still clean and exactly based on `99a51a4`; use `git merge --ff-only`. Do not push.
 
-- [ ] **Step 4: Fresh final-main verification**
+- [x] **Step 4: Fresh final-main verification**
 
 Rerun full Swift suite, release/static checks, package prepare/verify from the integrated main tree.
 
@@ -211,16 +211,16 @@ Rerun full Swift suite, release/static checks, package prepare/verify from the i
 - Consumes: final-main verified package.
 - Produces: installed fixed identity and identity-bound dry-run/enabled-once/recovery-resleep acceptance.
 
-- [ ] **Step 1: Deploy fixed package**
+- [x] **Step 1: Deploy fixed package**
 
 Run visible Terminal `sudo ./scripts/manage-production-daemon.sh upgrade`. Verify loaded／disabled／zero PID.
 
-- [ ] **Step 2: Repair crash state**
+- [x] **Step 2: Repair crash state**
 
 Run explicit `sudo ./scripts/manage-production-daemon.sh reset-crash-budget` only while mode disabled and
 zero PID. Verify count 0, circuit closed, runActive false or missing clean state before next start.
 
-- [ ] **Step 3: Run serial acceptance batch**
+- [x] **Step 3: Run serial acceptance batch**
 
 Run in order:
 
@@ -233,7 +233,27 @@ deployment-recovery-resleep
 After each stage require matching acceptance plus loaded／disabled／zero PID and crash count 0. Any failure
 stops immediately; no later stage runs.
 
-- [ ] **Step 4: Final verification**
+- [x] **Step 4: Final verification**
 
 Verify complete three-stage acceptance, rollback integrity, repository clean, no activation/reboot/push.
 
+
+## Production closure note
+
+Final local-main package identity:
+
+```text
+source commit: 7bf98ff6ceae710757b38b14efa00d42c34ca573
+version: 7bf98ff6ceae
+binary SHA-256: 6b30459a2168d0f409cc45e4cd152a3b535a85566347e7bc273b58109e2c6ee3
+```
+
+The first recovery-resleep attempt was manually stopped after the display had been on for about 20
+seconds. `pmset` showed `LINE timed out(30000 ms)`: the display became interactive before IOKit delivered
+`systemHasPoweredOn`. The 15-second recovery interval is intentionally measured from
+`systemHasPoweredOn`, not display-on. No runtime policy change was approved or implemented.
+
+A recovery-only retest kept the lid at approximately 45–55 degrees for at least 60 seconds. PID `64966`
+emitted two sleep requests, one `recovery-resleep`, two wake observations and retained PID continuity.
+All three deployment acceptance stages now match the installed identity. Final state is
+loaded／disabled／zero PID with crash count 0; activate、reboot and push were not executed.

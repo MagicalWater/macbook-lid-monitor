@@ -151,3 +151,52 @@ sequence is:
 Every acceptance stage must restore loaded／disabled／zero PID with crash count 0, circuit closed and
 runActive false. Any failure stops immediately. Activate, reboot and push remain prohibited.
 
+## Final-main package and production closure
+
+Fresh final-main verification produced:
+
+```text
+source commit: 7bf98ff6ceae710757b38b14efa00d42c34ca573
+version: 7bf98ff6ceae
+binary SHA-256: 6b30459a2168d0f409cc45e4cd152a3b535a85566347e7bc273b58109e2c6ee3
+Swift full suite: 299 tests, 1 child-only skip, 0 failures
+release/static/package gates: pass
+```
+
+The package was upgraded, the inherited incident crash state was explicitly reset, and dry-run plus
+enabled-once passed for the same identity.
+
+The first recovery-resleep attempt was manually stopped after the display had been on for about 20
+seconds. `pmset` recorded `LINE timed out(30000 ms)` during the same sleep transaction. The display had
+become interactive before IOKit delivered `systemHasPoweredOn`; therefore the configured 15-second
+recovery interval had not finished when the lid was reopened. This was not treated as a runtime
+regression, and no product behavior change was approved.
+
+The recovery-only retest kept the lid at approximately 45–55 degrees for at least 60 seconds and passed:
+
+```text
+PID: 64966
+first sleep request: 2026-07-31T08:59:03Z
+first wake evidence: 2026-07-31T08:59:33Z
+recovery-resleep and second request: 2026-07-31T08:59:49Z
+second wake evidence: 2026-07-31T09:00:17Z
+attempt-count: 2
+return-count: 2
+recovery-count: 1
+wake-count: 2
+pid-stable: true
+```
+
+Final live state:
+
+```text
+acceptance: complete for deployment-dry-run, deployment-enabled-once, deployment-recovery-resleep
+mode: disabled
+job: loaded, not running
+resident PID: none
+crash: count=0 circuit=false runActive=false
+activate: not executed
+reboot: not executed
+push: not executed
+```
+

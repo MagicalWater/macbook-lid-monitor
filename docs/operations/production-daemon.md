@@ -95,17 +95,33 @@ Startup candidate 期間：
 production enabled；差異只在 dry-run 輸出 `would-sleep`，真實模式呼叫系統睡眠。純診斷
 `--list`、`--watch`、`--watch --raw` 不建立 auto-sleep coordinator，因此不受影響。
 
-### 尚未完成 production 部署時
+### Recovery-resleep 的計時語意
 
-Repository 中存在 Milestone 17 候選程式不代表目前已安裝 binary 已更新。必須完成：
+15 秒 `wake-recovery` 只在 IOKit 正式送達 `systemHasPoweredOn` 後開始，不以螢幕亮起或鍵盤
+輸入作為起點。macOS 的顯示子系統可以先熄滅或先恢復互動，而系統核心仍在完成原本的
+sleep／wake power transaction。
 
-1. 新 package `upgrade`；
-2. 新 identity 的 dry-run、enabled-once、recovery-resleep acceptance；
-3. evidence-gated `activate`；
-4. 上蓋 `<=68` 的登入前 reboot 真實驗收；
+若其他已註冊 power notification 的 client 沒有及時確認 `systemWillSleep`，macOS 可能等待
+最多約 30 秒後才完成交易。2026-07-31 真機驗收曾記錄：
 
-上述流程 closure 前，仍應將目前 live production 視為舊 startup 規則。暫時作法是開機後先把
-上蓋打開到 `>=75`，確認已 armed，再降低到 `<=68`。
+```text
+LINE timed out(30000 ms)
+```
+
+當時螢幕已先亮起，但 `systemHasPoweredOn` 較晚送達；因此從使用者看到螢幕亮起到第二次
+睡眠，體感等待可能接近 `30 + 15 = 45` 秒。這不代表 recovery timer 失效。驗收或日常觀察時，
+應持續保持上蓋明顯低於 `68`，直到第二次睡眠真正發生；若 15–20 秒尚未再次睡眠，不要立即
+翻開上蓋判定失敗。
+
+### 尚未完成 persistent activation 與 reboot 驗收時
+
+Milestone 17 identity `7bf98ff6ceae` 已完成 package upgrade 與三階段 acceptance，但尚未完成：
+
+1. evidence-gated `activate`；
+2. 上蓋 `<=68` 的登入前 reboot 真實驗收；
+
+目前 production 仍刻意保持 loaded／disabled／zero PID；未取得 activation 批准前，不會長期
+自動執行真實睡眠。
 
 ## 日常狀態檢查
 

@@ -124,6 +124,12 @@ dry-run 不會向 macOS 發出真正的睡眠要求。
 - recovery 期間只要取得新的 `>=75` 角度，就會立即取消待執行的再次睡眠並重新啟用自動睡眠。
 - recovery 期間若沒有新的有效資料，或資料格式無效，程式會採用 fail-open：不要求睡眠並進入 `disarmed`。
 
+`wake-recovery` 的 15 秒從 IOKit 正式送達 `systemHasPoweredOn` 時開始，不是從螢幕亮起或
+鍵盤按下時開始。若其他已註冊 power notification 的程式延遲 macOS 睡眠交易，螢幕可能先
+熄滅、之後也能先亮起，但正式 wake callback 仍較晚到達。2026-07-31 真機驗收曾觀察到
+`LINE timed out(30000 ms)`；在這種情況下，從螢幕亮起到 recovery-resleep 的體感等待可能接近
+45 秒。只要上蓋持續低於 `75` 且資料有效，正式 wake callback 後約 15 秒仍會再次睡眠。
+
 在預設 `5` 秒 startup cooldown 與 `2` 秒 close debounce 下，低角度啟動從 daemon 開始運行到
 提出睡眠要求約需 7 秒；實際時間仍受 HID 新鮮資料與系統排程影響。
 

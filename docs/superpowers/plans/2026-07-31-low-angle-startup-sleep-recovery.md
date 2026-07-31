@@ -275,16 +275,16 @@ Upgrade 必須結束於 loaded/disabled/zero PID；舊 acceptance 因 payload id
 
 在低角度 startup path 取得 candidate、debounce、一次 `would-sleep` evidence，最後 disabled。
 
-- [ ] **Step 3: 批准並執行 enabled-once acceptance**
+- [x] **Step 3: 批准並執行 enabled-once acceptance**
 
 真實 sleep request exactly once，完成後 disabled。此 step 因 dry-run cleanup 誤增 crash budget
-而 blocked；Task 6R2 complete、重新部署、reset 與 dry-run revalidation 前不得執行。
+曾被 blocked；Task 6R3 修復、重新部署、reset 與 dry-run revalidation 後已通過。
 
-- [ ] **Step 4: 批准並執行 recovery-resleep acceptance**
+- [x] **Step 4: 批准並執行 recovery-resleep acceptance**
 
 維持既有 exactly-two-attempt boundary，完成後 disabled。
 
-- [ ] **Step 5: Task review**
+- [x] **Step 5: Task review**
 
 每個 acceptance identity 必須與新 installed source commit/version 完全一致。
 
@@ -311,18 +311,13 @@ docs/superpowers/specs/2026-07-31-acceptance-clean-exit-handoff-recovery-design.
 docs/superpowers/plans/2026-07-31-acceptance-clean-exit-handoff-recovery.md
 ```
 
-Task 6R2 repository-only TDD 與 local-main ff-only integration 已完成。Production 維持 installed identity
-`93d9881ecddb`、loaded／disabled／zero PID、dry-run pass、crash count 1 closed；不得 reset、
-重跑 acceptance 或執行真實睡眠。仍必須重新建立 final-main package，所有
-production mutation繼續分開批准。
-
-Task 6 enabled-once 在 Task 6R2 repository closure、local-main integration、new package
-deployment、crash-budget reset 與 dry-run revalidation 各自獲得批准前保持 blocked。現有
-installed identity `99a51a4a2c45` is now the incident baseline, not an accepted Task 6 identity。
+Task 6R2 repository-only TDD 與 local-main ff-only integration 已完成；其 production incident
+baseline 與 blocked 狀態屬歷史證據。後續第二個 graceful-shutdown race 由 Task 6R3 接管並完成
+修復、部署與 acceptance。Task 6R2 不再擁有任何獨立 open production scope。
 
 ### Task 6R3: Graceful shutdown single-authority recovery
 
-**Status:** integrated to local main；fresh final-main verification pending。
+**Status:** complete、integrated、deployed and production-accepted；activation/reboot remain separate gates。
 
 **Authority:**
 
@@ -334,9 +329,9 @@ docs/validation/2026-07-31-graceful-shutdown-single-authority-recovery.md
 
 Task 6R3 adds an independent true double-SIGTERM child contract, guards signal-handler completion, and
 removes the overlapping management `stop_job` authority. Repository gates pass at 98 management tests
-and 299 full tests. Local main fast-forwarded from `99a51a4` to `65193e1` with no conflict and no push。
-Production remains disabled／job absent／zero PID with incident `runActive=true` until final-main package
-verification completes。
+and 299 full tests. Final local-main identity `7bf98ff6ceae` was deployed; crash state was explicitly reset;
+dry-run、enabled-once、recovery-resleep acceptance all passed for the same identity. Final production state
+is loaded／disabled／zero PID、crash count 0、circuit closed、runActive false. No activate、reboot or push。
 
 ### Task 7: Persistent activation 與低角度 reboot/loginwindow acceptance
 

@@ -745,3 +745,81 @@ production mutation: none
 
 Integration itself does not authorize deployment. Fresh verification and package prepare/verify must run
 on the final local-main documentation commit before any production mutation.
+
+## Task 6R3 — Final-main and production re-entry review
+
+### Final-main evidence
+
+```text
+final local main: 7bf98ff6ceae710757b38b14efa00d42c34ca573
+version: 7bf98ff6ceae
+binary SHA-256: 6b30459a2168d0f409cc45e4cd152a3b535a85566347e7bc273b58109e2c6ee3
+Swift full suite: 299 tests, 1 child-only skip, 0 failures
+release/static/package gates: pass
+working tree before deployment: clean
+push: none
+```
+
+### Production upgrade and crash repair
+
+- Upgrade installed the exact final-main identity and checksum: pass.
+- The first post-upgrade disabled daemon briefly ran before reaching loaded／not-running; the one-shot
+  orchestration script sampled too early and stopped. The process then exited zero and persisted clean
+  state. This was an orchestration sampling issue, not a daemon failure.
+- The inherited incident `runActive=true` was counted once by the first new daemon start, then explicitly
+  reset while disabled／zero PID: pass.
+- Dry-run acceptance: pass, crash count remained 0.
+- Enabled-once acceptance: pass, exactly one request／return, PID stable.
+
+### First recovery-resleep attempt review
+
+The first attempt emitted the initial sleep request at `16:26:05`. The display became interactive at
+`16:26:12`, but `pmset` recorded:
+
+```text
+16:26:35 Delays to Sleep notifications: [LINE timed out(30000 ms)]
+```
+
+The daemon received its formal wake callback at `16:26:35`; `wake-recovery=15` therefore had not expired
+when the user, after waiting about 20 seconds from display-on, reopened the lid to continue operating.
+The later `monitoring-armed` event is consistent with that reopen and is not evidence that the lid was
+raised immediately after wake. The user stopped the bounded command with Ctrl+C. Cleanup left
+disabled／job absent／zero PID and crash count 0. No acceptance was recorded for this failed attempt.
+
+### Recovery-only retest evidence
+
+The retest preserved the already accepted dry-run and enabled-once stages, kept the lid at approximately
+45–55 degrees, and allowed at least 60 seconds after the first display wake.
+
+```text
+PID: 64966
+08:59:03 first sleep-request-attempted / sleep-requested
+08:59:33 first wake evidence
+08:59:49 recovery-resleep
+08:59:49 second sleep-request-attempted / sleep-requested
+09:00:17 second wake evidence and reopen
+attempt-count=2
+return-count=2
+recovery-count=1
+wake-count=2
+pid-stable=true
+```
+
+The 46-second interval from the first request to recovery-resleep is compatible with an external
+30-second sleep-notification delay followed by the configured 15-second interval. The product contract
+remains `systemHasPoweredOn + 15 seconds`; no display-on timer or runtime behavior amendment was approved.
+
+### Final state and decision
+
+```text
+acceptance: deployment-dry-run, deployment-enabled-once, deployment-recovery-resleep
+installed identity: 7bf98ff6ceae
+mode/job/process: disabled / loaded-not-running / 0
+crash: count 0 / circuit closed / runActive false
+activate: not executed
+reboot: not executed
+push: not executed
+```
+
+**Task 6 and Task 6R3 production acceptance approved and complete.** Open P0 = 0；Open P1 without
+disposition = 0。Task 7 remains the only open Stage C scope.
