@@ -15,10 +15,11 @@ Production LaunchDaemon 只會透過 `scripts/manage-production-daemon.sh` 的�
 - 上蓋重新打開後，服務會重新進入監控狀態。
 
 > **部署狀態提醒：** Milestone 17 identity `7bf98ff6ceae` 已完成 upgrade、三階段
-> identity-bound acceptance 與 evidence-gated persistent activation；目前 production 為
-> `enabled`、single PID、`monitoring-armed`，低角度啟動規則已在 live binary 中生效。尚未完成的
-> 是上蓋 `<=68` 時重新啟動並停留 loginwindow 的獨立真機證明；在該驗收完成前，不宣稱整個
-> Milestone 17 已收尾。
+> identity-bound acceptance、evidence-gated persistent activation，以及上蓋 `<=68` 的
+> reboot/loginwindow 真機驗收。新 boot 中的 system-domain daemon 已在登入前自動啟動，完成
+> startup cooldown、startup-closed candidate、debounce 與一次真實睡眠要求；finish verifier
+> 亦確認 changed boot、pre-login observer、新 PID、identity、health 與 baseline，並清理所有
+> temporary reboot artifacts。Milestone 17 僅剩 repository holistic closure 與未獲批准的 push。
 
 最常用管理命令：
 

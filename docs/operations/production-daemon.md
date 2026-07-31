@@ -113,7 +113,7 @@ LINE timed out(30000 ms)
 應持續保持上蓋明顯低於 `68`，直到第二次睡眠真正發生；若 15–20 秒尚未再次睡眠，不要立即
 翻開上蓋判定失敗。
 
-### Persistent activation 已完成、reboot 驗收尚未完成時
+### Persistent activation 與低角度 reboot 驗收
 
 Milestone 17 identity `7bf98ff6ceae` 已完成 package upgrade、三階段 acceptance 與
 evidence-gated `activate`。2026-07-31 activation 後的嚴格基準為：
@@ -126,9 +126,24 @@ health_state=monitoring-armed
 operational_baseline=pass
 ```
 
-正式服務會長期自動執行真實睡眠。尚未完成的是上蓋 `<=68` 時重新啟動、停留 loginwindow，
-並證明新 boot 中的 system-domain daemon 在登入前完成 startup cooldown、startup-closed candidate、
-debounce 與一次睡眠要求。Reboot observer、手動 reboot 與 finish 各自仍需要獨立批准。
+正式服務會長期自動執行真實睡眠。2026-07-31 已完成上蓋約 45–55° 的手動 reboot/loginwindow
+真機驗收：prepared boot epoch `1785457249`／PID `99898` 變為新 boot epoch `1785491605`／PID
+`281`；新 daemon 在登入前依序記錄 startup cooldown、`startup-closed-candidate`、debounce 與
+一次 `sleep-requested`，開蓋喚醒後同一 PID 回到 `monitoring-armed`。
+
+`deployment-reboot-finish` 隨後正式驗證：
+
+```text
+boot-changed=true
+pre-login=true
+mode=enabled
+pid=281
+operational_baseline=pass
+```
+
+finish 成功後，temporary reboot state、observer evidence、observer script、observer plist 與
+observer launchd job 均已移除；production 保持 enabled／loaded／single PID。正常日常使用不需
+保留或手動管理這些 temporary artifacts。
 
 ## 日常狀態檢查
 

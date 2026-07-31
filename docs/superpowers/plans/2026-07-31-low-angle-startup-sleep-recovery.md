@@ -367,10 +367,17 @@ Observer LaunchDaemon 已在目前 boot 執行一次並正常退出（runs=1、l
 wake。開蓋後同一 PID 回到 `monitoring-armed`。Observer evidence mtime 更新至 17:54:07，
 但受保護 plist 的 pre-login console user、identity 與 PID 綁定仍由 Step 4 root verifier 驗證。
 
-- [ ] **Step 4: Finish and verify**
+- [x] **Step 4: Finish and verify**
 
 changed boot、new PID、pre-login daemon、startup-closed candidate、一次 sleep request、reopen recovery、
 baseline pass、temporary observer cleanup。
+
+2026-07-31 已完成：root verifier 確認 reboot state 從 boot epoch `1785457249` 變為
+`1785491605`，observer evidence 為 `pre-login=true`、PID `281`，且 installed identity、完整
+deployment acceptance、monitoring health 與 PID 綁定全部相符。`operational_baseline=pass`
+後才執行 bounded cleanup；deployment reboot state、observer evidence、observer executable、
+observer plist 與 launchd job 均為 absent。Production 最終保持 enabled／loaded／single PID
+`281`、crash count 0。未 reboot、未 disable、未 rollback、未 push。
 
 - [ ] **Step 5: Milestone holistic closure**
 

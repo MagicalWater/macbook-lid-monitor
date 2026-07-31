@@ -991,5 +991,50 @@ fields are intentionally verified by `deployment-reboot-finish` in Step 4 before
 
 **Task 7 Step 3 manual reboot and runtime observation approved and complete.** Changed boot、new PID、
 low-angle startup candidate、debounce、exactly one real sleep request、wake and same-PID rearm are proven.
-Open P0 = 0；Open P1 without disposition = 0。Step 4 finish remains separately approval-gated；observer
-artifacts remain intentionally installed and no cleanup、rollback or push occurred.
+Open P0 = 0；Open P1 without disposition = 0。At Step 3 closure, Step 4 finish remained separately
+approval-gated and observer artifacts remained intentionally installed. Step 4 was later approved and
+completed in the following review; no rollback or push occurred.
+
+## Task 7 Step 4 — Reboot finish and cleanup review
+
+### Approval and boundary
+
+The user separately approved `deployment-reboot-finish` with strict fail-stop semantics. The command
+was allowed to remove temporary reboot artifacts only after changed boot、pre-login observer、installed
+identity、new PID、health and operational baseline all passed. Reboot、disable、rollback and push were
+explicitly prohibited.
+
+### Root verifier evidence
+
+```text
+verified deployment-reboot-state boot-changed=true start=1785457249 current=1785491605
+verified reboot-observer pre-login=true pid=281 boot-epoch=1785491605
+verified deployment-acceptance stages=deployment-dry-run deployment-enabled-once deployment-recovery-resleep
+operational_baseline=pass pid=281
+accepted deployment-reboot-finish boot-changed=true pre-login=true mode=enabled pid=281
+```
+
+This proves the protected observer fields matched the current installed identity and hardware profile,
+the observed daemon PID differed from prepared PID `99898`, and PID-bound health was armed at loginwindow.
+
+### Bounded cleanup and final live state
+
+Cleanup ran only after all root verification succeeded. Independent post-command evidence confirmed:
+
+```text
+mode/job/process: enabled / loaded / 1
+current PID: 281
+operational baseline: pass
+reboot artifact count: 0
+observer launchd job: absent
+crash: count 0 / circuit closed / runActive true
+```
+
+No production daemon restart or mode change occurred during finish. No reboot、disable、rollback or push
+occurred.
+
+### Decision
+
+**Task 7 Step 4 approved and complete.** Changed boot、pre-login auto-start、new PID、low-angle startup
+sleep, exact identity, health, baseline and temporary cleanup are all proven. Open P0 = 0；Open P1
+without disposition = 0。Step 5 Milestone holistic closure remains open and separately governed.
