@@ -29,7 +29,7 @@
 - Consumes: `runScriptResult(_:environment:)`、sandbox `MLM_TEST_ROOT`、既有 `upgrade` transaction。
 - Produces: `MLM_TEST_RESIDENT_DAEMON_PROBES` failing contract，以及穩定 timeout message contract。
 
-- [ ] **Step 1: 新增 delayed-exit RED test**
+- [x] **Step 1: 新增 delayed-exit RED test**
 
 加入 `testUpgradeWaitsForResidentDaemonToExitBeforeReplacingPayload`：
 
@@ -45,7 +45,7 @@ XCTAssertTrue(output.contains("daemon-exit-wait=pass probes=3"), output)
 XCTAssertEqual(try Data(contentsOf: installedBinary), try Data(contentsOf: stagedBinary))
 ```
 
-- [ ] **Step 2: 新增 timeout RED test**
+- [x] **Step 2: 新增 timeout RED test**
 
 加入 `testUpgradeFailsBeforePayloadReplacementWhenResidentDaemonExitTimesOut`，使用 51 個 resident
 probe，要求：
@@ -60,12 +60,12 @@ XCTAssertEqual(decodedConfig.mode, .disabled)
 XCTAssertFalse(FileManager.default.fileExists(atPath: rollback.path))
 ```
 
-- [ ] **Step 3: 新增 sandbox-only hook contract**
+- [x] **Step 3: 新增 sandbox-only hook contract**
 
 加入 source contract，要求 production branch 仍直接使用 exact `pgrep`，而
 `MLM_TEST_RESIDENT_DAEMON_PROBES` 只存在於 `SYSTEM_ROOT` 非空分支。
 
-- [ ] **Step 4: 執行 focused RED**
+- [x] **Step 4: 執行 focused RED**
 
 ```bash
 swift test --filter ProductionManagementScriptTests/testUpgradeWaitsForResidentDaemonToExitBeforeReplacingPayload
@@ -76,7 +76,7 @@ swift test --filter ProductionManagementScriptTests/testMaintenanceResidentProbe
 Expected: delayed-exit／timeout tests 失敗，原因是 hook 與 bounded wait 尚不存在；unrelated test
 不得失敗。
 
-- [ ] **Step 5: Immediate RED review and commit**
+- [x] **Step 5: Immediate RED review and commit**
 
 ```bash
 git add Tests/LidMonitorTests/ProductionManagementScriptTests.swift \
@@ -95,7 +95,7 @@ git commit -m "test: define bounded maintenance exit contract"
 - Consumes: `SYSTEM_ROOT`、`MLM_TEST_RESIDENT_DAEMON_PROBES`、exact daemon path probe。
 - Produces: `managed_daemon_is_resident()` 與 `wait_for_managed_daemon_exit()`；成功輸出 `daemon-exit-wait=pass probes=N`，timeout return 70。
 
-- [ ] **Step 1: 加入 sandbox-only deterministic probe**
+- [x] **Step 1: 加入 sandbox-only deterministic probe**
 
 在 script 初始化 test counter：
 
@@ -106,7 +106,7 @@ TEST_RESIDENT_DAEMON_PROBES_REMAINING="${MLM_TEST_RESIDENT_DAEMON_PROBES:-0}"
 `managed_daemon_is_resident` 在 sandbox 中驗證 non-negative integer，remaining > 0 時遞減並
 return 0，否則 return 1；真實系統忽略 hook 並執行 exact `pgrep`。
 
-- [ ] **Step 2: 加入 5-second bounded wait**
+- [x] **Step 2: 加入 5-second bounded wait**
 
 ```bash
 wait_for_managed_daemon_exit() {
@@ -127,7 +127,7 @@ wait_for_managed_daemon_exit() {
 }
 ```
 
-- [ ] **Step 3: Wire maintenance boundary**
+- [x] **Step 3: Wire maintenance boundary**
 
 將 `prepare_maintenance_disabled_state` 的 immediate `pgrep` block 替換為：
 
@@ -137,7 +137,7 @@ wait_for_managed_daemon_exit
 printf 'maintenance-state mode=disabled job=booted-out process-count=0\n'
 ```
 
-- [ ] **Step 4: 執行 focused GREEN**
+- [x] **Step 4: 執行 focused GREEN**
 
 ```bash
 swift test --filter ProductionManagementScriptTests/testUpgradeWaitsForResidentDaemonToExitBeforeReplacingPayload
@@ -148,14 +148,14 @@ swift test --filter ProductionManagementScriptTests/testExplicitRollback
 swift test --filter ProductionManagementScriptTests/testUninstall
 ```
 
-- [ ] **Step 5: Static verification**
+- [x] **Step 5: Static verification**
 
 ```bash
 bash -n scripts/manage-production-daemon.sh scripts/lib/*.sh
 shellcheck -x scripts/manage-production-daemon.sh scripts/lib/*.sh
 ```
 
-- [ ] **Step 6: Immediate implementation review and commit**
+- [x] **Step 6: Immediate implementation review and commit**
 
 確認 5 秒上限、no kill、production hook isolation、timeout-before-replacement 與 upgrade／rollback／
 uninstall shared boundary。

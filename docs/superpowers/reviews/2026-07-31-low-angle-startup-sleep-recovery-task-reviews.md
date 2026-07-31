@@ -400,3 +400,37 @@ production mutation: none
 
 三條 failure 都直接指向缺少 bounded-exit contract，而非 test fixture、staging identity 或 Swift
 compile error。**Task 6R-1 RED approved.** Open P0 = 0；Open P1 without disposition = 0。
+
+## Task 6R-2 — Bounded resident-process wait implementation
+
+### GREEN evidence
+
+```text
+delayed-exit contract: 1 test, 0 failures
+timeout-before-replacement contract: 1 test, 0 failures
+sandbox-only hook contract: 1 test, 0 failures
+
+upgrade-focused regressions: 7 tests, 0 failures
+explicit rollback regressions: 2 tests, 0 failures
+uninstall regressions: 3 tests, 0 failures
+
+bash -n: pass
+shellcheck -x: pass
+git diff --check: pass
+```
+
+### Immediate review
+
+- Production probe 使用 exact daemon path `pgrep`：通過。
+- `MLM_TEST_RESIDENT_DAEMON_PROBES` 只在 `SYSTEM_ROOT` sandbox branch 生效：通過。
+- Wait 上限為 50 × 100 ms，沒有 unbounded retry：通過。
+- Timeout return 70，不送 SIGKILL 或其他 signal：通過。
+- Timeout 發生在 backup、acceptance invalidation 與 payload activation 前：通過。
+- Upgrade、rollback、uninstall 共用 `prepare_maintenance_disabled_state` boundary：通過。
+- Sandbox timeout test 不做 wall-clock sleep：通過。
+- Live production mutation：none。
+
+### Decision
+
+**Task 6R-2 approved.** Open P0 = 0；Open P1 without disposition = 0。可進入 Task 6R-3
+holistic repository gate。

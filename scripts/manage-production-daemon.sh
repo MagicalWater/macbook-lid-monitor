@@ -11,6 +11,8 @@ source "$SCRIPT_DIR/lib/production-deployment-state.sh"
 # shellcheck source=scripts/lib/production-observability.sh
 source "$SCRIPT_DIR/lib/production-observability.sh"
 
+TEST_RESIDENT_DAEMON_PROBES_REMAINING="${MLM_TEST_RESIDENT_DAEMON_PROBES:-0}"
+
 usage() {
     printf '%s\n' 'usage: manage-production-daemon.sh prepare|verify|install|bootstrap|status|stop|bootout|disable|dry-run|deployment-dry-run|deployment-dry-run-reopen|deployment-dry-run-sleep-wake|deployment-enabled-once|deployment-recovery-resleep|deployment-reboot-start|deployment-reboot-finish|activate|upgrade|rollback|reset-crash-budget|rotate-logs|diagnostics|operational-baseline|uninstall|accept-task9|accept-task10|accept-task11|accept-task12-logged-in|accept-task12-loginwindow-start|accept-task12-loginwindow-finish|accept-task12-sleep-wake|accept-task13-dry-run-path|accept-task13-enabled-once|accept-task13-recovery-resleep|accept-task14-reboot-start|accept-task14-reboot-finish' >&2
     exit 64
@@ -102,6 +104,48 @@ bootout_job() {
     require_root_for_system
     launchctl_system bootout "system/$LAUNCHD_LABEL" 2>/dev/null || true
     printf 'booted-out label=%s\n' "$LAUNCHD_LABEL"
+}
+
+managed_daemon_is_resident() {
+    if [[ -n "$SYSTEM_ROOT" ]]; then
+        case "$TEST_RESIDENT_DAEMON_PROBES_REMAINING" in
+            ''|*[!0-9]*)
+                printf 'error: MLM_TEST_RESIDENT_DAEMON_PROBES must be a non-negative integer\n' >&2
+                return 64
+                ;;
+        esac
+        if [[ "$TEST_RESIDENT_DAEMON_PROBES_REMAINING" -gt 0 ]]; then
+            TEST_RESIDENT_DAEMON_PROBES_REMAINING="$((TEST_RESIDENT_DAEMON_PROBES_REMAINING - 1))"
+            return 0
+        fi
+        return 1
+    fi
+    pgrep -f '^/Library/PrivilegedHelperTools/macbook-lid-monitor-daemon$' >/dev/null 2>&1
+}
+
+wait_for_managed_daemon_exit() {
+    local waits=0 probes=0 probe_status
+    while true; do
+        probes="$((probes + 1))"
+        if managed_daemon_is_resident; then
+            probe_status=0
+        else
+            probe_status=$?
+        fi
+        if [[ "$probe_status" -eq 1 ]]; then
+            printf 'daemon-exit-wait=pass probes=%s\n' "$probes"
+            return 0
+        fi
+        if [[ "$probe_status" -ne 0 ]]; then
+            return "$probe_status"
+        fi
+        if [[ "$waits" -ge 50 ]]; then
+            printf 'error: timed out waiting for resident daemon exit\n' >&2
+            return 70
+        fi
+        waits="$((waits + 1))"
+        if [[ -z "$SYSTEM_ROOT" ]]; then /bin/sleep 0.1; fi
+    done
 }
 
 set_managed_mode() {
@@ -989,10 +1033,7 @@ prepare_maintenance_disabled_state() {
     verify_installed_set
     set_managed_mode disabled
     bootout_job
-    if [[ -z "$SYSTEM_ROOT" ]] && pgrep -f '^/Library/PrivilegedHelperTools/macbook-lid-monitor-daemon$' >/dev/null 2>&1; then
-        printf 'error: maintenance requires no resident daemon\n' >&2
-        return 70
-    fi
+    wait_for_managed_daemon_exit
     printf 'maintenance-state mode=disabled job=booted-out process-count=0\n'
 }
 
